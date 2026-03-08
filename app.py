@@ -13,7 +13,7 @@ load_dotenv("keys.env")
 CLAUDE_KEY = os.getenv("CLAUDE_API_KEY")
 ELEVEN_KEY = os.getenv("ELEVENLABS_API_KEY")
 VOICE_EN   = "21m00Tcm4TlvDq8ikWAM"
-VOICE_DA   = "pNInz6obpgDQGcFmaJgB"
+VOICE_DA   = "ygiXC2Oa1BiHksD3WkJZ"  # Mathias - Danish baritone
 
 @st.cache_resource
 def get_session():
@@ -28,15 +28,21 @@ def clean_for_tts(text):
     return text.strip()
 
 def tts_chunk(text, voice_id):
-    r = get_session().post(
-        f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}/stream",
-        headers={"xi-api-key": ELEVEN_KEY, "Content-Type": "application/json"},
-        json={"text": text.strip(), "model_id": "eleven_turbo_v2",
-              "voice_settings": {"stability": 0.4, "similarity_boost": 0.75}},
-        stream=True, timeout=30,
-    )
+    import time
+    for attempt in range(3):
+        r = get_session().post(
+            f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}/stream",
+            headers={"xi-api-key": ELEVEN_KEY, "Content-Type": "application/json"},
+            json={"text": text.strip(), "model_id": "eleven_multilingual_v2",
+                  "voice_settings": {"stability": 0.4, "similarity_boost": 0.75}},
+            stream=True, timeout=30,
+        )
+        if r.status_code == 429:
+            time.sleep(1.5 * (attempt + 1))
+            continue
+        r.raise_for_status()
+        return b"".join(r.iter_content(4096))
     r.raise_for_status()
-    return b"".join(r.iter_content(4096))
 
 def run_pipeline(system, user_input, history, voice_id):
     sess = get_session()
