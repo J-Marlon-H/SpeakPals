@@ -3,7 +3,7 @@
 import streamlit as st
 import streamlit.components.v1 as components
 import requests, urllib3, base64, json, re, concurrent.futures, hashlib
-import threading, http.server, socketserver, tempfile, pathlib
+import pathlib
 from dotenv import load_dotenv
 import os
 
@@ -114,164 +114,10 @@ PROMPT_DA = """Du er en venlig dansk sprogunderviser (A1-B1).
 Elev: {name} | Niveau: {level} | Fejl: {mistakes} | Emner: {covered} | I dag: {today}
 Regler: Max 2-3 korte saetninger. Naturlig tone. Afslut ALTID med sporgsmaal."""
 
-MIC_HTML = """<!DOCTYPE html>
-<html><head><meta charset="utf-8"><style>
-* { margin:0; padding:0; box-sizing:border-box; }
-body {
-  background: transparent;
-  display: flex; flex-direction: column;
-  align-items: center; justify-content: center;
-  height: 160px; font-family: 'Segoe UI', sans-serif;
-  overflow: hidden;
-}
-#btn {
-  width: 104px; height: 104px; border-radius: 50%; border: none;
-  cursor: pointer; position: relative;
-  display: flex; align-items: center; justify-content: center;
-  background: #e2e8f0;
-  box-shadow: 0 4px 20px rgba(0,0,0,.12);
-  transition: background .25s, box-shadow .25s;
-}
-#btn.listening {
-  background: linear-gradient(135deg, #818cf8, #a78bfa);
-  box-shadow: 0 6px 32px rgba(129,140,248,.55);
-}
-#ring {
-  position: absolute; border-radius: 50%;
-  width: 104px; height: 104px;
-  border: 3px solid rgba(129,140,248,.0);
-  pointer-events: none;
-  transition: transform .1s, border-color .1s;
-}
-#btn.listening #ring { border-color: rgba(129,140,248,.4); }
-#lbl { margin-top: 12px; font-size: 12px; color: #94a3b8; letter-spacing: .4px; text-align: center; }
-</style></head><body>
-<button id="btn" onclick="toggle()">
-  <div id="ring"></div>
-  <svg id="mic" width="40" height="40" viewBox="0 0 24 24" fill="#94a3b8" style="pointer-events:none;transition:fill .25s">
-    <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
-    <path d="M19 10v2a7 7 0 0 1-14 0v-2" stroke="#94a3b8" stroke-width="2" fill="none" stroke-linecap="round" id="arc"/>
-    <line x1="12" y1="19" x2="12" y2="23" stroke="#94a3b8" stroke-width="2" stroke-linecap="round" id="line1"/>
-    <line x1="8"  y1="23" x2="16" y2="23" stroke="#94a3b8" stroke-width="2" stroke-linecap="round" id="line2"/>
-  </svg>
-</button>
-<div id="lbl">tap to speak</div>
-<script>
-function send(val) {
-  window.parent.postMessage({isStreamlitMessage:true, type:"streamlit:setComponentValue", value:val}, "*");
-}
-window.parent.postMessage({isStreamlitMessage:true, type:"streamlit:componentReady", apiVersion:1}, "*");
 
-const btn  = document.getElementById('btn');
-const ring = document.getElementById('ring');
-const lbl  = document.getElementById('lbl');
-
-function setColor(c) {
-  ['mic','arc','line1','line2'].forEach(function(id) {
-    var el = document.getElementById(id);
-    if (!el) return;
-    if (id === 'mic') el.setAttribute('fill', c);
-    else el.setAttribute('stroke', c);
-  });
-}
-
-var stream=null, recorder=null, audioCtx=null, analyser=null;
-var chunks=[], listening=false, spokenOnce=false;
-var lastSound=0, startTime=0, vadTimer=null;
-
-var SILENCE_MS = 1200;
-var PROTECT_MS = 1000;
-var THRESH     = 10;
-
-async function toggle() {
-  if (listening) stopListening(false);
-  else           await startListening();
-}
-
-async function startListening() {
-  try {
-    stream = await navigator.mediaDevices.getUserMedia({audio:true, video:false});
-  } catch(e) { lbl.textContent = 'mic blocked'; return; }
-
-  audioCtx = new AudioContext();
-  analyser = audioCtx.createAnalyser();
-  analyser.fftSize = 512;
-  audioCtx.createMediaStreamSource(stream).connect(analyser);
-
-  recorder = new MediaRecorder(stream);
-  chunks = [];
-  spokenOnce = false;
-  startTime = Date.now();
-  lastSound = 0;
-
-  recorder.ondataavailable = function(e) { if (e.data.size > 0) chunks.push(e.data); };
-  recorder.onstop = async function() {
-    if (audioCtx) { audioCtx.close(); audioCtx = null; analyser = null; }
-    stream.getTracks().forEach(function(t) { t.stop(); });
-    stream = null;
-    if (!spokenOnce || chunks.length === 0) {
-      lbl.textContent = 'tap to speak';
-      return;
-    }
-    lbl.textContent = 'sending...';
-    var blob = new Blob(chunks, {type: recorder.mimeType || 'audio/webm'});
-    var buf  = await blob.arrayBuffer();
-    var b64  = btoa(String.fromCharCode.apply(null, new Uint8Array(buf)));
-    send(b64);
-    setTimeout(function() { lbl.textContent = 'tap to speak'; }, 2000);
-  };
-
-  recorder.start(100);
-  listening = true;
-  btn.classList.add('listening');
-  setColor('white');
-  lbl.textContent = 'listening...';
-
-  vadTimer = setInterval(function() {
-    if (!listening || !analyser) { clearInterval(vadTimer); return; }
-    var data = new Uint8Array(analyser.fftSize);
-    analyser.getByteTimeDomainData(data);
-    var sum = 0;
-    for (var i = 0; i < data.length; i++) { var d = data[i]-128; sum += d*d; }
-    var rms = Math.sqrt(sum / data.length);
-    ring.style.transform = 'scale(' + (1 + Math.min(rms/28, 0.65)) + ')';
-    if (rms > THRESH) { lastSound = Date.now(); spokenOnce = true; }
-    var elapsed = Date.now() - startTime;
-    var silent  = lastSound === 0 ? 0 : Date.now() - lastSound;
-    if (spokenOnce && silent > SILENCE_MS && elapsed > PROTECT_MS) {
-      clearInterval(vadTimer);
-      stopListening(true);
-    }
-  }, 50);
-}
-
-function stopListening(sendAudio) {
-  listening = false;
-  if (vadTimer) { clearInterval(vadTimer); vadTimer = null; }
-  btn.classList.remove('listening');
-  ring.style.transform = 'scale(1)';
-  setColor('#94a3b8');
-  lbl.textContent = sendAudio ? 'sending...' : 'tap to speak';
-  if (recorder && recorder.state !== 'inactive') recorder.stop();
-}
-</script>
-</body></html>"""
-
-@st.cache_resource
-def start_mic_server():
-    tmpdir = pathlib.Path(tempfile.mkdtemp())
-    (tmpdir / "index.html").write_text(MIC_HTML, encoding="utf-8")
-    port = 8502
-    class H(http.server.SimpleHTTPRequestHandler):
-        def log_message(self, *a): pass
-        def __init__(self, *a, **kw): super().__init__(*a, directory=str(tmpdir), **kw)
-    def run():
-        with socketserver.TCPServer(("", port), H) as s: s.serve_forever()
-    threading.Thread(target=run, daemon=True).start()
-    return port
-
-port = start_mic_server()
-mic  = components.declare_component("vad_mic", url=f"http://localhost:{port}")
+# Component served from vad_component/index.html — works locally and on Streamlit Cloud
+_component_dir = pathlib.Path(__file__).parent / "vad_component"
+mic = components.declare_component("vad_mic", path=str(_component_dir))
 
 def avatar_html(chunks=None, thinking=False):
     clips = chunks or []
@@ -366,8 +212,16 @@ function idle(){{mouth.classList.remove('on');lbl.textContent='Ready';lbl.classN
 
 st.set_page_config(page_title="Danish Tutor", page_icon="DK", layout="centered",
                    initial_sidebar_state="expanded")
+
+components.html("""<script>
+Object.keys(localStorage).forEach(function(k){
+  if(k.indexOf('Sidebar')>-1) localStorage.removeItem(k);
+});
+</script>""", height=0)
+
 st.markdown("""<style>
   #MainMenu,footer,[data-testid="stToolbar"]{visibility:hidden}
+  [data-testid="collapsedControl"]{display:block!important;opacity:1!important;visibility:visible!important;width:2rem!important}
   [data-testid="stAppViewContainer"]{background:#f8faff}
   [data-testid="stSidebar"]{background:#f0f4ff}
   .block-container{max-width:580px;padding-top:1rem;padding-bottom:1rem}
