@@ -81,7 +81,7 @@ function setColor(c) {
 
 // State
 var stream=null, workletNode=null, audioCtx=null, analyser=null, ws=null;
-var listening=false, spokenOnce=false, committed=false;
+var listening=false, spokenOnce=false, committed=false, fired=false;
 var lastSound=0, startTime=0, vadTimer=null;
 var lastPartial='';
 
@@ -165,6 +165,7 @@ async function startListening() {
 
     spokenOnce  = false;
     committed   = false;
+    fired       = false;
     lastPartial = '';
     startTime   = Date.now();
     lastSound   = 0;
@@ -184,9 +185,8 @@ async function startListening() {
         lbl.textContent = msg.text.length > 40 ? msg.text.slice(-40) + '...' : msg.text;
       }
       if ((mt === 'committed_transcript' || mt === 'committed_transcript_with_timestamps') && msg.text) {
-        // Use committed text for display; pipeline already started on partial
         lbl.textContent = msg.text.length > 40 ? msg.text.slice(-40) + '...' : msg.text;
-        if (!committed) { sendToStreamlit(msg.text); resetUI(); }  // fallback if no partial
+        if (!fired) { fired = true; sendToStreamlit(msg.text); resetUI(); }  // fallback if no partial fired yet
       }
       if (mt === 'error' || mt === 'auth_error' || mt === 'input_error') {
         lbl.textContent = 'STT error';
@@ -236,17 +236,19 @@ function commitAndStop() {
 
   // Fire pipeline immediately on the last partial — don't wait for ElevenLabs commit round-trip
   if (lastPartial) {
+    fired = true;
     sendToStreamlit(lastPartial);
     lbl.textContent = lastPartial.length > 40 ? lastPartial.slice(-40) + '...' : lastPartial;
     lastPartial = '';
   } else {
-    lbl.textContent = 'transcribing...';
+    lbl.textContent = 'transcribing...';  // waiting for committed_transcript fallback
   }
 }
 
 function resetUI() {
   listening = false;
   committed = false;
+  fired     = false;
   lastPartial = '';
   if (vadTimer) { clearInterval(vadTimer); vadTimer = null; }
   btn.classList.remove('listening');
