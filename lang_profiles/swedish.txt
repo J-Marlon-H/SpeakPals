@@ -1,0 +1,21 @@
+# Language Background: Swedish
+
+## Similarities to Danish
+- Danish and Swedish are mutually intelligible in written form -- a huge advantage.
+- Shared vocabulary is very high: "hus/hus", "vatten/vand", "vinter/vinter", "broed/broed".
+- Both have two grammatical genders (common/neuter): Swedish "en/ett" mirrors Danish "en/et".
+- Both attach the definite article as a suffix: Swedish "huset" = Danish "huset".
+- Verb conjugation is similarly simple -- no person agreement.
+
+## Key Differences to Highlight
+- Danish pronunciation is the main challenge: softer, more reduced, and less melodic than Swedish.
+- Danish has the stoed (glottal stop) -- Swedish does not; Swedish has tonal word accent instead.
+- The soft d in Danish has no direct Swedish equivalent.
+- Some false friends exist: Swedish "rolig" (fun) vs Danish "rolig" (calm/quiet).
+- Danish spelling occasionally diverges: Swedish "och" = Danish "og", Swedish "vad" = Danish "hvad".
+
+## Teaching Tips for Swedish Speakers
+- Start by reading Danish -- comprehension will come quickly.
+- Focus the bulk of effort on spoken Danish pronunciation, especially vowel reduction and the soft d.
+- Use Swedish cognates as anchors, but flag the false friends early.
+- The tonal instinct from Swedish will not transfer -- replace it with awareness of the stoed.

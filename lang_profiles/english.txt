@@ -1,0 +1,19 @@
+# Language Background: English
+
+## Similarities to Danish
+- Shared Germanic roots mean many words look or sound familiar: "house" = "hus", "water" = "vand" (older form "water"), "winter" = "vinter", "green" = "groen".
+- Word order is similar: Subject-Verb-Object in most sentences.
+- Both languages use the Latin alphabet with only minor additions (Danish adds ae, o with stroke, aa).
+
+## Key Differences to Highlight
+- Danish has two grammatical genders (common and neuter) instead of none in English -- use "en" vs "et".
+- Definite articles are suffixes, not separate words: "a dog" = "en hund", but "the dog" = "hunden".
+- Danish has a distinctive "soft d" sound (like the "th" in "the") that does not exist in English -- worth drilling early.
+- Verbs do not conjugate by person in Danish (simpler than English), but tense formation differs.
+- "Stoed" (the glottal stop) is a prosodic feature with no English equivalent -- affects meaning.
+
+## Teaching Tips for English Speakers
+- Lean on cognates early to build confidence.
+- Emphasize the en/et article system as the first major hurdle.
+- Use minimal pairs to practice the soft d and the stoed.
+- Point out that Danish word order in subordinate clauses flips the verb and adverb (unlike English).

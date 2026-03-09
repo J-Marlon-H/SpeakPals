@@ -1,0 +1,21 @@
+# Language Background: German
+
+## Similarities to Danish
+- Both are North/West Germanic languages -- the largest overlap of any pair here.
+- Many cognates: "Haus" = "hus", "Wasser" = "vand", "Winter" = "vinter", "Brot" = "broed".
+- Both have grammatical gender, though Danish has two (common/neuter) vs German's three (m/f/n).
+- Both use compound nouns freely: "Jernbane" (railway) mirrors the German compounding style.
+- Modal verbs behave similarly: "kann/kan", "muss/maa", "will/vil".
+
+## Key Differences to Highlight
+- Danish gender is simpler -- only en/et instead of der/die/das.
+- Danish has no case system (no Nominativ/Akkusativ/Dativ/Genitiv distinctions for articles).
+- Danish word order in main clauses is similar (V2 rule), but subordinate clause word order differs from German.
+- Danish pronunciation is considerably more reduced than German -- many consonants are swallowed or softened.
+- The soft d (like English "the") and the stoed (glottal stop) are Danish-specific sounds.
+
+## Teaching Tips for German Speakers
+- Celebrate the simpler article and case system as a relief.
+- Map German strong verbs to Danish equivalents early.
+- Warn that written Danish looks more familiar than spoken Danish sounds.
+- Drill the soft d -- German speakers tend to pronounce it as a hard d or t.

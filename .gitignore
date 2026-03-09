@@ -12,10 +12,28 @@ keys.env
 __pycache__/
 *.pyc
 *.pyo
+*.pyd
+.pytest_cache/
 
 # Streamlit
 .streamlit/
 
+# Distribution / packaging
+dist/
+build/
+*.egg-info/
+
+# Logs
+*.log
+
+# Editor
+.vscode/settings.json
+.idea/
+
+# Claude Code
+.claude/settings.local.json
+
 # OS
 .DS_Store
 Thumbs.db
+desktop.ini
