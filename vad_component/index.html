@@ -50,14 +50,18 @@ window.parent.postMessage({isStreamlitMessage:true, type:"streamlit:componentRea
 // Receive props from Python
 // Local mode:  proxy_port set  → ws://localhost:{proxy_port}?lang={lang}
 // Cloud mode:  eleven_key set  → wss://api.elevenlabs.io/...?xi-api-key={eleven_key}
-var lang      = "da";
-var proxyPort = null;
-var elevenKey = null;
+var lang         = "da";
+var proxyPort    = null;
+var elevenKey    = null;
+var rendered     = false;
+var pendingStart = false;
 window.addEventListener("message", function(e) {
   if (e.data && e.data.type === "streamlit:render" && e.data.args) {
     lang      = e.data.args.lang        || "da";
     proxyPort = e.data.args.proxy_port  || null;
     elevenKey = e.data.args.eleven_key  || null;
+    rendered  = true;
+    if (pendingStart) { pendingStart = false; startListening(); }
   }
 });
 
@@ -115,8 +119,9 @@ registerProcessor('pcm-processor', PCMProcessor);
 `;
 
 async function toggle() {
-  if (listening) commitAndStop();
-  else           await startListening();
+  if (listening) { commitAndStop(); return; }
+  if (!rendered) { pendingStart = true; lbl.textContent = 'loading...'; return; }
+  await startListening();
 }
 
 async function startListening() {
