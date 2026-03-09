@@ -160,7 +160,22 @@ async function startListening() {
     src.connect(workletNode);
 
     workletNode.port.onmessage = function(e) {
-      if (ws && ws.readyState === WebSocket.OPEN) ws.send(e.data);
+      if (!ws || ws.readyState !== WebSocket.OPEN) return;
+      if (proxyPort) {
+        // Local mode: proxy handles base64 conversion
+        ws.send(e.data);
+      } else {
+        // Cloud mode: ElevenLabs expects base64-encoded JSON, not raw binary
+        var bytes = new Uint8Array(e.data);
+        var bin = '';
+        for (var i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+        ws.send(JSON.stringify({
+          message_type: 'input_audio_chunk',
+          audio_base_64: btoa(bin),
+          commit: false,
+          sample_rate: 16000
+        }));
+      }
     };
 
     spokenOnce  = false;
@@ -229,7 +244,18 @@ function commitAndStop() {
 
   if (workletNode) { workletNode.port.onmessage = null; workletNode.disconnect(); workletNode = null; }
   if (ws && ws.readyState === WebSocket.OPEN) {
-    ws.send(JSON.stringify({type: 'commit'}));
+    if (proxyPort) {
+      // Local mode: proxy translates this to the ElevenLabs commit format
+      ws.send(JSON.stringify({type: 'commit'}));
+    } else {
+      // Cloud mode: send commit directly in ElevenLabs format
+      ws.send(JSON.stringify({
+        message_type: 'input_audio_chunk',
+        audio_base_64: '',
+        commit: true,
+        sample_rate: 16000
+      }));
+    }
   }
   if (audioCtx) { audioCtx.close(); audioCtx = null; analyser = null; }
   if (stream)   { stream.getTracks().forEach(function(t) { t.stop(); }); stream = null; }
