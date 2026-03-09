@@ -49,17 +49,17 @@ window.parent.postMessage({isStreamlitMessage:true, type:"streamlit:componentRea
 
 // Receive props from Python
 // Local mode:  proxy_port set  → ws://localhost:{proxy_port}?lang={lang}
-// Cloud mode:  eleven_key set  → wss://api.elevenlabs.io/...?xi-api-key={eleven_key}
+// Cloud mode:  ws_token set    → wss://api.elevenlabs.io/...?token={ws_token}
 var lang         = "da";
 var proxyPort    = null;
-var elevenKey    = null;
+var wsToken      = null;
 var rendered     = false;
 var pendingStart = false;
 window.addEventListener("message", function(e) {
   if (e.data && e.data.type === "streamlit:render" && e.data.args) {
-    lang      = e.data.args.lang        || "da";
-    proxyPort = e.data.args.proxy_port  || null;
-    elevenKey = e.data.args.eleven_key  || null;
+    lang      = e.data.args.lang       || "da";
+    proxyPort = e.data.args.proxy_port || null;
+    wsToken   = e.data.args.ws_token   || null;
     rendered  = true;
     if (pendingStart) { pendingStart = false; startListening(); }
   }
@@ -129,17 +129,18 @@ async function startListening() {
     stream = await navigator.mediaDevices.getUserMedia({audio:true, video:false});
   } catch(e) { lbl.textContent = 'mic blocked'; return; }
 
+  if (!proxyPort && !wsToken) { lbl.textContent = 'not ready'; return; }
   var wsUrl;
   if (proxyPort) {
     wsUrl = 'ws://localhost:' + proxyPort + '?lang=' + lang;
   } else {
-    // Cloud mode: connect directly to ElevenLabs with key in query string
+    // Cloud mode: signed single-use token (generated server-side)
     wsUrl = 'wss://api.elevenlabs.io/v1/speech-to-text/realtime'
-      + '?model_id=scribe_v2_realtime'
+      + '?token=' + wsToken
+      + '&model_id=scribe_v2_realtime'
       + '&language_code=' + lang
       + '&encoding=pcm_s16le'
-      + '&sample_rate=16000'
-      + '&xi-api-key=' + elevenKey;
+      + '&sample_rate=16000';
   }
   ws = new WebSocket(wsUrl);
   ws.binaryType = 'arraybuffer';
@@ -165,7 +166,7 @@ async function startListening() {
         // Local mode: proxy handles base64 conversion
         ws.send(e.data);
       } else {
-        // Cloud mode: ElevenLabs expects base64-encoded JSON, not raw binary
+        // Cloud mode: ElevenLabs expects base64-encoded JSON (token auth)
         var bytes = new Uint8Array(e.data);
         var bin = '';
         for (var i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);

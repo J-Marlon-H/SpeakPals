@@ -99,11 +99,26 @@ mic      = components.declare_component("vad_mic", path=str(_vad_dir))
 avatar_slot     = st.empty()
 transcript_slot = st.empty()
 
+def _scribe_token(eleven_key):
+    """Generate a single-use signed token for the ElevenLabs Scribe v2 Realtime WS (browser use)."""
+    try:
+        import requests as _req
+        r = _req.post(
+            "https://api.elevenlabs.io/v1/single-use-token/realtime_scribe",
+            headers={"xi-api-key": eleven_key},
+            timeout=5,
+        )
+        return r.json().get("token")
+    except Exception:
+        return None
+
 mic_props = dict(lang=stt_lang, default=None, height=160)
 if IS_LOCAL:
     mic_props["proxy_port"] = PROXY_PORT
 else:
-    mic_props["eleven_key"] = ELEVEN_KEY
+    ws_token = _scribe_token(ELEVEN_KEY)
+    if ws_token:
+        mic_props["ws_token"] = ws_token
 
 transcript_raw = mic(key="vad_mic", **mic_props)
 
