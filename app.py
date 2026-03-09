@@ -2,19 +2,28 @@
 
 import streamlit as st
 import streamlit.components.v1 as components
-import concurrent.futures, hashlib, base64, pathlib, time
+import hashlib, pathlib, time  # time used for replay nonce
 from dotenv import load_dotenv
 import os
 
-from pipeline import run_pipeline, stt, warmup_claude
+from pipeline import run_pipeline_stream, MODELS
 from avatar import avatar_html
 from prompts import build_system_prompt
+from ws_proxy import start_in_thread, PROXY_PORT
 
 load_dotenv("keys.env")
 CLAUDE_KEY = os.getenv("CLAUDE_API_KEY")
 ELEVEN_KEY = os.getenv("ELEVENLABS_API_KEY")
 VOICE_EN   = "21m00Tcm4TlvDq8ikWAM"
 VOICE_DA   = "ygiXC2Oa1BiHksD3WkJZ"  # Mathias - Danish baritone
+
+# ── Start WebSocket proxy (once per process) ──────────────────────────────────
+
+@st.cache_resource
+def _start_proxy():
+    return start_in_thread()
+
+_start_proxy()
 
 # ── Page config ───────────────────────────────────────────────────────────────
 
@@ -49,6 +58,9 @@ with st.sidebar:
     bg_lang = st.selectbox("Your native language", ["English", "German", "Swedish"])
     today   = st.text_area("Today's topics", "Daily life, shopping")
     st.divider()
+    model_label = st.selectbox("AI model", list(MODELS.keys()))
+    model_id    = MODELS[model_label]
+    st.divider()
     if st.button("Clear chat"):
         for k in ["chat", "last_chunks", "last_response", "last_id"]:
             st.session_state.pop(k, None)
@@ -66,51 +78,50 @@ voice_id = VOICE_EN if debug else VOICE_DA
 
 # ── Layout ────────────────────────────────────────────────────────────────────
 
-_component_dir = pathlib.Path(__file__).parent / "vad_component"
-mic = components.declare_component("vad_mic", path=str(_component_dir))
+_vad_dir = pathlib.Path(__file__).parent / "vad_component"
+mic      = components.declare_component("vad_mic", path=str(_vad_dir))
 
 avatar_slot     = st.empty()
 transcript_slot = st.empty()
 
-audio_b64 = mic(key="vad_mic", default=None, height=160)
+transcript_raw = mic(key="vad_mic", lang=stt_lang, proxy_port=PROXY_PORT,
+                     default=None, height=160)
 
 with st.expander("type instead", expanded=False):
     text_in   = st.text_input("msg", placeholder="Type here...", label_visibility="collapsed")
     send_text = st.button("Send", use_container_width=True)
 
-# ── Detect new audio ──────────────────────────────────────────────────────────
+# ── Detect new input ──────────────────────────────────────────────────────────
 
-new_audio_b64 = None
-if audio_b64 and isinstance(audio_b64, str) and len(audio_b64) > 200:
-    h = hashlib.md5(audio_b64.encode()).hexdigest()
+voice_transcript = None
+if transcript_raw and isinstance(transcript_raw, str) and transcript_raw.strip():
+    h = hashlib.md5(transcript_raw.encode()).hexdigest()
     if h != st.session_state.last_id:
         st.session_state.last_id = h
-        new_audio_b64 = audio_b64
+        voice_transcript = transcript_raw.strip()
 
 trigger_text = text_in.strip() if (send_text and text_in.strip()) else None
+student_text = voice_transcript or trigger_text
 
 # ── Pipeline ──────────────────────────────────────────────────────────────────
 
-if new_audio_b64 or trigger_text:
+if student_text:
     with avatar_slot:
         components.html(avatar_html(thinking=True), height=310)
     try:
-        if new_audio_b64:
-            audio_bytes = base64.b64decode(new_audio_b64)
-            with concurrent.futures.ThreadPoolExecutor(max_workers=2) as tex:
-                stt_future   = tex.submit(stt, audio_bytes, stt_lang, ELEVEN_KEY)
-                _            = tex.submit(warmup_claude, system, st.session_state.chat, CLAUDE_KEY)
-                student_text = stt_future.result()
-        else:
-            student_text = trigger_text
+        all_chunks = []
+        tutor_text = ""
 
-        tutor_text, audio_chunks = run_pipeline(
-            system, student_text, st.session_state.chat, voice_id, CLAUDE_KEY, ELEVEN_KEY)
+        for tutor_text, chunk_b64 in run_pipeline_stream(
+                system, student_text, st.session_state.chat, voice_id, CLAUDE_KEY, ELEVEN_KEY,
+                model=model_id):
+            all_chunks.append(chunk_b64)
+
         st.session_state.chat.extend([
             {"role": "user",      "content": student_text},
             {"role": "assistant", "content": tutor_text},
         ])
-        st.session_state.last_chunks   = audio_chunks
+        st.session_state.last_chunks   = all_chunks
         st.session_state.last_response = (student_text, tutor_text)
     except Exception as e:
         st.error(f"Error: {e}")

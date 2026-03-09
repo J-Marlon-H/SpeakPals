@@ -24,7 +24,7 @@ def tts_chunk(text, voice_id, eleven_key):
         r = get_session().post(
             f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}/stream",
             headers={"xi-api-key": eleven_key, "Content-Type": "application/json"},
-            json={"text": text.strip(), "model_id": "eleven_multilingual_v2",
+            json={"text": text.strip(), "model_id": "eleven_turbo_v2_5",
                   "voice_settings": {"stability": 0.4, "similarity_boost": 0.75}},
             stream=True, timeout=30,
         )
@@ -36,7 +36,17 @@ def tts_chunk(text, voice_id, eleven_key):
     r.raise_for_status()
 
 
-def run_pipeline(system, user_input, history, voice_id, claude_key, eleven_key):
+MODELS = {
+    "Sonnet 4.6 — best quality": "claude-sonnet-4-6",
+    "Haiku 4.5 — fastest":       "claude-haiku-4-5-20251001",
+}
+
+
+def run_pipeline_stream(system, user_input, history, voice_id, claude_key, eleven_key,
+                        model="claude-sonnet-4-6"):
+    """Generator: yields (full_text_so_far, chunk_b64) for each TTS chunk in order.
+    TTS futures run in parallel with Claude streaming; chunks are yielded as they finish.
+    """
     sess = get_session()
     messages = [{"role": m["role"], "content": m["content"]}
                 for m in history if m["role"] in {"user", "assistant"} and m["content"]]
@@ -46,7 +56,7 @@ def run_pipeline(system, user_input, history, voice_id, claude_key, eleven_key):
         "https://api.anthropic.com/v1/messages",
         headers={"x-api-key": claude_key, "anthropic-version": "2023-06-01",
                  "Content-Type": "application/json"},
-        json={"model": "claude-sonnet-4-6", "max_tokens": 120, "temperature": 0.3,
+        json={"model": model, "max_tokens": 120, "temperature": 0.3,
               "stream": True, "system": system, "messages": messages},
         stream=True, timeout=30,
     )
@@ -87,42 +97,10 @@ def run_pipeline(system, user_input, history, voice_id, claude_key, eleven_key):
 
     if buf.strip():
         submit(buf)
-    executor.shutdown(wait=True)
+    executor.shutdown(wait=False)
 
-    results = sorted(ordered, key=lambda x: x[0])
-    return (
-        " ".join(t for _, t, _ in results),
-        [base64.b64encode(f.result()).decode() for _, _, f in results],
-    )
-
-
-def stt(audio_bytes, lang, eleven_key):
-    r = get_session().post(
-        "https://api.elevenlabs.io/v1/speech-to-text",
-        headers={"xi-api-key": eleven_key},
-        files={"file": ("input.webm", audio_bytes, "audio/webm")},
-        data={"model_id": "scribe_v1", "language_code": lang},
-        timeout=20,
-    )
-    r.raise_for_status()
-    t = r.json().get("text") or r.json().get("transcript") or ""
-    if not t:
-        raise RuntimeError("No transcript")
-    return t
-
-
-def warmup_claude(system, history, claude_key):
-    try:
-        msgs = [{"role": m["role"], "content": m["content"]}
-                for m in history[-4:] if m["role"] in {"user", "assistant"} and m["content"]]
-        msgs.append({"role": "user", "content": "..."})
-        get_session().post(
-            "https://api.anthropic.com/v1/messages",
-            headers={"x-api-key": claude_key, "anthropic-version": "2023-06-01",
-                     "Content-Type": "application/json"},
-            json={"model": "claude-sonnet-4-6", "max_tokens": 1, "stream": False,
-                  "system": system, "messages": msgs},
-            timeout=5,
-        )
-    except Exception:
-        pass
+    full_text = ""
+    for _, text, future in ordered:
+        chunk_b64 = base64.b64encode(future.result()).decode()
+        full_text = (full_text + " " + text).strip()
+        yield full_text, chunk_b64

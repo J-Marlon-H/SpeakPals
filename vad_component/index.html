@@ -41,34 +41,77 @@ body {
 </button>
 <div id="lbl">tap to speak</div>
 <script>
-function send(val) {
+// Streamlit plumbing
+function sendToStreamlit(val) {
   window.parent.postMessage({isStreamlitMessage:true, type:"streamlit:setComponentValue", value:val}, "*");
 }
 window.parent.postMessage({isStreamlitMessage:true, type:"streamlit:componentReady", apiVersion:1}, "*");
 
-const btn  = document.getElementById('btn');
-const ring = document.getElementById('ring');
-const lbl  = document.getElementById('lbl');
+// Receive props from Python (lang, proxy_port)
+var lang = "da";
+var proxyPort = 8502;
+window.addEventListener("message", function(e) {
+  if (e.data && e.data.type === "streamlit:render" && e.data.args) {
+    lang      = e.data.args.lang       || "da";
+    proxyPort = e.data.args.proxy_port || 8502;
+  }
+});
+
+// DOM refs
+var btn  = document.getElementById('btn');
+var ring = document.getElementById('ring');
+var lbl  = document.getElementById('lbl');
 
 function setColor(c) {
   ['mic','arc','line1','line2'].forEach(function(id) {
     var el = document.getElementById(id);
     if (!el) return;
     if (id === 'mic') el.setAttribute('fill', c);
-    else el.setAttribute('stroke', c);
+    else              el.setAttribute('stroke', c);
   });
 }
 
-var stream=null, recorder=null, audioCtx=null, analyser=null;
-var chunks=[], listening=false, spokenOnce=false;
+// State
+var stream=null, workletNode=null, audioCtx=null, analyser=null, ws=null;
+var listening=false, spokenOnce=false, committed=false;
 var lastSound=0, startTime=0, vadTimer=null;
+var lastPartial='';
 
 var SILENCE_MS = 1200;
 var PROTECT_MS = 1000;
 var THRESH     = 10;
 
+var WORKLET_CODE = `
+class PCMProcessor extends AudioWorkletProcessor {
+  constructor() { super(); this._buf = []; this._samples = 0; this._target = 1600; }
+  process(inputs) {
+    var ch = inputs[0][0];
+    if (!ch || ch.length === 0) return true;
+    var pcm = new Int16Array(ch.length);
+    for (var i = 0; i < ch.length; i++) {
+      var s = Math.max(-1, Math.min(1, ch[i]));
+      pcm[i] = s < 0 ? s * 32768 : s * 32767;
+    }
+    this._buf.push(pcm);
+    this._samples += pcm.length;
+    if (this._samples >= this._target) {
+      var total = new Int16Array(this._samples);
+      var offset = 0;
+      for (var j = 0; j < this._buf.length; j++) {
+        total.set(this._buf[j], offset);
+        offset += this._buf[j].length;
+      }
+      this.port.postMessage(total.buffer, [total.buffer]);
+      this._buf = []; this._samples = 0;
+    }
+    return true;
+  }
+}
+registerProcessor('pcm-processor', PCMProcessor);
+`;
+
 async function toggle() {
-  if (listening) stopListening(false);
+  if (listening) commitAndStop();
   else           await startListening();
 }
 
@@ -77,40 +120,65 @@ async function startListening() {
     stream = await navigator.mediaDevices.getUserMedia({audio:true, video:false});
   } catch(e) { lbl.textContent = 'mic blocked'; return; }
 
-  audioCtx = new AudioContext();
-  analyser = audioCtx.createAnalyser();
-  analyser.fftSize = 512;
-  audioCtx.createMediaStreamSource(stream).connect(analyser);
+  ws = new WebSocket('ws://localhost:' + proxyPort + '?lang=' + lang);
+  ws.binaryType = 'arraybuffer';
 
-  recorder = new MediaRecorder(stream);
-  chunks = [];
-  spokenOnce = false;
-  startTime = Date.now();
-  lastSound = 0;
+  ws.onopen = async function() {
+    audioCtx = new AudioContext({ sampleRate: 16000 });
+    analyser = audioCtx.createAnalyser();
+    analyser.fftSize = 512;
+    var src = audioCtx.createMediaStreamSource(stream);
+    src.connect(analyser);
 
-  recorder.ondataavailable = function(e) { if (e.data.size > 0) chunks.push(e.data); };
-  recorder.onstop = async function() {
-    if (audioCtx) { audioCtx.close(); audioCtx = null; analyser = null; }
-    stream.getTracks().forEach(function(t) { t.stop(); });
-    stream = null;
-    if (!spokenOnce || chunks.length === 0) {
-      lbl.textContent = 'tap to speak';
-      return;
-    }
-    lbl.textContent = 'sending...';
-    var blob = new Blob(chunks, {type: recorder.mimeType || 'audio/webm'});
-    var buf  = await blob.arrayBuffer();
-    var b64  = btoa(String.fromCharCode.apply(null, new Uint8Array(buf)));
-    send(b64);
-    setTimeout(function() { lbl.textContent = 'tap to speak'; }, 2000);
+    var blob = new Blob([WORKLET_CODE], { type: 'application/javascript' });
+    var blobUrl = URL.createObjectURL(blob);
+    await audioCtx.audioWorklet.addModule(blobUrl);
+    URL.revokeObjectURL(blobUrl);
+
+    workletNode = new AudioWorkletNode(audioCtx, 'pcm-processor');
+    src.connect(workletNode);
+
+    workletNode.port.onmessage = function(e) {
+      if (ws && ws.readyState === WebSocket.OPEN) ws.send(e.data);
+    };
+
+    spokenOnce  = false;
+    committed   = false;
+    lastPartial = '';
+    startTime   = Date.now();
+    lastSound   = 0;
+    listening  = true;
+    btn.classList.add('listening');
+    setColor('white');
+    lbl.textContent = 'listening...';
+    startVAD();
   };
 
-  recorder.start(100);
-  listening = true;
-  btn.classList.add('listening');
-  setColor('white');
-  lbl.textContent = 'listening...';
+  ws.onmessage = function(e) {
+    try {
+      var msg = JSON.parse(e.data);
+      var mt = msg.message_type || msg.type || '';
+      if (mt === 'partial_transcript' && msg.text) {
+        lastPartial = msg.text;
+        lbl.textContent = msg.text.length > 40 ? msg.text.slice(-40) + '...' : msg.text;
+      }
+      if ((mt === 'committed_transcript' || mt === 'committed_transcript_with_timestamps') && msg.text) {
+        // Use committed text for display; pipeline already started on partial
+        lbl.textContent = msg.text.length > 40 ? msg.text.slice(-40) + '...' : msg.text;
+        if (!committed) { sendToStreamlit(msg.text); resetUI(); }  // fallback if no partial
+      }
+      if (mt === 'error' || mt === 'auth_error' || mt === 'input_error') {
+        lbl.textContent = 'STT error';
+        resetUI();
+      }
+    } catch(_) {}
+  };
 
+  ws.onerror = function() { lbl.textContent = 'proxy error'; resetUI(); };
+  ws.onclose = function() { if (listening) resetUI(); };
+}
+
+function startVAD() {
   vadTimer = setInterval(function() {
     if (!listening || !analyser) { clearInterval(vadTimer); return; }
     var data = new Uint8Array(analyser.fftSize);
@@ -124,19 +192,47 @@ async function startListening() {
     var silent  = lastSound === 0 ? 0 : Date.now() - lastSound;
     if (spokenOnce && silent > SILENCE_MS && elapsed > PROTECT_MS) {
       clearInterval(vadTimer);
-      stopListening(true);
+      commitAndStop();
     }
   }, 50);
 }
 
-function stopListening(sendAudio) {
+function commitAndStop() {
+  if (committed) return;
+  committed = true;
+  clearInterval(vadTimer);
   listening = false;
+  btn.classList.remove('listening');
+  ring.style.transform = 'scale(1)';
+  setColor('#94a3b8');
+
+  if (workletNode) { workletNode.port.onmessage = null; workletNode.disconnect(); workletNode = null; }
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify({type: 'commit'}));
+  }
+  if (audioCtx) { audioCtx.close(); audioCtx = null; analyser = null; }
+  if (stream)   { stream.getTracks().forEach(function(t) { t.stop(); }); stream = null; }
+
+  // Fire pipeline immediately on the last partial — don't wait for ElevenLabs commit round-trip
+  if (lastPartial) {
+    sendToStreamlit(lastPartial);
+    lbl.textContent = lastPartial.length > 40 ? lastPartial.slice(-40) + '...' : lastPartial;
+    lastPartial = '';
+  } else {
+    lbl.textContent = 'transcribing...';
+  }
+}
+
+function resetUI() {
+  listening = false;
+  committed = false;
+  lastPartial = '';
   if (vadTimer) { clearInterval(vadTimer); vadTimer = null; }
   btn.classList.remove('listening');
   ring.style.transform = 'scale(1)';
   setColor('#94a3b8');
-  lbl.textContent = sendAudio ? 'sending...' : 'tap to speak';
-  if (recorder && recorder.state !== 'inactive') recorder.stop();
+  if (ws) { ws.close(); ws = null; }
+  setTimeout(function() { lbl.textContent = 'tap to speak'; }, 1500);
 }
 </script>
 </body></html>
