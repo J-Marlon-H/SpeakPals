@@ -12,16 +12,31 @@ from prompts import build_system_prompt
 from ws_proxy import start_in_thread, PROXY_PORT
 
 load_dotenv("keys.env")
-CLAUDE_KEY = os.getenv("CLAUDE_API_KEY")
-ELEVEN_KEY = os.getenv("ELEVENLABS_API_KEY")
+
+def _secret(key):
+    """Read from st.secrets (Streamlit Cloud) with fallback to environment / keys.env."""
+    try:
+        return st.secrets[key]
+    except Exception:
+        return os.getenv(key)
+
+CLAUDE_KEY = _secret("CLAUDE_API_KEY")
+ELEVEN_KEY = _secret("ELEVENLABS_API_KEY")
 VOICE_EN   = "21m00Tcm4TlvDq8ikWAM"
 VOICE_DA   = "ygiXC2Oa1BiHksD3WkJZ"  # Mathias - Danish baritone
 
-# ── Start WebSocket proxy (once per process) ──────────────────────────────────
+# ── Local proxy vs cloud direct connection ─────────────────────────────────────
+# On Streamlit Cloud the browser can't reach localhost, so the component connects
+# directly to ElevenLabs using the key in the WebSocket URL.
+# Locally the proxy keeps the key server-side.
+
+IS_LOCAL = pathlib.Path("keys.env").exists()
 
 @st.cache_resource
 def _start_proxy():
-    return start_in_thread()
+    if IS_LOCAL:
+        return start_in_thread()
+    return None
 
 _start_proxy()
 
@@ -84,8 +99,13 @@ mic      = components.declare_component("vad_mic", path=str(_vad_dir))
 avatar_slot     = st.empty()
 transcript_slot = st.empty()
 
-transcript_raw = mic(key="vad_mic", lang=stt_lang, proxy_port=PROXY_PORT,
-                     default=None, height=160)
+mic_props = dict(lang=stt_lang, default=None, height=160)
+if IS_LOCAL:
+    mic_props["proxy_port"] = PROXY_PORT
+else:
+    mic_props["eleven_key"] = ELEVEN_KEY
+
+transcript_raw = mic(key="vad_mic", **mic_props)
 
 with st.expander("type instead", expanded=False):
     text_in   = st.text_input("msg", placeholder="Type here...", label_visibility="collapsed")

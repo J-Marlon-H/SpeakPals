@@ -47,13 +47,17 @@ function sendToStreamlit(val) {
 }
 window.parent.postMessage({isStreamlitMessage:true, type:"streamlit:componentReady", apiVersion:1}, "*");
 
-// Receive props from Python (lang, proxy_port)
-var lang = "da";
-var proxyPort = 8502;
+// Receive props from Python
+// Local mode:  proxy_port set  → ws://localhost:{proxy_port}?lang={lang}
+// Cloud mode:  eleven_key set  → wss://api.elevenlabs.io/...?xi-api-key={eleven_key}
+var lang      = "da";
+var proxyPort = null;
+var elevenKey = null;
 window.addEventListener("message", function(e) {
   if (e.data && e.data.type === "streamlit:render" && e.data.args) {
-    lang      = e.data.args.lang       || "da";
-    proxyPort = e.data.args.proxy_port || 8502;
+    lang      = e.data.args.lang        || "da";
+    proxyPort = e.data.args.proxy_port  || null;
+    elevenKey = e.data.args.eleven_key  || null;
   }
 });
 
@@ -120,7 +124,19 @@ async function startListening() {
     stream = await navigator.mediaDevices.getUserMedia({audio:true, video:false});
   } catch(e) { lbl.textContent = 'mic blocked'; return; }
 
-  ws = new WebSocket('ws://localhost:' + proxyPort + '?lang=' + lang);
+  var wsUrl;
+  if (proxyPort) {
+    wsUrl = 'ws://localhost:' + proxyPort + '?lang=' + lang;
+  } else {
+    // Cloud mode: connect directly to ElevenLabs with key in query string
+    wsUrl = 'wss://api.elevenlabs.io/v1/speech-to-text/realtime'
+      + '?model_id=scribe_v2_realtime'
+      + '&language_code=' + lang
+      + '&encoding=pcm_s16le'
+      + '&sample_rate=16000'
+      + '&xi-api-key=' + elevenKey;
+  }
+  ws = new WebSocket(wsUrl);
   ws.binaryType = 'arraybuffer';
 
   ws.onopen = async function() {

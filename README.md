@@ -106,20 +106,32 @@ pip install -r requirements.txt
 
 ### Configuration
 
-Create `keys.env` in the project root:
+**Local:** create `keys.env` in the project root:
 
 ```env
 CLAUDE_API_KEY=your_anthropic_key_here
 ELEVENLABS_API_KEY=your_elevenlabs_key_here
 ```
 
-### Run
+**Streamlit Cloud:** add the same two keys in your app's **Settings → Secrets** panel (TOML format):
+
+```toml
+CLAUDE_API_KEY     = "sk-ant-..."
+ELEVENLABS_API_KEY = "sk_..."
+```
+
+### Run locally
 
 ```bash
 streamlit run app.py
 ```
 
 Open `http://localhost:8501`. The WebSocket proxy starts automatically on port `8502`.
+
+### Deploy to Streamlit Cloud
+
+Push to GitHub and connect the repo at [share.streamlit.io](https://share.streamlit.io).
+Add secrets in the app settings panel. No proxy needed — the browser connects directly to ElevenLabs.
 
 ---
 
