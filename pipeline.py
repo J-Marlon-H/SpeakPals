@@ -25,7 +25,7 @@ def tts_chunk(text, voice_id, eleven_key):
             f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}/stream",
             headers={"xi-api-key": eleven_key, "Content-Type": "application/json"},
             json={"text": text.strip(), "model_id": "eleven_turbo_v2_5",
-                  "voice_settings": {"stability": 0.4, "similarity_boost": 0.75}},
+                  "voice_settings": {"stability": 0.4, "similarity_boost": 0.75, "speed": 0.92}},
             stream=True, timeout=30,
         )
         if r.status_code == 429:
@@ -56,7 +56,7 @@ def run_pipeline_stream(system, user_input, history, voice_id, claude_key, eleve
         "https://api.anthropic.com/v1/messages",
         headers={"x-api-key": claude_key, "anthropic-version": "2023-06-01",
                  "Content-Type": "application/json"},
-        json={"model": model, "max_tokens": 120, "temperature": 0.3,
+        json={"model": model, "max_tokens": 80, "temperature": 0.3,
               "stream": True, "system": system, "messages": messages},
         stream=True, timeout=30,
     )

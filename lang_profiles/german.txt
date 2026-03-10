@@ -1,21 +1,189 @@
-# Language Background: German
+# Language Background: German → Danish
 
-## Similarities to Danish
-- Both are North/West Germanic languages -- the largest overlap of any pair here.
-- Many cognates: "Haus" = "hus", "Wasser" = "vand", "Winter" = "vinter", "Brot" = "broed".
-- Both have grammatical gender, though Danish has two (common/neuter) vs German's three (m/f/n).
-- Both use compound nouns freely: "Jernbane" (railway) mirrors the German compounding style.
-- Modal verbs behave similarly: "kann/kan", "muss/maa", "will/vil".
+## How to use this profile
+German speakers have the largest head start of any group here. The languages share North/West Germanic roots,
+very similar grammar structures, and massive vocabulary overlap. Move faster than with English speakers at A1 —
+the student can absorb more. Focus energy on pronunciation, which diverges sharply.
 
-## Key Differences to Highlight
-- Danish gender is simpler -- only en/et instead of der/die/das.
-- Danish has no case system (no Nominativ/Akkusativ/Dativ/Genitiv distinctions for articles).
-- Danish word order in main clauses is similar (V2 rule), but subordinate clause word order differs from German.
-- Danish pronunciation is considerably more reduced than German -- many consonants are swallowed or softened.
-- The soft d (like English "the") and the stoed (glottal stop) are Danish-specific sounds.
+---
 
-## Teaching Tips for German Speakers
-- Celebrate the simpler article and case system as a relief.
-- Map German strong verbs to Danish equivalents early.
-- Warn that written Danish looks more familiar than spoken Danish sounds.
-- Drill the soft d -- German speakers tend to pronounce it as a hard d or t.
+## A1 — Instant wins: cognates the student can use from day one
+
+These words are near-identical. German speakers can often read Danish immediately:
+
+| German | Danish | Note |
+|--------|--------|------|
+| Haus | hus | same root |
+| Hand | hånd | same |
+| Arm | arm | identical |
+| Finger | finger | identical |
+| Name | navn | close |
+| Brot | brød | very close |
+| Milch | mælk | recognisable |
+| Wasser | vand | same root, different form |
+| Winter | vinter | identical almost |
+| Sommer | sommer | identical |
+| Schule | skole | close |
+| Buch | bog | same root |
+| Tag | dag | same |
+| Nacht | nat | same root |
+| Jahr | år | same root |
+| Monat | måned | recognisable |
+| Woche | uge | different — warn student |
+| Mutter | mor/moder | same root |
+| Vater | far/fader | same root |
+| Kind | barn | different — warn student |
+| Hund | hund | identical |
+| Katze | kat | close |
+| Fisch | fisk | same |
+| Fleisch | kød | different — warn student |
+| Bier | øl | different — warn student |
+| Kaffee | kaffe | close |
+| grün | grøn | very close |
+| blau | blå | very close |
+| rot | rød | same root |
+| schwarz | sort | different |
+| weiß | hvid | different |
+
+### A1 Core vocabulary by topic
+
+**Greetings:**
+- Hallo/Guten Tag → Hej / Goddag
+- Guten Morgen → Godmorgen
+- Auf Wiedersehen → Farvel / Hej hej
+- Danke → Tak
+- Bitte → Vær så venlig (more complex in Danish — just use "tak" in context)
+- Ja / Nein → Ja / Nej
+
+**Numbers 1–10:** en/et, to, tre, fire, fem, seks, syv, otte, ni, ti
+(Compare: ein, zwei, drei, vier, fünf, sechs, sieben, acht, neun, zehn — very recognisable!)
+
+**Modal verbs (huge advantage for German speakers):**
+| German | Danish | Meaning |
+|--------|--------|---------|
+| können | kan | can |
+| müssen | må / skal | must |
+| wollen | vil | want to |
+| sollen | skal | should/supposed to |
+| dürfen | må | may/allowed to |
+| mögen | kan lide | like |
+
+---
+
+## A2 — Grammar comparisons for German speakers
+
+### What is EASIER in Danish than German — celebrate these!
+
+**1. Only 2 genders instead of 3**
+German: der/die/das → Danish: en/et
+No more neuter/masculine/feminine split — just common (en) vs neuter (et).
+Teaching tip: "Denk nicht an der/die/das — nur en oder et!"
+
+**2. No case system**
+German: Nominativ, Akkusativ, Dativ, Genitiv with changing articles
+Danish: no cases — the article never changes form based on sentence role.
+"Ich gebe dem Mann das Buch" → "Jeg giver manden bogen" (no case changes)
+
+**3. Simpler verb conjugation**
+German: ich gehe / du gehst / er geht / wir gehen / ihr geht / sie gehen
+Danish: jeg går / du går / han går / vi går / I går / de går (SAME FORM throughout!)
+
+### What is HARDER — explain these:
+
+**1. Definite article as suffix**
+German uses separate articles: der Mann, das Haus
+Danish attaches them: manden (the man), huset (the house)
+- en mand (a man) → manden (the man)
+- et hus (a house) → huset (the house)
+- en hund (a dog) → hunden (the dog)
+- et barn (a child) → barnet (the child)
+
+**2. Subordinate clause word order — different from German!**
+German sub-clause: verb goes to the END — "Ich weiß, dass er kommt."
+Danish sub-clause: "ikke" (not) goes BEFORE the verb — "Jeg ved, at han ikke kommer."
+(In German this would be: "Ich weiß, dass er nicht kommt." — similar position but different rule)
+
+**3. Main clause word order (V2) — same as German!**
+"Gestern bin ich zur Schule gegangen" → "I går gik jeg i skole"
+The verb is always second — exactly like German. This is a big advantage.
+
+**4. Separable verbs — same concept, different style:**
+German: aufmachen (to open) — ich mache auf
+Danish: åbne is simple; but: fortælle (fortæl-ler), komme an (arrive)
+Not as systematic as German, but the concept of verb+particle exists.
+
+### A2 Vocabulary expansion — everyday life:
+
+**At the shop:** butik (Laden), pris (Preis), billig (billig — same!), dyr (teuer), købe (kaufen), betale (bezahlen)
+**Transport:** tog (Zug), cykel (Fahrrad), bil (Auto/Wagen), fly (Flugzeug)
+**Weather:** sol (Sonne), regn (Regen — close!), sne (Schnee — close!), vind (Wind — same!), koldt (kalt), varmt (warm — same!)
+**Home:** køkken (Küche), stue (Wohnzimmer), soveværelse (Schlafzimmer), badeværelse (Badezimmer)
+**Time:** i dag (heute), i morgen (morgen), i går (gestern), nu (jetzt), snart (bald)
+
+### Compound nouns — German speakers already get this:
+Danish loves compounds just like German:
+- Jernbane (Eisenbahn — railway): jern (iron) + bane (track)
+- Fodgænger (Fußgänger — pedestrian): fod (foot) + gænger (goer)
+- Håndtaske (Handtasche — handbag): hånd (hand) + taske (bag)
+- Arbejdsplads (Arbeitsplatz — workplace): arbejds (work) + plads (place)
+
+---
+
+## B1 — Advanced connections and nuances
+
+### Idiomatic expressions (with German equivalents):
+- "Det er lige meget" = "Das ist egal" (it doesn't matter)
+- "Slå to fluer med ét smæk" = "Zwei Fliegen mit einer Klappe schlagen" (exact same idiom!)
+- "Gå op i røg" = "In Rauch aufgehen" (go up in smoke — same!)
+- "Koste en arm og et ben" = "Ein Vermögen kosten" (cost a fortune)
+- "Tage det roligt" = "Es ruhig angehen lassen" (take it easy)
+- "Komme til sagen" = "Zur Sache kommen" (get to the point — nearly identical!)
+- "Gøre en bjørnetjeneste" = "Jemandem einen Bärendienst erweisen" (exactly the same!)
+- "Have ret" = "Recht haben" (to be right — identical structure!)
+- "Det er ikke min kop te" = "Das ist nicht mein Fall" (not my thing)
+- "Sætte spørgsmålstegn ved" = "In Frage stellen" (to question something)
+
+### B1 Grammar nuances:
+- **Passive voice:** Bogen læses (Das Buch wird gelesen) / Bogen blev læst (Das Buch wurde gelesen)
+- **Perfect tense:** Jeg har spist (Ich habe gegessen) — same auxiliary "have/haben"!
+- **Modal verbs in past:** kunne (konnte), måtte (musste), ville (wollte), skulle (sollte)
+- **Relative clauses:** "Manden, der bor her..." = "Der Mann, der hier wohnt..." (very similar)
+- **Conditional:** "Hvis jeg var rig, ville jeg rejse" = "Wenn ich reich wäre, würde ich reisen" (same structure!)
+
+### B1 Register — formal vs. informal:
+- Danish is far more informal than German in everyday speech
+- "Du" is used with almost everyone — no "Sie/Ihr" distinction needed in practice
+- First names are used universally, even with bosses and strangers
+- This informality can surprise German speakers — it is not rude, it is Danish culture
+
+### False friends — warn the student:
+| Danish | What it means | German confusion |
+|--------|--------------|-----------------|
+| gift | married / poison | Gift (Ger.) = poison ✓ but also means "married"! |
+| fart | speed | Fahrt (journey) — similar false friend for Germans |
+| blive | to become / to stay | bleiben (stay) — close but not identical! |
+| siden | since / ago | seitdem — similar |
+| rar | nice/kind | rar (Ger.) = rare — different! |
+| mænd | men (plural of mand) | Männer — recognisable |
+| kede sig | to be bored | sich langweilen — different construction |
+| synes | to think/have an opinion | scheinen (seem) — partial overlap |
+| egentlig | actually/really | eigentlich — same meaning! |
+| selvfølgelig | of course | selbstverständlich — same meaning, recognisable root |
+
+### B1 Common collocations:
+- tage en beslutning (eine Entscheidung treffen — make a decision)
+- gøre en forskel (einen Unterschied machen — make a difference)
+- have ret (Recht haben — to be right)
+- være glad for (sich freuen über — be happy about)
+- holde op med (aufhören mit — stop doing something)
+- komme overens med (auskommen mit — get along with)
+- se frem til (sich freuen auf — look forward to)
+
+### Pronunciation guide for German speakers:
+- **Soft d (blødt d):** The Danish d between vowels is NOT a German d or t — it sounds like the English "th" in "the". German speakers typically say a hard "d" — must drill this. Words: mad (food), rød (red), glad (happy), bade (to bathe).
+- **Stød (glottal stop):** A creaky laryngeal break. No German equivalent. "Hund" with stød vs "hun" (she) without — it changes meaning. Practice: hund, sol, hjem.
+- **Reduced pronunciation:** Danish swallows syllables far more than German. "Selvfølgelig" sounds like "selfolli". "Hvad hedder du?" sounds like "veheddu?". Trust your ears more than the spelling.
+- **å:** Like German "o" in "offen" but rounder. gå, stå, år, kål.
+- **ø:** Like German "ö". grøn, øl, søster.
+- **æ:** Like German "ä". læse, æble.
+- **The h in hv-words:** "hvad", "hvor", "hvem" — the h is NOT pronounced. Say "vad", "vor", "vem".

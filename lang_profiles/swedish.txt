@@ -1,21 +1,226 @@
-# Language Background: Swedish
+# Language Background: Swedish → Danish
 
-## Similarities to Danish
-- Danish and Swedish are mutually intelligible in written form -- a huge advantage.
-- Shared vocabulary is very high: "hus/hus", "vatten/vand", "vinter/vinter", "broed/broed".
-- Both have two grammatical genders (common/neuter): Swedish "en/ett" mirrors Danish "en/et".
-- Both attach the definite article as a suffix: Swedish "huset" = Danish "huset".
-- Verb conjugation is similarly simple -- no person agreement.
+## How to use this profile
+Swedish speakers have the greatest advantage of any group. Written Danish and Swedish are largely mutually
+intelligible. The student can skip many A1 basics and move faster — but spoken Danish is a genuine challenge
+and needs dedicated focus. Do not let the false sense of familiarity prevent drilling pronunciation.
 
-## Key Differences to Highlight
-- Danish pronunciation is the main challenge: softer, more reduced, and less melodic than Swedish.
-- Danish has the stoed (glottal stop) -- Swedish does not; Swedish has tonal word accent instead.
-- The soft d in Danish has no direct Swedish equivalent.
-- Some false friends exist: Swedish "rolig" (fun) vs Danish "rolig" (calm/quiet).
-- Danish spelling occasionally diverges: Swedish "och" = Danish "og", Swedish "vad" = Danish "hvad".
+---
 
-## Teaching Tips for Swedish Speakers
-- Start by reading Danish -- comprehension will come quickly.
-- Focus the bulk of effort on spoken Danish pronunciation, especially vowel reduction and the soft d.
-- Use Swedish cognates as anchors, but flag the false friends early.
-- The tonal instinct from Swedish will not transfer -- replace it with awareness of the stoed.
+## A1 — Instant wins: near-identical vocabulary
+
+Swedish speakers can often read Danish with no prior study. Point this out immediately to build confidence:
+
+| Swedish | Danish | Note |
+|---------|--------|------|
+| hus | hus | identical |
+| dag | dag | identical |
+| natt | nat | very close |
+| år | år | identical |
+| bok | bog | close |
+| hund | hund | identical |
+| katt | kat | close |
+| fisk | fisk | identical |
+| bröd | brød | very close |
+| mjölk | mælk | very close |
+| vatten | vand | same root |
+| hand | hånd | very close |
+| arm | arm | identical |
+| finger | finger | identical |
+| name | navn | close |
+| gå | gå | identical |
+| komma | komme | very close |
+| se | se | identical |
+| ge | give | different — warn student |
+| ta | tage | very close |
+| stor | stor | identical |
+| liten | lille | different |
+| bra | god/godt | different — warn student |
+| dålig | dårlig | very close |
+| och | og | close |
+| men | men | identical |
+| eller | eller | identical |
+| för | for | close |
+| på | på | identical |
+
+### A1 Greetings (minimal teaching needed):
+Swedish speakers understand most Danish greetings intuitively:
+- Hej (SW: hej) = Hej (DA) — identical
+- Hejdå / Adjö (SW) → Hej hej / Farvel (DA) — slightly different
+- Tack (SW) → Tak (DA) — very close
+- Varsågod (SW) → Vær så venlig / Selv tak (DA)
+- Ja / Nej — identical
+
+### A1 Numbers (almost identical — teach differences only):
+SW: ett, två, tre, fyra, fem, sex, sju, åtta, nio, tio
+DA: en/et, to, tre, fire, fem, seks, syv, otte, ni, ti
+Focus on: to (not "två"), syv (not "sju"), otte (not "åtta")
+
+---
+
+## A2 — Grammar comparisons for Swedish speakers
+
+### What is IDENTICAL — already mastered:
+
+**1. Gender system: en/ett = en/et**
+Swedish: en hund, ett hus → Danish: en hund, et hus
+The logic is identical. Definite form also attaches as suffix.
+Swedish: hunden, huset → Danish: hunden, huset (same!)
+
+**2. No person conjugation:**
+Swedish: jag går, du går, han går → Danish: jeg går, du går, han går
+Identical structure — verb never changes by person.
+
+**3. V2 word order:**
+Swedish: Igår gick jag till skolan. → Danish: I går gik jeg i skole.
+The V2 rule (verb second in main clause) is the same.
+
+**4. Suffix definite articles:**
+Swedish: boken, huset, stolen → Danish: bogen, huset, stolen
+Near-identical! The plural definite differs slightly:
+SW: hundarna → DA: hundene (different suffix)
+
+### What is DIFFERENT — these need drilling:
+
+**1. Past tense formation — major difference:**
+Swedish strong verbs: gick (went), såg (saw), fick (got), kom (came)
+Danish strong verbs: gik (went), så (saw), fik (got), kom (came)
+Very close but not identical — many students mix up the spelling.
+
+**2. Subordinate clause: "ikke" position**
+Danish: "Jeg ved, at han ikke kommer." (ikke before verb)
+Swedish: "Jag vet att han inte kommer." (same position — reassure student, it IS the same!)
+
+**3. Definiteness with adjectives:**
+Swedish: den store hunden / det stora huset
+Danish: den store hund / det store hus (adjective changes, noun does NOT add suffix when adjective present!)
+This is a key Danish rule: definite article + adjective + noun (no suffix on noun).
+
+**4. Plural forms differ:**
+Swedish: hundar, katter, böcker → Danish: hunde, katte, bøger
+The concept is the same but suffixes differ — drill the Danish forms specifically.
+
+### A2 Vocabulary — focus on Swedish/Danish differences:
+
+**Words that differ most:**
+| Swedish | Danish | Meaning |
+|---------|--------|---------|
+| rolig | sjov | fun |
+| rolig (SW) | rolig (DA) | calm — same word, DIFFERENT meaning! |
+| ledsen | ked af det | sad |
+| snygg | smuk/flot | beautiful |
+| trött | træt | tired |
+| hungrig | sulten | hungry |
+| törstig | tørstig | thirsty |
+| lagom | passende/tilpas | just right (Danish has no direct equivalent) |
+| skönt | dejligt | lovely/nice |
+| kul | sjovt | fun/cool |
+| jobbig | irriterende/besværlig | annoying/difficult |
+
+---
+
+## B1 — Advanced connections and nuances
+
+### Idiomatic expressions (with Swedish equivalents):
+- "Det er lige meget" = "Det spelar ingen roll" (it doesn't matter)
+- "Slå to fluer med ét smæk" = "Slå två flugor i en smäll" (exactly the same idiom!)
+- "Gå op i røg" = "Gå upp i rök" (go up in smoke — same!)
+- "Koste en arm og et ben" = "Kosta skjortan" (cost a lot — different image)
+- "Tage det roligt" = "Ta det lugnt" (take it easy — same structure!)
+- "Komme til sagen" = "Komma till saken" (get to the point — identical!)
+- "Have ret" = "Ha rätt" (be right — identical structure!)
+- "Det er ikke min kop te" = "Det är inte min kopp te" (identical!)
+- "Gøre en bjørnetjeneste" = "Göra en björntjänst" (exactly the same idiom!)
+- "Se frem til" = "Se fram emot" (look forward to — very close!)
+- "Sætte spørgsmålstegn ved" = "Ifrågasätta" (to question)
+
+### B1 Grammar nuances — key divergences from Swedish:
+
+**1. Passive voice:**
+Danish: læse → læses (passive) / bliver læst (analytical passive)
+Swedish: läsa → läses / blir läst — very similar, reassure student
+
+**2. Perfect tense:**
+Danish: Jeg har spist / Jeg har set
+Swedish: Jag har ätit / Jag har sett — same structure, different past participles
+
+**3. The definite form with attributive adjective (IMPORTANT):**
+SW: "Jag ser den gamla mannen" (den + adj + noun with no extra suffix)
+DA: "Jeg ser den gamle mand" (den + adj + mand — no extra suffix — SAME rule!)
+Students often add -en/-et to the noun unnecessarily — remind them not to.
+
+**4. Modal verbs in past — slight differences:**
+SW: kunde, måste, ville, skulle
+DA: kunne, måtte, ville, skulle — almost identical, just remind student of spelling.
+
+**5. Reflexive verbs:**
+SW: Jag tvättar mig / Vi ses
+DA: Jeg vasker mig / Vi ses — same structure!
+
+### False friends — CRITICAL for Swedish speakers (these cause real confusion):
+
+| Danish | Actual meaning | Swedish word it resembles |
+|--------|---------------|--------------------------|
+| rolig | calm / quiet | rolig (SW) = fun |
+| gift | married / poison | gift (SW) = poison only |
+| siden | since / ago | sedan (SW) = since/then |
+| glad | happy | glad (SW) = happy ✓ same! |
+| ledsen | (does not exist in Danish) | ledsen (SW) = sad |
+| ked af det | sad | — |
+| egentlig | actually | egentligen (SW) = actually ✓ same! |
+| selvfølgelig | of course | självklart (SW) = of course |
+| affære | affair / matter | affär (SW) = shop/business |
+| semester | semester (school term) | semester (SW) = vacation! |
+| semester | school term | — |
+| ferie | vacation/holiday | semester (SW) — don't confuse! |
+| begrænset | limited | begränsad (SW) = limited ✓ |
+| sød | sweet / cute | söt (SW) = sweet/cute ✓ |
+| dygtig | skilled / clever | duktig (SW) = well-behaved/good |
+| gammel | old | gammal (SW) = old ✓ same! |
+| ung | young | ung (SW) = young ✓ same! |
+
+### B1 Common collocations (compare with Swedish):
+- tage en beslutning (fatta ett beslut) — make a decision
+- gøre en forskel (göra skillnad) — make a difference
+- have ret (ha rätt) — be right
+- holde op med (sluta med) — stop doing something
+- komme overens med (komma överens med) — get along with ✓ identical!
+- se frem til (se fram emot) — look forward to ✓ very close!
+- være enig (vara överens/enig) — agree
+- tage sig af (ta hand om) — take care of
+
+### Pronunciation guide for Swedish speakers — THE CRITICAL AREA:
+
+Written Danish: easy. Spoken Danish: a genuine challenge. Be direct with the student about this.
+
+**1. Soft d (blødt d) — does not exist in Swedish:**
+Between vowels, Danish d sounds like the English "th" in "the".
+Swedish speakers say a clear Swedish "d" — must be corrected immediately.
+Drill words: mad (food), rød (red), glad (happy), side (page), bade (to bathe), hede (heath).
+
+**2. Stød vs Swedish pitch accent — completely different systems:**
+Swedish has tonal word accent (tone 1 vs tone 2) — this does NOT transfer to Danish.
+Danish has stød (glottal stop/creak) instead. "Hund" vs "hun" (she) — stød changes meaning.
+Tell students: forget Swedish tones entirely when speaking Danish.
+
+**3. Vowel reduction — far more extreme than Swedish:**
+Danish reduces and swallows vowels aggressively.
+"Hvad hedder du?" sounds approximately like "veheddu?" in fast speech.
+"Selvfølgelig" → "selfolli"
+"Jeg ved det ikke" → "jæ ve dedge"
+Train the student to listen to natural speech, not spelled-out pronunciation.
+
+**4. The silent letters:**
+- hv-words: hvad, hvor, hvem, hvilken — the h is silent. Say "vad", "vor", "vem".
+- d at end of word after vowel: rød → approximately "røth", glad → approximately "glath"
+- g after vowel often silent or very weak: dag → "da", sag → "sa"
+
+**5. Å, Ø, Æ — Swedish speakers know these sounds:**
+- å = same as Swedish å: år, gå, stå ✓
+- ø = same as Swedish ö: grøn, øl, søster ✓
+- æ = same as Swedish ä: læse, æble ✓
+This is a major advantage — these vowels are already natural.
+
+**6. The Danish "r":**
+Danish r is uvular (back of throat), like French r — not the Swedish rolled r.
+Students must consciously place it further back: rød, rose, ret, rejse.

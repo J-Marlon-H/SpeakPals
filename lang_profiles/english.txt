@@ -1,19 +1,169 @@
-# Language Background: English
+# Language Background: English → Danish
 
-## Similarities to Danish
-- Shared Germanic roots mean many words look or sound familiar: "house" = "hus", "water" = "vand" (older form "water"), "winter" = "vinter", "green" = "groen".
-- Word order is similar: Subject-Verb-Object in most sentences.
-- Both languages use the Latin alphabet with only minor additions (Danish adds ae, o with stroke, aa).
+## How to use this profile
+Use these insights to speed up the student's learning by connecting Danish to what they already know from English.
+Point out cognates immediately — they are confidence boosters. Flag false friends early to prevent embarrassment.
 
-## Key Differences to Highlight
-- Danish has two grammatical genders (common and neuter) instead of none in English -- use "en" vs "et".
-- Definite articles are suffixes, not separate words: "a dog" = "en hund", but "the dog" = "hunden".
-- Danish has a distinctive "soft d" sound (like the "th" in "the") that does not exist in English -- worth drilling early.
-- Verbs do not conjugate by person in Danish (simpler than English), but tense formation differs.
-- "Stoed" (the glottal stop) is a prosodic feature with no English equivalent -- affects meaning.
+---
 
-## Teaching Tips for English Speakers
-- Lean on cognates early to build confidence.
-- Emphasize the en/et article system as the first major hurdle.
-- Use minimal pairs to practice the soft d and the stoed.
-- Point out that Danish word order in subordinate clauses flips the verb and adverb (unlike English).
+## A1 — Instant wins: cognates the student can use from day one
+
+These words are nearly identical. Introduce them early and often:
+
+| English | Danish | Note |
+|---------|--------|------|
+| arm | arm | identical |
+| finger | finger | identical |
+| salt | salt | identical |
+| winter | vinter | one letter change |
+| summer | sommer | one letter change |
+| school | skole | very close |
+| house | hus | short form |
+| man | mand | add d |
+| name | navn | close |
+| problem | problem | identical |
+| hotel | hotel | identical |
+| hospital | hospital | identical |
+| music | musik | one letter |
+| sport | sport | identical |
+| number | nummer | close |
+| family | familie | close |
+| telephone | telefon | close |
+| computer | computer | identical |
+| internet | internet | identical |
+| coffee | kaffe | close |
+| tea | te | identical |
+| bus | bus | identical |
+| taxi | taxa | close |
+| park | park | identical |
+| bank | bank | identical |
+
+### A1 Core vocabulary by topic
+
+**Greetings:**
+- Hello = Hej (sounds like "hi")
+- Good morning = Godmorgen
+- Goodbye = Hej hej / Farvel
+- Thank you = Tak
+- Please = Vær så venlig / tak (context-dependent)
+- Yes = Ja | No = Nej
+
+**Numbers 1–10:** en/et, to, tre, fire, fem, seks, syv, otte, ni, ti
+
+**Colors:**
+- red = rød | blue = blå | green = grøn | yellow = gul
+- black = sort | white = hvid | brown = brun | grey = grå
+
+**Family:**
+- mother = mor | father = far | sister = søster | brother = bror
+- child = barn | family = familie
+
+**Food & drink:**
+- bread = brød | milk = mælk | water = vand | beer = øl
+- apple = æble | fish = fisk | meat = kød | egg = æg
+
+---
+
+## A2 — Grammar comparisons for English speakers
+
+### What is EASIER in Danish than English:
+- **Verb conjugation:** English: "I am / you are / he is" → Danish: jeg er / du er / han er (same form always)
+- **No irregular plurals:** mostly add -er or -e: dog = hund → hunde
+- **No genitive case:** just add -s like English: the dog's = hundens
+
+### What is HARDER — explain these carefully:
+
+**1. Grammatical gender (en/et)**
+English has no gender. Danish has two: common (en) and neuter (et).
+The article must be memorised with each noun — there is no rule.
+- en hund (a dog) → hunden (the dog)
+- et hus (a house) → huset (the house)
+Teaching tip: always teach noun + article as a pair, never the noun alone.
+
+**2. Definite article as suffix**
+English uses a separate word "the". Danish attaches it to the end of the noun:
+- the dog = hunden (en hund + en)
+- the house = huset (et hus + et)
+- the dogs = hundene
+
+**3. Verb-second (V2) word order**
+English: "Yesterday I went to school."
+Danish: "I går gik jeg i skole." (verb must be second — subject moves after verb)
+This is the same as German but different from English.
+
+**4. Negation position**
+English: "I do not eat meat." → Danish: "Jeg spiser ikke kød." (ikke after verb)
+
+### A2 Key grammar structures to practise:
+- Present tense: spise → jeg spiser, du spiser, han spiser
+- Past tense: spiste (regular), var (was), fik (got), gik (went)
+- Question formation: Spiser du? (inversion — verb first)
+- Negation: ikke (not), aldrig (never), ingen (none)
+
+### A2 Vocabulary expansion — everyday life:
+
+**Transport:** bus, tog (train), cykel (bicycle), bil (car), fly (plane)
+**Shopping:** butik (shop), pris (price), billig (cheap), dyr (expensive), købe (to buy)
+**Time:** i dag (today), i morgen (tomorrow), i går (yesterday), nu (now), snart (soon)
+**Weather:** sol (sun), regn (rain), sne (snow), vind (wind), koldt (cold), varmt (warm)
+**Home:** køkken (kitchen), stue (living room), soveværelse (bedroom), badeværelse (bathroom)
+
+---
+
+## B1 — Advanced connections and nuances
+
+### Idiomatic expressions (with English equivalents):
+- "Det er lige meget" = "It doesn't matter" (lit. it is equal amount)
+- "Hvad så?" = "So what?" / "What's up?"
+- "Gå op i røg" = "Go up in smoke" (same idiom!)
+- "Slå to fluer med ét smæk" = "Kill two birds with one stone" (lit. kill two flies with one slap)
+- "Tage det roligt" = "Take it easy"
+- "Det er ikke min kop te" = "It's not my cup of tea" (identical!)
+- "Koste en arm og et ben" = "Cost an arm and a leg" (identical structure!)
+- "Gøre en bjørnetjeneste" = "Do someone a disservice" (lit. do a bear service)
+- "Komme til sagen" = "Get to the point"
+- "Slå koldt vand i blodet" = "Cool down / calm down" (lit. pour cold water in the blood)
+
+### B1 Grammar nuances:
+- **Subjunctive mood:** "hvis jeg var rig..." (if I were rich) — same as English "were"
+- **Passive voice:** Bogen læses (The book is read) vs. Bogen bliver læst (active passive)
+- **Modal verbs in past:** kunne (could), måtte (had to), ville (wanted to), skulle (was supposed to)
+- **Relative clauses:** "Manden, som/der bor her..." (the man who lives here)
+- **Subordinate clause word order:** "Jeg ved, at han ikke kommer" (ikke before verb in sub-clause)
+
+### B1 Register — formal vs. informal:
+- De (formal you) vs. du (informal) — De is rare but exists in writing
+- "Hvad hedder du?" (informal) vs. "Hvad er Deres navn?" (very formal)
+- Written Danish is more conservative than spoken Danish
+
+### False friends — warn the student immediately:
+| Danish | What it means | English false friend |
+|--------|--------------|---------------------|
+| gift | married / poison | gift (present) |
+| fart | speed | fart |
+| slut | end / finish | slut |
+| brag | crash / bang | brag (to boast) |
+| koks | coal / mess | coke |
+| have | garden | have (to possess) |
+| bad | bath | bad (negative) |
+| mand | man / husband | man |
+| kind | cheek | kind (nice) |
+| stå | to stand | stay |
+| vil | want to / will | will |
+
+### B1 Common collocations:
+- tage en beslutning (make a decision — not "lave")
+- gøre en forskel (make a difference)
+- have ret (be right — lit. have right)
+- være glad for (be happy about)
+- synes om (like / be of the opinion)
+- komme af med (get rid of)
+- holde op med (stop doing something)
+
+### Pronunciation guide for English speakers:
+- **Soft d (blødt d):** Between vowels, the Danish d sounds like the English "th" in "the". Example: "mad" (food) is pronounced "math" roughly. Drill: rød, mad, glad, side, bade.
+- **Stød (glottal stop):** A creaky break in the voice. "Hund" with stød vs without changes meaning. No English equivalent — closest is the Cockney "bottle" (bo'le).
+- **Reduced vowels:** Danish swallows many syllables. "Selvfølgelig" sounds like "sel-fol-li". Train the student to listen rather than read.
+- **å sound:** Like the "aw" in "awe". Practice: å, år, gå, stå, kål.
+- **ø sound:** Like the "u" in "burn" with rounded lips. Practice: grøn, øl, søster, størrelse.
+- **æ sound:** Like the "a" in "bad" but longer. Practice: læse, æble, hæfte.

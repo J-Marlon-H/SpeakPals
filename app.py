@@ -22,8 +22,11 @@ def _secret(key):
 
 CLAUDE_KEY = _secret("CLAUDE_API_KEY")
 ELEVEN_KEY = _secret("ELEVENLABS_API_KEY")
-VOICE_EN   = "21m00Tcm4TlvDq8ikWAM"
-VOICE_DA   = "ygiXC2Oa1BiHksD3WkJZ"  # Mathias - Danish baritone
+VOICES = {
+    "Mathias — male baritone": "ygiXC2Oa1BiHksD3WkJZ",
+    "Camilla — female":        "4RklGmuxoAskAbGXplXN",
+    "Casper — male, calm":     "ADRrvIX3j1uTFlD5q6DE",
+}
 
 # ── Local proxy vs cloud direct connection ─────────────────────────────────────
 # On Streamlit Cloud the browser can't reach localhost, so the component connects
@@ -64,14 +67,13 @@ st.markdown("""<style>
 
 with st.sidebar:
     st.header("Settings")
-    mode  = st.radio("Mode", ["Danish", "English Debug"], index=1)
-    debug = "Debug" in mode
-    st.divider()
     st.subheader("Student Profile")
-    name    = st.text_input("Name", "Alex")
+    name    = st.text_input("Name", "Marlon")
     level   = st.selectbox("Level", ["A1", "A2", "B1"])
     bg_lang = st.selectbox("Your native language", ["English", "German", "Swedish"])
     today   = st.text_area("Today's topics", "Daily life, shopping")
+    st.divider()
+    voice_label = st.selectbox("Tutor voice", list(VOICES.keys()))
     st.divider()
     model_label = st.selectbox("AI model", list(MODELS.keys()))
     model_id    = MODELS[model_label]
@@ -87,9 +89,9 @@ for k, v in [("chat", []), ("last_chunks", None), ("last_response", None), ("las
     if k not in st.session_state:
         st.session_state[k] = v
 
-system   = build_system_prompt(debug, name, level, today, bg_lang)
-stt_lang = "en" if debug else "da"
-voice_id = VOICE_EN if debug else VOICE_DA
+system   = build_system_prompt(name, level, today, bg_lang)
+stt_lang = "da"
+voice_id = VOICES[voice_label]
 
 # ── Layout ────────────────────────────────────────────────────────────────────
 
