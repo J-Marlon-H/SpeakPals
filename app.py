@@ -80,11 +80,8 @@ SCENE_NEXT_PROMPT = {
 # Build scene lookup from catalog
 _SCENE_BY_KEY = {s["key"]: s for s in SCENE_CATALOG}
 
-def _scene_key(scene_src: str) -> str | None:
-    for key in SCENE_SCRIPTS:
-        if key in (scene_src or ""):
-            return key
-    return None
+def _scene_key(_: str) -> str | None:
+    return st.session_state.get("selected_scene")
 
 # ── Local proxy vs cloud direct ────────────────────────────────────────────────
 
