@@ -6,9 +6,9 @@ html{height:100.5%}
 .wrap{
   position:absolute;inset:0;
   background-color:#000;
-  background-size:cover;             /* fill full frame — no black bars */
+  background-size:contain;           /* show full image without cropping */
   background-repeat:no-repeat;
-  background-position:top center;   /* anchor top: head always visible */
+  background-position:top center;   /* anchor top: head never cut */
 }
 .no-scene{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
   color:rgba(255,255,255,.35);font-size:14px;letter-spacing:.5px}
