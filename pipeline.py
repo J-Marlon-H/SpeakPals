@@ -63,7 +63,7 @@ SCENE_CATALOG = [
     },
     {
         "key":         "flower_store",
-        "level":       "A1",
+        "level":       "A2",
         "title":       "At the Flower Shop",
         "desc":        "Buy flowers and chat with the florist in Danish",
         "file":        "flower_store.png",
@@ -73,7 +73,7 @@ SCENE_CATALOG = [
     },
     {
         "key":         "bakery",
-        "level":       "A1",
+        "level":       "A2",
         "title":       "At the Bakery",
         "desc":        "Order pastries and bread from the baker in Danish",
         "file":        "bakery.png",

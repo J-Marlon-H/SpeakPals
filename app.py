@@ -157,7 +157,7 @@ name        = st.session_state.get("s_name",        "Marlon")
 level       = st.session_state.get("s_level",       "A1")
 bg_lang     = st.session_state.get("s_bg_lang",     "German")
 voice_label = st.session_state.get("s_voice_label", list(VOICES.keys())[0])
-model_label = st.session_state.get("s_model_label", "Sonnet 4.6 — best quality")
+model_label = st.session_state.get("s_model_label", "Haiku 4.5 — fastest")
 model_id    = MODELS[model_label]
 
 # ── Session state ──────────────────────────────────────────────────────────────
@@ -292,35 +292,35 @@ with st.sidebar:
         )
     else:
         last_i = len(log) - 1
-        parts = []
+        # Find index of the last character entry (for replay button placement)
+        last_char_i = next((i for i in range(len(log)-1, -1, -1) if log[i]["who"] == "character"), None)
         for i, entry in enumerate(log):
             txt  = entry["text"].replace("<", "&lt;").replace(">", "&gt;")
             anim = "animation:msgSlideIn .4s cubic-bezier(.34,1.56,.64,1) both;" if i == last_i else ""
             if entry["who"] == "character":
-                parts.append(
+                st.markdown(
                     f"<div style='background:rgba(255,255,255,.07);border-radius:12px 12px 12px 3px;"
                     f"padding:10px 12px;margin:12px 12px 4px;font-size:13px;line-height:1.5;"
                     f"color:#e2e8f0;word-break:break-word;{anim}'>"
                     f"<span style='font:600 10px Segoe UI;color:#94a3b8;display:block;margin-bottom:4px;letter-spacing:.5px;text-transform:uppercase'>{char_label}</span>"
-                    f"<em>{txt}</em></div>"
+                    f"<em>{txt}</em></div>",
+                    unsafe_allow_html=True
                 )
+                # Replay button — only on the latest character message
+                if i == last_char_i and st.session_state.char_audio:
+                    if st.button("↺ replay", key=f"rch_{i}",
+                                 help=f"Replay {char_label.lower()}"):
+                        st.session_state.replay_char_seq += 1
+                        st.rerun()
             else:
-                parts.append(
+                st.markdown(
                     f"<div style='background:rgba(129,140,248,.18);border-radius:12px 12px 3px 12px;"
                     f"padding:10px 12px;margin:4px 12px 12px;font-size:13px;line-height:1.5;"
                     f"color:#c7d2fe;word-break:break-word;{anim}'>"
                     f"<span style='font:600 10px Segoe UI;color:#818cf8;display:block;margin-bottom:4px;letter-spacing:.5px;text-transform:uppercase'>You ✓</span>"
-                    f"{txt}</div>"
+                    f"{txt}</div>",
+                    unsafe_allow_html=True
                 )
-        st.markdown("".join(parts), unsafe_allow_html=True)
-
-    # ── Replay character ──────────────────────────────────────────────────────
-    if st.session_state.lesson_started and st.session_state.char_audio:
-        st.markdown("<div style='height:6px'></div>", unsafe_allow_html=True)
-        if st.button(f"↺ Replay {char_label.lower()}", use_container_width=True,
-                     help=f"Replay {char_label.lower()}'s last line"):
-            st.session_state.replay_char_seq += 1
-            st.rerun()
 
     # Error debug
     if st.session_state.get("pipeline_error"):
@@ -335,6 +335,26 @@ with st.sidebar:
     # Back to Home — always last → pinned to bottom by CSS
     if st.button("🏠 Back to Home", use_container_width=True):
         st.switch_page("pages/home.py")
+
+# ── Style inline replay buttons via JS ────────────────────────────────────────
+components.html("""<script>
+(function styleReplay() {
+  var doc = window.parent.document;
+  var btns = Array.from(doc.querySelectorAll('[data-testid="stSidebar"] button'));
+  btns.forEach(function(btn) {
+    if (btn.textContent.trim() === '\u21BA replay') {
+      btn.style.cssText = [
+        'padding:1px 8px','font-size:10px','line-height:1.6',
+        'background:rgba(255,255,255,.05)','border:1px solid rgba(255,255,255,.10)',
+        'color:rgba(255,255,255,.38)','border-radius:20px',
+        'min-height:0','height:auto','margin-top:-6px','float:right','cursor:pointer'
+      ].join('!important;') + '!important';
+      btn.parentElement.style.cssText = 'padding:0!important;margin:0 12px 8px!important';
+    }
+  });
+  setTimeout(styleReplay, 400);
+})();
+</script>""", height=0)
 
 # ── VAD / scene component ──────────────────────────────────────────────────────
 
