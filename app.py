@@ -26,6 +26,16 @@ FAL_KEY    = _secret("FAL_KEY")
 # ── Scene scripts ──────────────────────────────────────────────────────────────
 
 SCENE_SCRIPTS = {
+    "meet_a_friend": [
+        "Hej! Hvad hedder du?",
+        "Hvor gammel er du?",
+        "Hvor bor du?",
+    ],
+    "cafe": [
+        "Hej! Hvad må det være?",
+        "Vil du have mælk i din kaffe?",
+        "Det er 35 kroner. Betaler du med kort?",
+    ],
     "supermarket": [
         "Vil du betale med kort eller kontanter?",
         "Vil du have en kvittering?",
@@ -52,6 +62,8 @@ SCENE_SCRIPTS = {
 
 # Preference order per scene: first voice that doesn't clash with the tutor's voice is used
 SCENE_CHAR_VOICE = {
+    "meet_a_friend": [VOICES["Camilla — female"],        VOICES["Casper — male, calm"]],
+    "cafe":          [VOICES["Camilla — female"],        VOICES["Mathias — male baritone"]],
     "supermarket":  [VOICES["Camilla — female"],        VOICES["Mathias — male baritone"]],
     "flower_store": [VOICES["Casper — male, calm"],     VOICES["Mathias — male baritone"]],
     "bakery":       [VOICES["Camilla — female"],        VOICES["Casper — male, calm"]],

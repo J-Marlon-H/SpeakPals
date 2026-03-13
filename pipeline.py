@@ -52,6 +52,26 @@ VOICES = {
 # ── Scene catalog — single source of truth for all scenes ──────────────────────
 SCENE_CATALOG = [
     {
+        "key":         "meet_a_friend",
+        "level":       "A1",
+        "title":       "Meet a Friend",
+        "desc":        "Introduce yourself and get to know someone in Danish",
+        "file":        "meet_a_friend.png",
+        "gradient":    "linear-gradient(135deg,#064e3b,#065f46)",
+        "char_name":   "Friend",
+        "scene_description": "A friendly young Dane smiling at you in a sunny park, ready to chat and get to know you",
+    },
+    {
+        "key":         "cafe",
+        "level":       "A1",
+        "title":       "At the Café",
+        "desc":        "Order a coffee and have a short chat with the barista",
+        "file":        "cafe.png",
+        "gradient":    "linear-gradient(135deg,#451a03,#78350f)",
+        "char_name":   "Barista",
+        "scene_description": "A cosy Danish café — the barista is at the counter with coffee cups and pastries, ready to take your order",
+    },
+    {
         "key":         "supermarket",
         "level":       "A1",
         "title":       "Supermarket Checkout",
