@@ -1,100 +1,115 @@
 import streamlit as st
-import pathlib, base64
 from pipeline import SCENE_CATALOG, LESSON_STATE_KEYS
 
 st.set_page_config(page_title="SpeakPals", page_icon="🇩🇰",
                    layout="wide", initial_sidebar_state="collapsed")
 
-st.markdown("""<style>
-  #MainMenu,footer,[data-testid="stToolbar"]{visibility:hidden}
-  [data-testid="stHeader"],header,.stAppHeader{display:none!important}
+# ── Build per-scene button CSS selectors ──────────────────────────────────────
+_sel  = ", ".join(f".st-key-{s['key']} button" for s in SCENE_CATALOG)
+_selH = ", ".join(f".st-key-{s['key']} button:hover" for s in SCENE_CATALOG)
+_selP = ", ".join(
+    f".st-key-{s['key']} button [data-testid='stMarkdownContainer'],"
+    f" .st-key-{s['key']} button p"
+    for s in SCENE_CATALOG
+)
+_selP2 = ", ".join(f".st-key-{s['key']} button p" for s in SCENE_CATALOG)
+
+st.markdown(f"""<style>
+  #MainMenu,footer,[data-testid="stToolbar"]{{visibility:hidden}}
+  [data-testid="stHeader"],header,.stAppHeader{{display:none!important}}
   [data-testid="collapsedControl"],[data-testid="stSidebarCollapseButton"],
-  [data-testid="stSidebarNav"]{display:none!important}
-  [data-testid="stAppViewContainer"],[data-testid="stMain"]{background:#0b0b1a!important}
-  .block-container{padding:2.5rem 3rem!important;max-width:960px!important;margin:auto}
-
-  /* Scene card */
-  .scene-card{
-    position:relative;width:100%;padding-top:60%;
-    border-radius:18px;overflow:hidden;cursor:pointer;
-    background:#1e1e30;
-    box-shadow:0 6px 32px rgba(0,0,0,.55);
-    transition:transform .22s cubic-bezier(.34,1.56,.64,1),
-               box-shadow .22s ease,filter .22s ease}
-  .scene-card:hover{
-    transform:scale(1.035) translateY(-4px);
-    box-shadow:0 16px 48px rgba(129,140,248,.35),0 4px 20px rgba(0,0,0,.6);
-    filter:brightness(1.08)}
-  .scene-card img{
-    position:absolute;inset:0;width:100%;height:100%;
-    object-fit:cover;object-position:top center;
-    border-radius:18px;transition:transform .22s ease}
-  .scene-card:hover img{transform:scale(1.05)}
-  .scene-placeholder{position:absolute;inset:0;border-radius:18px}
-  .scene-card-overlay{
-    position:absolute;bottom:0;left:0;right:0;
-    background:linear-gradient(to top,rgba(10,10,26,.92) 0%,rgba(10,10,26,.4) 55%,transparent 100%);
-    padding:20px 18px 16px;border-radius:0 0 18px 18px}
-  .scene-card-title{font:800 18px/1.2 'Segoe UI',sans-serif;color:#fff;margin-bottom:4px}
-  .scene-card-desc{font:400 12px 'Segoe UI',sans-serif;color:rgba(255,255,255,.6)}
-
-  /* Level badge */
-  .lvl-badge{
-    display:inline-block;padding:3px 9px;border-radius:20px;
-    font:700 10px/1 'Segoe UI',sans-serif;letter-spacing:1.2px;
-    text-transform:uppercase;margin-bottom:8px}
-  .lvl-A1{background:rgba(52,211,153,.18);color:#34d399;border:1px solid rgba(52,211,153,.3)}
-  .lvl-A2{background:rgba(251,191,36,.18);color:#fbbf24;border:1px solid rgba(251,191,36,.3)}
-  .lvl-B1{background:rgba(129,140,248,.2);color:#a5b4fc;border:1px solid rgba(129,140,248,.35)}
-  .lvl-B2{background:rgba(248,113,113,.18);color:#fca5a5;border:1px solid rgba(248,113,113,.3)}
+  [data-testid="stSidebarNav"]{{display:none!important}}
+  [data-testid="stAppViewContainer"],[data-testid="stMain"]{{background:#0b0b1a!important}}
+  .block-container{{padding:2.5rem 3rem!important;max-width:960px!important;margin:auto}}
 
   /* Section heading */
-  .section-head{
+  .section-head{{
     font:700 11px/1 'Segoe UI',sans-serif;letter-spacing:2px;
     text-transform:uppercase;color:rgba(255,255,255,.35);
-    margin:32px 0 16px;padding-bottom:8px;
-    border-bottom:1px solid rgba(255,255,255,.07)}
-  .section-head.current{color:rgba(129,140,248,.75);
-    border-bottom-color:rgba(129,140,248,.25)}
+    margin:32px 0 14px;padding-bottom:8px;
+    border-bottom:1px solid rgba(255,255,255,.07)}}
+  .section-head.current{{color:rgba(129,140,248,.75);
+    border-bottom-color:rgba(129,140,248,.25)}}
 
-  /* Buttons */
-  label,.stButton button{color:#e2e8f0!important}
-  .stButton button{
-    margin-top:10px!important;border-radius:12px!important;
-    font-weight:600!important;font-size:13px!important;
+  /* Header buttons (Feedback, Settings) */
+  label,.stButton button{{color:#e2e8f0!important}}
+  .stButton button{{
+    border-radius:12px!important;font-weight:600!important;font-size:13px!important;
     background:rgba(129,140,248,.15)!important;
     border:1px solid rgba(129,140,248,.3)!important;color:#c7d2fe!important;
-    transition:background .2s,border-color .2s}
-  .stButton button:hover{
+    transition:background .2s,border-color .2s}}
+  .stButton button:hover{{
     background:rgba(129,140,248,.28)!important;
-    border-color:rgba(129,140,248,.55)!important}
+    border-color:rgba(129,140,248,.5)!important}}
 
-  /* ── Invisible button overlay on scene cards ──────────────────────────────
-     Scoped to columns that contain a .scene-card (CSS :has selector).
-     The stButton is positioned absolutely over the card area so clicking
-     anywhere on the card triggers the Streamlit button. */
-  [data-testid="column"]:has(.scene-card) [data-testid="stVerticalBlock"]{
-    position:relative!important}
-  [data-testid="column"]:has(.scene-card) [data-testid="stButton"]{
-    position:absolute!important;top:0!important;left:0!important;right:0!important;
-    height:0!important;padding-bottom:60%!important;
-    margin:0!important;z-index:10!important;pointer-events:auto!important}
-  [data-testid="column"]:has(.scene-card) [data-testid="stButton"] button{
-    position:absolute!important;inset:0!important;
-    width:100%!important;height:100%!important;
-    opacity:0!important;cursor:pointer!important;
-    margin:0!important;border:none!important;background:transparent!important}
+  /* ── Scene card buttons ────────────────────────────────────────────────────
+     The button IS the card.  background-image = scene photo (injected below).
+     aspect-ratio keeps the card proportional at any column width.            */
+  {_sel} {{
+    display:block!important;
+    width:100%!important;
+    height:auto!important;
+    aspect-ratio:5/3!important;
+    max-height:320px!important;
+    padding:0!important;
+    margin:0!important;
+    border-radius:18px!important;
+    overflow:hidden!important;
+    border:none!important;
+    background-size:cover!important;
+    background-position:top center!important;
+    background-color:#1e1e30!important;
+    box-shadow:0 6px 32px rgba(0,0,0,.55)!important;
+    cursor:pointer!important;
+    position:relative!important;
+    transition:transform .22s cubic-bezier(.34,1.56,.64,1),
+               box-shadow .22s ease,filter .22s ease!important}}
+  {_selH} {{
+    transform:scale(1.035) translateY(-4px)!important;
+    box-shadow:0 16px 48px rgba(129,140,248,.35),0 4px 20px rgba(0,0,0,.6)!important;
+    filter:brightness(1.08)!important}}
+
+  /* Label text — pinned to bottom with gradient overlay */
+  {_selP} {{
+    position:absolute!important;
+    bottom:0!important;left:0!important;right:0!important;top:auto!important;
+    padding:28px 16px 14px!important;
+    background:linear-gradient(to top,rgba(10,10,26,.92) 0%,
+               rgba(10,10,26,.4) 55%,transparent 100%)!important;
+    border-radius:0 0 18px 18px!important;
+    text-align:left!important;
+    pointer-events:none!important;
+    margin:0!important}}
+  {_selP2} {{
+    font:800 17px/1.2 'Segoe UI',sans-serif!important;
+    color:#fff!important;
+    text-align:left!important;
+    margin:0!important}}
+
+  /* Description text below each card */
+  .scene-desc{{
+    font:400 12px 'Segoe UI',sans-serif;
+    color:rgba(255,255,255,.4);
+    margin-top:7px;padding:0 2px;line-height:1.5}}
 </style>""", unsafe_allow_html=True)
 
-# ── Settings ───────────────────────────────────────────────────────────────────
+# ── Per-scene background-image via static file URL (fast — no base64) ─────────
+img_css = []
+for s in SCENE_CATALOG:
+    img_url = f"app/static/scenes/{s['file']}"
+    img_css.append(
+        f".st-key-{s['key']} button{{"
+        f"background-image:url('{img_url}')!important}}"
+    )
+st.markdown(f"<style>{''.join(img_css)}</style>", unsafe_allow_html=True)
 
+
+# ── Settings ───────────────────────────────────────────────────────────────────
 name  = st.session_state.get("s_name",  "there")
 level = st.session_state.get("s_level", "A1")
-
 LEVEL_LABELS = {"A1": "Beginner", "A2": "Elementary", "B1": "Intermediate", "B2": "Upper Intermediate"}
 
 # ── Header ─────────────────────────────────────────────────────────────────────
-
 col_hdr, col_fb, col_acct = st.columns([5, 1, 1])
 with col_hdr:
     st.markdown(f"""
@@ -119,61 +134,32 @@ with col_acct:
     st.markdown("</div>", unsafe_allow_html=True)
 
 
-# ── Image helper ───────────────────────────────────────────────────────────────
-
-@st.cache_data
-def _img_data_url(filename: str) -> str | None:
-    path = pathlib.Path(__file__).parent.parent / "assets" / "scenes" / filename
-    if not path.exists():
-        return None
-    data = path.read_bytes()
-    mime = "image/jpeg" if filename.lower().endswith((".jpg", ".jpeg")) else "image/png"
-    return f"data:{mime};base64," + base64.b64encode(data).decode()
-
-
 # ── Scene cards, grouped by level ──────────────────────────────────────────────
-
 LEVEL_ORDER = ["A1", "A2", "B1", "B2"]
-
-# Gather all levels that actually have scenes
 levels_with_scenes = [lvl for lvl in LEVEL_ORDER
                       if any(s["level"] == lvl for s in SCENE_CATALOG)]
 
 for lvl in levels_with_scenes:
     scenes = [s for s in SCENE_CATALOG if s["level"] == lvl]
-    is_current = lvl == level
-
-    label_suffix = " — Your level" if is_current else ""
+    is_cur = lvl == level
+    suffix = " — Your level" if is_cur else ""
     st.markdown(
-        f"<div class='section-head{'current' if is_current else ''}'>"
-        f"{lvl} · {LEVEL_LABELS.get(lvl, lvl)}{label_suffix}</div>",
+        f"<div class='section-head{'current' if is_cur else ''}'>"
+        f"{lvl} · {LEVEL_LABELS.get(lvl, lvl)}{suffix}</div>",
         unsafe_allow_html=True,
     )
 
     cols = st.columns(min(len(scenes), 3), gap="large")
     for col, scene in zip(cols, scenes):
         with col:
-            img_url = _img_data_url(scene["file"])
-            if img_url:
-                img_html = f"<img src='{img_url}' alt='{scene['title']}'>"
-            else:
-                gradient = scene["gradient"]
-                img_html = f"<div class='scene-placeholder' style='background:{gradient}'></div>"
-
-            st.markdown(f"""
-<div class='scene-card'>
-  {img_html}
-  <div class='scene-card-overlay'>
-    <div class='lvl-badge lvl-{scene["level"]}'>{scene["level"]}</div>
-    <div class='scene-card-title'>{scene["title"]}</div>
-    <div class='scene-card-desc'>{scene["desc"]}</div>
-  </div>
-</div>""", unsafe_allow_html=True)
-
-            if st.button(f"Start — {scene['title']}", key=scene["key"],
-                         use_container_width=True):
+            # Button IS the card — background-image loaded from static URL
+            if st.button(scene["title"], key=scene["key"], use_container_width=True):
                 st.session_state["selected_scene"] = scene["key"]
                 for k in LESSON_STATE_KEYS:
                     st.session_state.pop(k, None)
                 st.switch_page("app.py")
 
+            st.markdown(
+                f"<div class='scene-desc'>{scene['desc']}</div>",
+                unsafe_allow_html=True,
+            )
