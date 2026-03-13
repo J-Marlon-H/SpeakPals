@@ -94,12 +94,18 @@ st.markdown(f"""<style>
 </style>""", unsafe_allow_html=True)
 
 # ── Per-scene background-image via static file URL (fast — no base64) ─────────
+# Also explicitly set on :hover so the global .stButton button:hover background
+# shorthand can't reset background-image to none during the hover state.
 img_css = []
 for s in SCENE_CATALOG:
     img_url = f"app/static/scenes/{s['file']}"
+    rule = (
+        f"background-image:url('{img_url}')!important;"
+        f"background-size:cover!important;"
+        f"background-position:top center!important"
+    )
     img_css.append(
-        f".st-key-{s['key']} button{{"
-        f"background-image:url('{img_url}')!important}}"
+        f".st-key-{s['key']} button,.st-key-{s['key']} button:hover{{{rule}}}"
     )
 st.markdown(f"<style>{''.join(img_css)}</style>", unsafe_allow_html=True)
 
