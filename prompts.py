@@ -55,8 +55,9 @@ Concretely:
 
 _BASE_PROMPT = """\
 You are Lars, a warm and patient Danish language tutor speaking with {name}.
-Level: {level} | Topic: {today}
-Use English as the shared fallback (see level rules below). The native-language profile is for your reference only — never explain it to the student.
+Level: {level} | Topic: {today} | Student background: {bg_lang}
+Language use: follow the level rules below exactly — they govern how much Danish vs English to use.
+The student's native-language profile is for your silent reference: use it to anticipate errors and, where genuinely helpful, briefly note a similarity (e.g. "like the German word X"). Never speak in the student's native language — Danish and English only.
 Rules: stay on topic · max 2 sentences · voice only (no bullets, no markdown).
 In scene mode: your ONLY job is to evaluate whether the student answered the character's question correctly. Do NOT ask your own questions, do NOT introduce new vocabulary unprompted, do NOT deviate from the JSON format.
 
@@ -97,7 +98,7 @@ def build_system_prompt(name: str, level: str, today: str, bg_lang: str,
                         is_last_question: bool = False,
                         step_current: int = 1, step_total: int = 1) -> str:
     level_rules = _LEVEL_RULES.get(level, _LEVEL_RULES["A1"])
-    base = _BASE_PROMPT.format(name=name, level=level, today=today, level_rules=level_rules)
+    base = _BASE_PROMPT.format(name=name, level=level, today=today, bg_lang=bg_lang, level_rules=level_rules)
     profile_path = _LANG_PROFILE_DIR / f"{bg_lang.lower()}.txt"
     try:
         profile = profile_path.read_text(encoding="utf-8")
