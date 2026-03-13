@@ -147,8 +147,13 @@ st.markdown("""<style>
     border:none!important;display:block!important;margin:0!important}
   /* Chat message slide-in animation */
   @keyframes msgSlideIn{from{opacity:0;transform:translateX(-14px)}to{opacity:1;transform:translateX(0)}}
-  /* Pin last sidebar button (Home) to bottom; add clearance above it */
-  [data-testid="stSidebar"] > div:first-child{padding-bottom:64px!important}
+  /* Sidebar scroll area — leaves room for the pinned Home button */
+  [data-testid="stSidebar"] > div:first-child{
+    padding-bottom:80px!important;overflow-y:auto!important}
+  /* Each sidebar element — no gap collapse, no overflow issues */
+  [data-testid="stSidebar"] [data-testid="stVerticalBlock"]{
+    gap:0!important;overflow:visible!important}
+  /* Pin last sidebar button (Home) to bottom */
   [data-testid="stSidebar"] .stButton:last-child{
     position:fixed!important;bottom:0!important;left:0!important;
     width:320px!important;padding:10px 16px 14px!important;
@@ -356,9 +361,9 @@ components.html("""<script>
         'padding:1px 8px','font-size:10px','line-height:1.6',
         'background:rgba(255,255,255,.05)','border:1px solid rgba(255,255,255,.10)',
         'color:rgba(255,255,255,.38)','border-radius:20px',
-        'min-height:0','height:auto','margin-top:-6px','float:right','cursor:pointer'
+        'min-height:0','height:auto','cursor:pointer','display:inline-block'
       ].join('!important;') + '!important';
-      btn.parentElement.style.cssText = 'padding:0!important;margin:0 12px 8px!important';
+      btn.parentElement.style.cssText = 'padding:0!important;margin:-4px 12px 6px!important;text-align:right!important';
     }
   });
   setTimeout(styleReplay, 400);

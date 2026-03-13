@@ -1,6 +1,5 @@
 import streamlit as st
 import pathlib, base64
-import streamlit.components.v1 as components
 from pipeline import SCENE_CATALOG, LESSON_STATE_KEYS
 
 st.set_page_config(page_title="SpeakPals", page_icon="🇩🇰",
@@ -69,6 +68,22 @@ st.markdown("""<style>
   .stButton button:hover{
     background:rgba(129,140,248,.28)!important;
     border-color:rgba(129,140,248,.55)!important}
+
+  /* ── Invisible button overlay on scene cards ──────────────────────────────
+     Scoped to columns that contain a .scene-card (CSS :has selector).
+     The stButton is positioned absolutely over the card area so clicking
+     anywhere on the card triggers the Streamlit button. */
+  [data-testid="column"]:has(.scene-card) [data-testid="stVerticalBlock"]{
+    position:relative!important}
+  [data-testid="column"]:has(.scene-card) [data-testid="stButton"]{
+    position:absolute!important;top:0!important;left:0!important;right:0!important;
+    height:0!important;padding-bottom:60%!important;
+    margin:0!important;z-index:10!important;pointer-events:auto!important}
+  [data-testid="column"]:has(.scene-card) [data-testid="stButton"] button{
+    position:absolute!important;inset:0!important;
+    width:100%!important;height:100%!important;
+    opacity:0!important;cursor:pointer!important;
+    margin:0!important;border:none!important;background:transparent!important}
 </style>""", unsafe_allow_html=True)
 
 # ── Settings ───────────────────────────────────────────────────────────────────
@@ -157,30 +172,3 @@ for lvl in levels_with_scenes:
                     st.session_state.pop(k, None)
                 st.switch_page("app.py")
 
-# Wire scene cards so clicking the image/card triggers the Start button
-components.html("""<script>
-(function() {
-  var doc = window.parent.document;
-
-  function wireCard(card) {
-    if (card.dataset.wired) return;
-    card.dataset.wired = '1';
-    card.style.cursor = 'pointer';
-    card.addEventListener('click', function() {
-      var col = card.closest('[data-testid="column"]');
-      if (col) { var btn = col.querySelector('button'); if (btn) btn.click(); }
-    });
-  }
-
-  function wireAll() {
-    doc.querySelectorAll('.scene-card').forEach(wireCard);
-  }
-
-  // Wire immediately and at several intervals to cover async renders
-  wireAll();
-  [100, 300, 700, 1500].forEach(function(ms) { setTimeout(wireAll, ms); });
-
-  // Keep wiring whenever new nodes appear in the document
-  new MutationObserver(wireAll).observe(doc.body, {childList: true, subtree: true});
-})();
-</script>""", height=0)
