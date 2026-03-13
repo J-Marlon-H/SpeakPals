@@ -1,85 +1,577 @@
-<!DOCTYPE html>
-<html><head><meta charset="utf-8"><style>
-* { margin:0; padding:0; box-sizing:border-box; }
-body {
-  background: transparent;
-  display: flex; flex-direction: column;
-  align-items: center; justify-content: center;
-  height: 160px; font-family: 'Segoe UI', sans-serif;
-  overflow: hidden;
+<!DOCTYPE html><html><head><meta charset="utf-8"><style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%;margin:0;padding:0;background:#000;overflow:hidden;font-family:'Segoe UI',sans-serif}
+/* Extra safety: cover any sub-pixel gap at bottom */
+html{height:100.5%}
+.wrap{
+  position:absolute;inset:0;
+  background-color:#000;
+  background-size:cover;             /* fill full frame — no black bars */
+  background-repeat:no-repeat;
+  background-position:top center;   /* anchor top: head always visible */
 }
-#btn {
-  width: 104px; height: 104px; border-radius: 50%; border: none;
-  cursor: pointer; position: relative;
-  display: flex; align-items: center; justify-content: center;
-  background: #e2e8f0;
-  box-shadow: 0 4px 20px rgba(0,0,0,.12);
-  transition: background .25s, box-shadow .25s;
-}
-#btn.listening {
-  background: linear-gradient(135deg, #818cf8, #a78bfa);
-  box-shadow: 0 6px 32px rgba(129,140,248,.55);
-}
-#ring {
-  position: absolute; border-radius: 50%;
-  width: 104px; height: 104px;
-  border: 3px solid rgba(129,140,248,.0);
-  pointer-events: none;
-  transition: transform .1s, border-color .1s;
-}
-#btn.listening #ring { border-color: rgba(129,140,248,.4); }
-#lbl { margin-top: 12px; font-size: 12px; color: #94a3b8; letter-spacing: .4px; text-align: center; }
+.no-scene{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  color:rgba(255,255,255,.35);font-size:14px;letter-spacing:.5px}
+
+
+/* ── Avatar panel — bottom right ─────────────────────────────────────────── */
+.avatar-panel{
+  position:absolute;bottom:52px;right:14px;width:128px;
+  background:rgba(20,20,40,.8);backdrop-filter:blur(10px);
+  border-radius:16px;padding:6px 6px 6px;
+  display:flex;flex-direction:column;align-items:center;gap:3px;
+  box-shadow:0 4px 20px rgba(0,0,0,.45);border:1px solid rgba(255,255,255,.07)}
+.av-title{
+  font:700 9px/1 'Segoe UI',sans-serif;color:rgba(255,255,255,.55);
+  letter-spacing:2px;text-transform:uppercase;padding-bottom:2px}
+.head-wrap{position:relative;width:90px;height:90px;
+  display:flex;align-items:center;justify-content:center}
+.blob{position:absolute;width:90px;height:90px;
+  border-radius:60% 40% 55% 45%/50% 55% 45% 50%;
+  background:linear-gradient(135deg,#e0e9ff,#f5e6ff);
+  animation:blobmorph 6s ease-in-out infinite;z-index:0}
+@keyframes blobmorph{
+  0%,100%{border-radius:60% 40% 55% 45%/50% 55% 45% 50%}
+  33%{border-radius:45% 55% 40% 60%/55% 40% 60% 45%}
+  66%{border-radius:55% 45% 60% 40%/40% 60% 50% 55%}}
+.head-wrap svg{position:relative;z-index:1}
+@keyframes breathe{0%,100%{transform:translateY(0)}50%{transform:translateY(-3px)}}
+.head{animation:breathe 3.5s ease-in-out infinite}
+@keyframes blink{0%,92%,100%{transform:scaleY(1)}96%{transform:scaleY(0.05)}}
+.eyes{animation:blink 5s ease-in-out infinite;transform-origin:center 178px}
+@keyframes talk{
+  0%,100%{d:path("M 165 292 Q 200 300 235 292 Q 200 316 165 292 Z")}
+  40%{d:path("M 167 287 Q 200 274 233 287 Q 200 323 167 287 Z")}}
+.mouth.on{animation:talk 0.2s ease-in-out infinite}
+@keyframes dot{0%,80%,100%{opacity:.2;transform:translateY(0)}40%{opacity:1;transform:translateY(-5px)}}
+.av-dots{display:none;gap:4px;align-items:center}
+.av-dots span{width:5px;height:5px;border-radius:50%;background:#a78bfa;animation:dot 1.1s ease-in-out infinite}
+.av-dots span:nth-child(2){animation-delay:.18s}
+.av-dots span:nth-child(3){animation-delay:.36s}
+.av-lbl{font:10px/1 'Segoe UI',sans-serif;color:rgba(255,255,255,.5);min-height:13px;letter-spacing:.3px}
+.av-lbl.s{color:#a78bfa}
+.replay-btn{
+  background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.13);
+  border-radius:7px;padding:4px 0;font:10px 'Segoe UI',sans-serif;
+  color:rgba(255,255,255,.5);cursor:pointer;width:100%;margin-top:2px;
+  transition:background .18s,color .18s;display:none}
+.replay-btn:hover{background:rgba(255,255,255,.14);color:rgba(255,255,255,.85)}
+
+/* ── Mic button — bottom centre ──────────────────────────────────────────── */
+.mic-wrap{
+  position:absolute;bottom:52px;left:50%;transform:translateX(-50%);
+  display:flex;flex-direction:column;align-items:center;gap:5px;
+  background:rgba(0,0,0,.42);backdrop-filter:blur(10px);
+  border-radius:38px;padding:7px 15px 8px;
+  box-shadow:0 4px 18px rgba(0,0,0,.45);border:1px solid rgba(255,255,255,.09)}
+#btn{
+  width:60px;height:60px;border-radius:50%;border:none;cursor:pointer;
+  position:relative;display:flex;align-items:center;justify-content:center;
+  background:rgba(255,255,255,.16);
+  box-shadow:0 3px 14px rgba(0,0,0,.2);
+  transition:background .25s,box-shadow .25s;flex-shrink:0}
+#btn.listening{
+  background:linear-gradient(135deg,#818cf8,#a78bfa);
+  box-shadow:0 6px 28px rgba(129,140,248,.6)}
+#ring{
+  position:absolute;border-radius:50%;width:60px;height:60px;
+  border:3px solid rgba(129,140,248,.0);pointer-events:none;
+  transition:transform .1s,border-color .1s}
+#btn.listening #ring{border-color:rgba(129,140,248,.45)}
+#lbl{
+  font:10px/1.3 'Segoe UI',sans-serif;color:rgba(255,255,255,.65);
+  letter-spacing:.4px;text-align:center;white-space:nowrap}
+
+/* ── Progress dots ────────────────────────────────────────────────────────── */
+.progress{
+  position:absolute;bottom:16px;left:50%;transform:translateX(-50%);
+  display:flex;gap:10px;align-items:center;z-index:15}
+.pdot{
+  width:8px;height:8px;border-radius:50%;
+  background:rgba(255,255,255,.25);
+  transition:background .5s,transform .5s,box-shadow .5s}
+.pdot.done{
+  background:rgba(129,140,248,.9);transform:scale(1.3);
+  box-shadow:0 0 9px rgba(129,140,248,.65);
+  animation:pdotBounce .5s cubic-bezier(.34,1.56,.64,1)}
+@keyframes pdotBounce{from{transform:scale(.5)}to{transform:scale(1.3)}}
+.pdot.active{background:rgba(255,255,255,.7);animation:pdotPulse 1.4s ease-in-out infinite}
+@keyframes pdotPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.45)}}
+
+/* ── Tutor text panel — floats left of avatar ─────────────────────────────── */
+.tutor-text-panel{
+  position:absolute;bottom:52px;right:156px;
+  width:230px;max-height:170px;overflow-y:auto;
+  background:rgba(15,15,30,.93);backdrop-filter:blur(12px);
+  border-radius:14px;padding:12px 14px;
+  font:12px/1.6 'Segoe UI',sans-serif;color:#e2e8f0;
+  box-shadow:0 4px 24px rgba(0,0,0,.5);border:1px solid rgba(255,255,255,.08);
+  display:none;z-index:20}
+.tutor-text-panel.show{display:block}
+.tutor-text-tag{
+  font:700 9px/1 'Segoe UI',sans-serif;letter-spacing:2px;
+  text-transform:uppercase;color:#a78bfa;display:block;margin-bottom:7px}
+
+/* ── Celebration overlay ──────────────────────────────────────────────────── */
+.celebration{
+  position:absolute;inset:0;pointer-events:none;
+  display:none;align-items:center;justify-content:center;
+  flex-direction:column;gap:16px;
+  background:rgba(10,10,30,.55);backdrop-filter:blur(3px);z-index:60}
+.celebration.show{display:flex;pointer-events:auto}
+.cel-icon{font-size:64px;animation:celPop .55s cubic-bezier(.34,1.56,.64,1)}
+@keyframes celPop{from{transform:scale(0) rotate(-20deg)}to{transform:scale(1) rotate(0)}}
+.cel-text{font:700 26px/1.3 'Segoe UI',sans-serif;color:#fff;
+  text-shadow:0 2px 16px rgba(0,0,0,.7);text-align:center}
+.cel-sub{font:14px 'Segoe UI',sans-serif;color:rgba(255,255,255,.65);text-align:center}
+.cel-next{
+  margin-top:8px;background:rgba(255,255,255,.15);
+  border:1px solid rgba(255,255,255,.35);border-radius:50px;
+  padding:12px 36px;font:700 15px/1 'Segoe UI',sans-serif;color:#fff;
+  cursor:pointer;letter-spacing:1.5px;text-transform:uppercase;
+  transition:background .2s,transform .15s;backdrop-filter:blur(4px)}
+.cel-next:hover{background:rgba(255,255,255,.28);transform:scale(1.05)}
+.cel-next:active{transform:scale(.97)}
+/* Confetti layer — covers entire screen */
+.confetti-layer{position:absolute;inset:0;pointer-events:none;overflow:hidden;z-index:61}
+.confetti-piece{
+  position:absolute;top:-12px;
+  width:var(--w,8px);height:var(--h,12px);
+  background:var(--c,#818cf8);border-radius:var(--r,2px);
+  opacity:1;
+  animation:confettiFall var(--dur,3s) var(--delay,0s) ease-in forwards}
+@keyframes confettiFall{
+  0%  {transform:translate(0,0) rotate(0deg);opacity:1}
+  80% {opacity:1}
+  100%{transform:translate(var(--dx,0px),110vh) rotate(var(--rot,720deg));opacity:0}}
+
+/* ── Start overlay ────────────────────────────────────────────────────────── */
+.start-overlay{
+  position:absolute;inset:0;
+  background:rgba(0,0,0,.72);backdrop-filter:blur(6px);
+  display:flex;align-items:center;justify-content:center;z-index:90}
+.start-btn{
+  background:linear-gradient(135deg,#818cf8,#a78bfa);
+  border:none;border-radius:50px;
+  padding:18px 56px;
+  font:700 20px/1 'Segoe UI',sans-serif;color:#fff;
+  cursor:pointer;letter-spacing:3px;text-transform:uppercase;
+  box-shadow:0 8px 32px rgba(129,140,248,.55);
+  transition:transform .15s,box-shadow .15s}
+.start-btn:hover{transform:scale(1.06);box-shadow:0 12px 40px rgba(129,140,248,.7)}
+.start-btn:active{transform:scale(.97)}
 </style></head><body>
-<button id="btn" onclick="toggle()">
-  <div id="ring"></div>
-  <svg id="mic" width="40" height="40" viewBox="0 0 24 24" fill="#94a3b8" style="pointer-events:none;transition:fill .25s">
-    <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
-    <path d="M19 10v2a7 7 0 0 1-14 0v-2" stroke="#94a3b8" stroke-width="2" fill="none" stroke-linecap="round" id="arc"/>
-    <line x1="12" y1="19" x2="12" y2="23" stroke="#94a3b8" stroke-width="2" stroke-linecap="round" id="line1"/>
-    <line x1="8"  y1="23" x2="16" y2="23" stroke="#94a3b8" stroke-width="2" stroke-linecap="round" id="line2"/>
-  </svg>
-</button>
-<div id="lbl">tap to speak</div>
+<div class="wrap">
+  <div class="no-scene" id="no-scene">Loading scene…</div>
+
+  <!-- Avatar — bottom right -->
+  <div class="avatar-panel">
+    <div class="av-title">Tutor</div>
+    <div class="head-wrap">
+      <div class="blob"></div>
+      <svg class="head" width="86" height="86" viewBox="0 0 400 400">
+        <ellipse cx="200" cy="138" rx="136" ry="132" fill="#c8956c"/>
+        <rect x="168" y="346" width="64" height="48" rx="20" fill="#FECBA1"/>
+        <ellipse cx="200" cy="415" rx="168" ry="78" fill="#818cf8"/>
+        <ellipse cx="200" cy="208" rx="128" ry="146" fill="#FECBA1"/>
+        <ellipse cx="128" cy="256" rx="30" ry="18" fill="#ffb3a7" opacity=".38"/>
+        <ellipse cx="272" cy="256" rx="30" ry="18" fill="#ffb3a7" opacity=".38"/>
+        <ellipse cx="200" cy="88" rx="136" ry="70" fill="#c8956c"/>
+        <ellipse cx="88" cy="168" rx="27" ry="70" fill="#c8956c"/>
+        <ellipse cx="312" cy="168" rx="27" ry="70" fill="#c8956c"/>
+        <ellipse cx="144" cy="80" rx="54" ry="42" fill="#c8956c"/>
+        <ellipse cx="256" cy="80" rx="54" ry="42" fill="#c8956c"/>
+        <g class="eyes">
+          <ellipse cx="152" cy="178" rx="31" ry="27" fill="white"/>
+          <circle cx="152" cy="180" r="18" fill="#5b8dd9"/>
+          <circle cx="152" cy="180" r="10" fill="#1a1a2e"/>
+          <circle cx="158" cy="173" r="5.5" fill="white"/>
+          <circle cx="145" cy="184" r="2.5" fill="white" opacity=".6"/>
+          <path d="M120 162 Q152 148 184 162" stroke="#a0522d" stroke-width="5" fill="none" stroke-linecap="round"/>
+          <ellipse cx="248" cy="178" rx="31" ry="27" fill="white"/>
+          <circle cx="248" cy="180" r="18" fill="#5b8dd9"/>
+          <circle cx="248" cy="180" r="10" fill="#1a1a2e"/>
+          <circle cx="254" cy="173" r="5.5" fill="white"/>
+          <circle cx="241" cy="184" r="2.5" fill="white" opacity=".6"/>
+          <path d="M216 162 Q248 148 280 162" stroke="#a0522d" stroke-width="5" fill="none" stroke-linecap="round"/>
+        </g>
+        <ellipse cx="200" cy="234" rx="9" ry="6" fill="#e8a87c" opacity=".45"/>
+        <g class="mouth" id="av-mouth">
+          <path d="M 165 292 Q 200 300 235 292 Q 200 316 165 292 Z" fill="#e05c6a"/>
+          <path d="M 165 292 Q 200 286 235 292" fill="#f28b82"/>
+          <path d="M 174 293 Q 200 306 226 293" stroke="#c0404e" stroke-width="1.5" fill="none"/>
+        </g>
+      </svg>
+    </div>
+    <div class="av-dots" id="av-dots"><span></span><span></span><span></span></div>
+    <div class="av-lbl" id="av-lbl"></div>
+    <button class="replay-btn" id="replay-tutor-btn" onclick="replayTutor()">↺ replay</button>
+    <button class="replay-btn" id="stop-tutor-btn" onclick="stopTutor()" style="display:none">⏹ stop</button>
+    <button class="replay-btn" id="show-text-btn" onclick="toggleTutorText()" style="display:none">📄 text</button>
+  </div>
+
+  <!-- Tutor last-response text panel -->
+  <div class="tutor-text-panel" id="tutor-text-panel">
+    <span class="tutor-text-tag">Tutor said</span>
+    <span id="tutor-text-content"></span>
+  </div>
+
+  <!-- Mic — bottom centre -->
+  <div class="mic-wrap">
+    <button id="btn" onclick="toggle()">
+      <div id="ring"></div>
+      <svg id="mic" width="26" height="26" viewBox="0 0 24 24" fill="rgba(255,255,255,.85)"
+           style="pointer-events:none;transition:fill .25s">
+        <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+        <path d="M19 10v2a7 7 0 0 1-14 0v-2" stroke="rgba(255,255,255,.85)" stroke-width="2"
+              fill="none" stroke-linecap="round" id="arc"/>
+        <line x1="12" y1="19" x2="12" y2="23" stroke="rgba(255,255,255,.85)" stroke-width="2"
+              stroke-linecap="round" id="line1"/>
+        <line x1="8"  y1="23" x2="16" y2="23" stroke="rgba(255,255,255,.85)" stroke-width="2"
+              stroke-linecap="round" id="line2"/>
+      </svg>
+    </button>
+    <div id="lbl">tap to speak</div>
+  </div>
+
+  <!-- Progress dots -->
+  <div class="progress" id="progress"></div>
+
+  <!-- Celebration overlay -->
+  <div class="confetti-layer" id="confetti-layer"></div>
+  <div class="celebration" id="celebration">
+    <div class="cel-icon">🎉</div>
+    <div class="cel-text">Scene complete!</div>
+    <div class="cel-sub">Ready for the next challenge?</div>
+    <button class="cel-next" id="cel-next-btn" onclick="goToSceneSelect()">Next session →</button>
+  </div>
+
+  <!-- Start overlay — blocks audio until user taps -->
+  <div class="start-overlay" id="start-overlay">
+    <button class="start-btn" id="start-btn">Start lesson</button>
+  </div>
+</div>
+
 <script>
-// Streamlit plumbing
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function truncateLabel(text) {
+  return text.length > 36 ? text.slice(-36) + '...' : text;
+}
+
+// ── Streamlit plumbing ────────────────────────────────────────────────────────
 function sendToStreamlit(val) {
   window.parent.postMessage({isStreamlitMessage:true, type:"streamlit:setComponentValue", value:val}, "*");
 }
 window.parent.postMessage({isStreamlitMessage:true, type:"streamlit:componentReady", apiVersion:1}, "*");
 
-// Receive props from Python
-// Local mode:  proxy_port set  → ws://localhost:{proxy_port}?lang={lang}
-// Cloud mode:  ws_token set    → wss://api.elevenlabs.io/...?token={ws_token}
+// ── State ─────────────────────────────────────────────────────────────────────
 var lang         = "da";
 var proxyPort    = null;
 var wsToken      = null;
 var rendered     = false;
 var pendingStart = false;
-window.addEventListener("message", function(e) {
-  if (e.data && e.data.type === "streamlit:render" && e.data.args) {
-    lang      = e.data.args.lang       || "da";
-    proxyPort = e.data.args.proxy_port || null;
-    wsToken   = e.data.args.ws_token   || null;
-    rendered  = true;
-    if (pendingStart) { pendingStart = false; startListening(); }
+var started      = false;          // true after user clicks Start
+
+var lastTutorPlaySeq      = 0;
+var lastCharPlaySeq       = 0;
+var lastReplayCharSeq     = 0;
+var lastStopAudioSeq      = 0;
+var currentCharChunks     = [];   // kept for replay
+var lastTutorChunks       = [];   // kept for replay
+var pendingCharChunks     = [];   // queued before Start is clicked
+var pendingCharAfterTutor = [];   // char audio queued to play after tutor finishes
+var isTutorPlaying        = false;
+
+var wrapEl  = document.querySelector('.wrap');
+var noScene = document.getElementById('no-scene');
+var avMouth       = document.getElementById('av-mouth');
+var avDots        = document.getElementById('av-dots');
+var avLbl         = document.getElementById('av-lbl');
+var replayTutorBtn  = document.getElementById('replay-tutor-btn');
+var stopTutorBtn    = document.getElementById('stop-tutor-btn');
+var showTextBtn     = document.getElementById('show-text-btn');
+var tutorTextPanel  = document.getElementById('tutor-text-panel');
+var tutorTextContent= document.getElementById('tutor-text-content');
+var lastTutorText   = "";
+var progressEl      = document.getElementById('progress');
+var celebEl       = document.getElementById('celebration');
+var confettiLayer = document.getElementById('confetti-layer');
+var startOverlay  = document.getElementById('start-overlay');
+
+// ── Start button ──────────────────────────────────────────────────────────────
+document.getElementById('start-btn').addEventListener('click', function() {
+  startOverlay.style.display = 'none';
+  started = true;
+  sendToStreamlit("__started__");  // notify Python so chat log becomes visible
+  if (pendingCharChunks.length > 0) {
+    currentCharChunks = pendingCharChunks;
+    pendingCharChunks = [];
+    playCharChunks(currentCharChunks);
   }
 });
 
-// DOM refs
+// ── Props from Streamlit ──────────────────────────────────────────────────────
+window.addEventListener("message", function(e) {
+  if (!e.data || e.data.type !== "streamlit:render" || !e.data.args) return;
+  var a = e.data.args;
+  lang      = a.lang       || "da";
+  proxyPort = a.proxy_port || null;
+  wsToken   = a.ws_token   || null;
+  rendered  = true;
+
+  // ── Scene image (CSS background — fills container with no cropping at top)
+  var src = a.scene_src || "";
+  var currentBg = wrapEl.dataset.sceneSrc || "";
+  if (src && src !== currentBg) {
+    wrapEl.dataset.sceneSrc = src;
+    var tmp = new Image();
+    tmp.onload = function() {
+      wrapEl.style.backgroundImage = "url('" + src.replace(/'/g, "\\'") + "')";
+      noScene.style.display = 'none';
+    };
+    tmp.src = src;
+  } else if (!src) {
+    wrapEl.style.backgroundImage = "none";
+    noScene.style.display = "flex";
+  }
+
+  // ── Avatar (tutor) — seq-number based detection, checked FIRST ──────────
+  var thinking     = !!a.avatar_thinking;
+  var chunks       = a.avatar_chunks || [];
+  var tutorPlaySeq = a.tutor_play_seq || 0;
+  var tutorIsNew   = tutorPlaySeq > 0 && tutorPlaySeq !== lastTutorPlaySeq;
+
+  avDots.style.display = thinking ? "flex" : "none";
+  if (thinking) {
+    avMouth.classList.remove('on');
+    avLbl.textContent = "Thinking…";
+    avLbl.className   = "av-lbl";
+  } else if (!tutorIsNew && !isTutorPlaying) {
+    // Not thinking, no new tutor audio, not playing — visual idle only
+    // DO NOT call avIdleState() here — that would drain pendingCharAfterTutor prematurely
+    avMouth.classList.remove('on');
+    avDots.style.display = "none";
+    avLbl.textContent = "";
+    avLbl.className   = "av-lbl";
+  }
+
+  if (tutorIsNew) {
+    lastTutorPlaySeq = tutorPlaySeq;
+    if (started) {
+      playTutorChunks(chunks);
+    }
+  }
+
+  // ── Tutor text — show/hide button + update content when new response arrives
+  var tutorText = a.tutor_text || "";
+  if (tutorText && tutorText !== lastTutorText) {
+    lastTutorText = tutorText;
+    tutorTextContent.textContent = tutorText;
+    showTextBtn.style.display = 'block';
+    tutorTextPanel.classList.remove('show');  // collapse on new response
+  }
+
+  // ── Character audio — seq-number based detection ──────────────────────────
+  var charChunks   = a.char_audio  || [];
+  var charPlaySeq  = a.char_play_seq || 0;
+  var charIsNew    = charPlaySeq > 0 && charPlaySeq !== lastCharPlaySeq;
+
+  if (charIsNew) {
+    lastCharPlaySeq   = charPlaySeq;
+    currentCharChunks = charChunks;
+    if (started) {
+      if (tutorIsNew || isTutorPlaying) {
+        // Tutor is playing (or just started this render) — queue cashier for after
+        pendingCharAfterTutor = charChunks;
+      } else {
+        playCharChunks(charChunks);
+      }
+    } else {
+      pendingCharChunks = charChunks;
+    }
+  }
+
+  // ── Stop audio — triggered by sidebar button incrementing stop_audio_seq
+  var stopAudioSeq = a.stop_audio_seq || 0;
+  if (stopAudioSeq > 0 && stopAudioSeq !== lastStopAudioSeq) {
+    lastStopAudioSeq = stopAudioSeq;
+    stopAllAudio();
+    isTutorPlaying = false;
+    pendingCharAfterTutor = [];
+    avMouth.classList.remove('on');
+    avLbl.textContent = "";
+  }
+
+  // ── Replay cashier — triggered by sidebar button incrementing replay_char_seq
+  var replayCharSeq = a.replay_char_seq || 0;
+  if (replayCharSeq > 0 && replayCharSeq !== lastReplayCharSeq) {
+    lastReplayCharSeq = replayCharSeq;
+    if (started && currentCharChunks.length > 0) {
+      playCharChunks(currentCharChunks);
+    }
+  }
+
+  // ── Progress dots
+  renderProgress(a.progress_current || 0, a.progress_total || 0);
+
+  // ── Celebration
+  if (a.scene_celebration) {
+    celebEl.classList.add('show');
+    spawnConfetti();
+  } else {
+    celebEl.classList.remove('show');
+  }
+
+  if (pendingStart) { pendingStart = false; startListening(); }
+});
+
+// ── Audio exclusivity — only one voice plays at a time ───────────────────────
+var activeAudios = [];
+function stopAllAudio() {
+  activeAudios.forEach(function(a) { try { a.pause(); a.currentTime = 0; } catch(e) {} });
+  activeAudios = [];
+}
+
+// ── Character audio ───────────────────────────────────────────────────────────
+function playCharChunks(chunks) {
+  stopAllAudio();
+  var audios = chunks.map(function(b64) {
+    return new Audio("data:audio/mpeg;base64," + b64);
+  });
+  activeAudios = audios;
+  function next(i) {
+    if (i >= audios.length) return;
+    audios[i].play().catch(function() { next(i+1); });
+    audios[i].onended = function() { next(i+1); };
+  }
+  setTimeout(function() { next(0); }, 80);
+}
+
+// ── Tutor audio + avatar ──────────────────────────────────────────────────────
+function avSpeakState() {
+  isTutorPlaying = true;
+  avMouth.classList.add('on');
+  avDots.style.display = "none";
+  avLbl.textContent = "Speaking…";
+  avLbl.className   = "av-lbl s";
+}
+// Called ONLY when tutor audio finishes playing — drains the char queue
+function avIdleState() {
+  isTutorPlaying = false;
+  avMouth.classList.remove('on');
+  avDots.style.display = "none";
+  avLbl.textContent = "";
+  avLbl.className   = "av-lbl";
+  stopTutorBtn.style.display = 'none';
+  // Play cashier audio that was queued while tutor was speaking
+  if (pendingCharAfterTutor.length > 0) {
+    var toPlay = pendingCharAfterTutor;
+    pendingCharAfterTutor = [];
+    setTimeout(function() { playCharChunks(toPlay); }, 350);
+  }
+}
+function goToSceneSelect() {
+  sendToStreamlit("__scene_select__");
+}
+function toggleTutorText() {
+  tutorTextPanel.classList.toggle('show');
+}
+function replayTutor() {
+  if (lastTutorChunks.length > 0) playTutorChunks(lastTutorChunks);
+}
+function stopTutor() {
+  stopAllAudio();
+  isTutorPlaying = false;
+  pendingCharAfterTutor = [];
+  avMouth.classList.remove('on');
+  avLbl.textContent = "";
+}
+function playTutorChunks(chunks) {
+  lastTutorChunks = chunks;
+  replayTutorBtn.style.display = 'block';
+  stopTutorBtn.style.display   = 'block';
+  stopAllAudio();
+  var audios = chunks.map(function(b64) {
+    var a = new Audio("data:audio/mpeg;base64," + b64);
+    a.preload = "auto";
+    return a;
+  });
+  activeAudios = audios;
+  function next(i) {
+    if (i >= audios.length) { avIdleState(); return; }
+    avSpeakState();
+    audios[i].play().catch(function() { next(i+1); });
+    audios[i].onended = function() { next(i+1); };
+  }
+  setTimeout(function() { next(0); }, 100);
+}
+
+// ── Progress dots ─────────────────────────────────────────────────────────────
+function renderProgress(current, total) {
+  if (!total) { progressEl.innerHTML = ''; return; }
+  var html = '';
+  for (var i = 0; i < total; i++) {
+    var cls = 'pdot';
+    if (i < current)        cls += ' done';
+    else if (i === current) cls += ' active';
+    html += '<div class="' + cls + '"></div>';
+  }
+  progressEl.innerHTML = html;
+}
+
+// ── Confetti celebration ───────────────────────────────────────────────────────
+var confettiSpawned = false;
+var CONFETTI_COLORS = ['#818cf8','#a78bfa','#f472b6','#34d399','#fbbf24','#60a5fa','#f87171','#fff'];
+var CONFETTI_SHAPES = ['2px','50%','1px'];  // border-radius: rect, circle, thin
+
+function spawnConfetti() {
+  if (confettiSpawned) return;
+  confettiSpawned = true;
+  var count = 90;
+  for (var i = 0; i < count; i++) {
+    (function(i) {
+      setTimeout(function() {
+        var p = document.createElement('div');
+        p.className = 'confetti-piece';
+        var w = 6 + Math.random() * 8;
+        var h = 8 + Math.random() * 14;
+        var color = CONFETTI_COLORS[Math.floor(Math.random() * CONFETTI_COLORS.length)];
+        var radius = CONFETTI_SHAPES[Math.floor(Math.random() * CONFETTI_SHAPES.length)];
+        var left = Math.random() * 100;
+        var dx = (Math.random() - 0.5) * 200;
+        var dur = 2.5 + Math.random() * 2;
+        var delay = Math.random() * 0.8;
+        var rot = (Math.random() > 0.5 ? 1 : -1) * (360 + Math.random() * 720);
+        p.style.cssText =
+          'left:' + left + '%;' +
+          '--w:' + w + 'px;--h:' + h + 'px;' +
+          '--c:' + color + ';--r:' + radius + ';' +
+          '--dx:' + dx + 'px;--dur:' + dur + 's;--delay:' + delay + 's;' +
+          '--rot:' + rot + 'deg';
+        confettiLayer.appendChild(p);
+      }, i * 25);
+    })(i);
+  }
+  setTimeout(function() {
+    confettiSpawned = false;
+    confettiLayer.innerHTML = '';
+  }, 5500);
+}
+
+// ── Mic DOM refs ──────────────────────────────────────────────────────────────
 var btn  = document.getElementById('btn');
 var ring = document.getElementById('ring');
 var lbl  = document.getElementById('lbl');
 
-function setColor(c) {
-  ['mic','arc','line1','line2'].forEach(function(id) {
+function setMicColor(fill, stroke) {
+  document.getElementById('mic').setAttribute('fill', fill);
+  ['arc','line1','line2'].forEach(function(id) {
     var el = document.getElementById(id);
-    if (!el) return;
-    if (id === 'mic') el.setAttribute('fill', c);
-    else              el.setAttribute('stroke', c);
+    if (el) el.setAttribute('stroke', stroke);
   });
 }
 
-// State
+// ── Mic state ─────────────────────────────────────────────────────────────────
 var stream=null, workletNode=null, audioCtx=null, analyser=null, ws=null;
 var listening=false, spokenOnce=false, committed=false, fired=false;
 var lastSound=0, startTime=0, vadTimer=null;
@@ -134,7 +626,6 @@ async function startListening() {
   if (proxyPort) {
     wsUrl = 'ws://localhost:' + proxyPort + '?lang=' + lang;
   } else {
-    // Cloud mode: signed single-use token (generated server-side)
     wsUrl = 'wss://api.elevenlabs.io/v1/speech-to-text/realtime'
       + '?token=' + wsToken
       + '&model_id=scribe_v2_realtime'
@@ -163,10 +654,8 @@ async function startListening() {
     workletNode.port.onmessage = function(e) {
       if (!ws || ws.readyState !== WebSocket.OPEN) return;
       if (proxyPort) {
-        // Local mode: proxy handles base64 conversion
         ws.send(e.data);
       } else {
-        // Cloud mode: ElevenLabs expects base64-encoded JSON (token auth)
         var bytes = new Uint8Array(e.data);
         var bin = '';
         for (var i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
@@ -185,9 +674,9 @@ async function startListening() {
     lastPartial = '';
     startTime   = Date.now();
     lastSound   = 0;
-    listening  = true;
+    listening   = true;
     btn.classList.add('listening');
-    setColor('white');
+    setMicColor('white', 'white');
     lbl.textContent = 'listening...';
     startVAD();
   };
@@ -198,11 +687,12 @@ async function startListening() {
       var mt = msg.message_type || msg.type || '';
       if (mt === 'partial_transcript' && msg.text) {
         lastPartial = msg.text;
-        lbl.textContent = msg.text.length > 40 ? msg.text.slice(-40) + '...' : msg.text;
+        lbl.textContent = truncateLabel(msg.text);
       }
       if ((mt === 'committed_transcript' || mt === 'committed_transcript_with_timestamps') && msg.text) {
-        lbl.textContent = msg.text.length > 40 ? msg.text.slice(-40) + '...' : msg.text;
-        if (!fired) { fired = true; sendToStreamlit(msg.text); resetUI(); }  // fallback if no partial fired yet
+        lbl.textContent = truncateLabel(msg.text);
+        if (!fired) { fired = true; sendToStreamlit(msg.text); }
+        resetUI();  // always close ws and reset label, even if we already fired via lastPartial
       }
       if (mt === 'error' || mt === 'auth_error' || mt === 'input_error') {
         lbl.textContent = 'STT error';
@@ -212,7 +702,7 @@ async function startListening() {
   };
 
   ws.onerror = function() { lbl.textContent = 'proxy error'; resetUI(); };
-  ws.onclose = function() { if (listening) resetUI(); };
+  ws.onclose = function() { if (ws) resetUI(); };  // ws=null guard prevents re-entry
 }
 
 function startVAD() {
@@ -241,15 +731,13 @@ function commitAndStop() {
   listening = false;
   btn.classList.remove('listening');
   ring.style.transform = 'scale(1)';
-  setColor('#94a3b8');
+  setMicColor('rgba(255,255,255,.85)', 'rgba(255,255,255,.85)');
 
   if (workletNode) { workletNode.port.onmessage = null; workletNode.disconnect(); workletNode = null; }
   if (ws && ws.readyState === WebSocket.OPEN) {
     if (proxyPort) {
-      // Local mode: proxy translates this to the ElevenLabs commit format
       ws.send(JSON.stringify({type: 'commit'}));
     } else {
-      // Cloud mode: send commit directly in ElevenLabs format
       ws.send(JSON.stringify({
         message_type: 'input_audio_chunk',
         audio_base_64: '',
@@ -261,28 +749,29 @@ function commitAndStop() {
   if (audioCtx) { audioCtx.close(); audioCtx = null; analyser = null; }
   if (stream)   { stream.getTracks().forEach(function(t) { t.stop(); }); stream = null; }
 
-  // Fire pipeline immediately on the last partial — don't wait for ElevenLabs commit round-trip
   if (lastPartial) {
     fired = true;
     sendToStreamlit(lastPartial);
-    lbl.textContent = lastPartial.length > 40 ? lastPartial.slice(-40) + '...' : lastPartial;
+    lbl.textContent = truncateLabel(lastPartial);
     lastPartial = '';
   } else {
-    lbl.textContent = 'transcribing...';  // waiting for committed_transcript fallback
+    lbl.textContent = 'transcribing...';
   }
 }
 
 function resetUI() {
-  listening = false;
-  committed = false;
-  fired     = false;
+  listening   = false;
+  committed   = false;
+  fired       = false;
   lastPartial = '';
   if (vadTimer) { clearInterval(vadTimer); vadTimer = null; }
   btn.classList.remove('listening');
   ring.style.transform = 'scale(1)';
-  setColor('#94a3b8');
-  if (ws) { ws.close(); ws = null; }
-  setTimeout(function() { lbl.textContent = 'tap to speak'; }, 1500);
+  setMicColor('rgba(255,255,255,.85)', 'rgba(255,255,255,.85)');
+  // Null ws BEFORE closing so onclose re-entry guard (if (ws)) fires false
+  var _ws = ws; ws = null;
+  if (_ws) { try { _ws.close(); } catch(_) {} }
+  setTimeout(function() { if (!listening) lbl.textContent = 'tap to speak'; }, 1500);
 }
 </script>
 </body></html>
