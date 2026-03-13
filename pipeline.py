@@ -49,6 +49,30 @@ VOICES = {
     "Casper — male, calm":     "ADRrvIX3j1uTFlD5q6DE",
 }
 
+# ── Scene catalog — single source of truth for all scenes ──────────────────────
+SCENE_CATALOG = [
+    {
+        "key":         "supermarket",
+        "level":       "A1",
+        "title":       "Supermarket Checkout",
+        "desc":        "Pay for your groceries and chat with the cashier",
+        "file":        "supermarket_cashier.png",
+        "gradient":    "linear-gradient(135deg,#1e3a8a,#312e81)",
+        "char_name":   "Cashier",
+        "scene_description": "Danish supermarket checkout — the cashier is facing you, ready to scan your items",
+    },
+    {
+        "key":         "restaurant",
+        "level":       "B1",
+        "title":       "At the Restaurant",
+        "desc":        "Order a meal and interact with the waiter in Danish",
+        "file":        "restaurant.png",
+        "gradient":    "linear-gradient(135deg,#7c2d12,#9a3412)",
+        "char_name":   "Waiter",
+        "scene_description": "Danish restaurant — a waiter is at your table, ready to take your order",
+    },
+]
+
 # Session state keys that belong to one lesson — cleared when starting a new one
 LESSON_STATE_KEYS = [
     "chat", "last_chunks", "last_response", "last_id",
