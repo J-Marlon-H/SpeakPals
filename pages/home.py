@@ -1,5 +1,6 @@
 import streamlit as st
 import pathlib, base64
+import streamlit.components.v1 as components
 from pipeline import SCENE_CATALOG, LESSON_STATE_KEYS
 
 st.set_page_config(page_title="SpeakPals", page_icon="🇩🇰",
@@ -155,3 +156,20 @@ for lvl in levels_with_scenes:
                 for k in LESSON_STATE_KEYS:
                     st.session_state.pop(k, None)
                 st.switch_page("app.py")
+
+# Wire scene cards so clicking the image/card triggers the Start button
+components.html("""<script>
+(function wire() {
+  var doc = window.parent.document;
+  var cards = doc.querySelectorAll('.scene-card:not([data-wired])');
+  cards.forEach(function(card) {
+    card.setAttribute('data-wired','1');
+    card.addEventListener('click', function() {
+      var col = card.closest('[data-testid="column"]');
+      if (col) { var btn = col.querySelector('button'); if (btn) btn.click(); }
+    });
+  });
+  if (doc.querySelectorAll('.scene-card:not([data-wired])').length > 0)
+    setTimeout(wire, 300);
+})();
+</script>""", height=0)

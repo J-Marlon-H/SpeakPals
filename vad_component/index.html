@@ -57,6 +57,19 @@ html{height:100.5%}
   transition:background .18s,color .18s;display:none}
 .replay-btn:hover{background:rgba(255,255,255,.14);color:rgba(255,255,255,.85)}
 
+/* ── Character replay pill — bottom centre-left ──────────────────────────── */
+#char-replay-btn{
+  position:absolute;bottom:52px;
+  left:calc(50% - 130px);transform:translateX(-100%);
+  background:rgba(20,20,40,.72);backdrop-filter:blur(8px);
+  border:1px solid rgba(255,255,255,.10);border-radius:20px;
+  padding:7px 13px;
+  font:10px/1 'Segoe UI',sans-serif;color:rgba(255,255,255,.5);
+  cursor:pointer;letter-spacing:.5px;
+  transition:opacity .25s,background .2s,color .2s;
+  display:none;white-space:nowrap}
+#char-replay-btn:hover{background:rgba(40,40,70,.85);color:rgba(255,255,255,.8)}
+
 /* ── Mic button — bottom centre ──────────────────────────────────────────── */
 .mic-wrap{
   position:absolute;bottom:52px;left:50%;transform:translateX(-50%);
@@ -215,6 +228,9 @@ html{height:100.5%}
     <span class="tutor-text-tag">Tutor said</span>
     <span id="tutor-text-content"></span>
   </div>
+
+  <!-- Character replay pill -->
+  <button id="char-replay-btn" onclick="replayChar()">↺ replay</button>
 
   <!-- Mic — bottom centre -->
   <div class="mic-wrap">
@@ -436,12 +452,13 @@ function stopAllAudio() {
 // ── Character audio ───────────────────────────────────────────────────────────
 function playCharChunks(chunks) {
   stopAllAudio();
+  charReplayBtn.style.display = 'none';  // hide while playing
   var audios = chunks.map(function(b64) {
     return new Audio("data:audio/mpeg;base64," + b64);
   });
   activeAudios = audios;
   function next(i) {
-    if (i >= audios.length) return;
+    if (i >= audios.length) { charReplayBtn.style.display = 'block'; return; }
     audios[i].play().catch(function() { next(i+1); });
     audios[i].onended = function() { next(i+1); };
   }
@@ -563,6 +580,11 @@ function spawnConfetti() {
 var btn  = document.getElementById('btn');
 var ring = document.getElementById('ring');
 var lbl  = document.getElementById('lbl');
+var charReplayBtn = document.getElementById('char-replay-btn');
+
+function replayChar() {
+  if (currentCharChunks.length > 0) playCharChunks(currentCharChunks);
+}
 
 function setMicColor(fill, stroke) {
   document.getElementById('mic').setAttribute('fill', fill);
