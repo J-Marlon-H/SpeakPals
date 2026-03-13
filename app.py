@@ -53,8 +53,8 @@ SCENE_SCRIPTS = {
 # Preference order per scene: first voice that doesn't clash with the tutor's voice is used
 SCENE_CHAR_VOICE = {
     "supermarket":  [VOICES["Camilla — female"],        VOICES["Mathias — male baritone"]],
-    "flower_store": [VOICES["Camilla — female"],        VOICES["Casper — male, calm"]],
-    "bakery":       [VOICES["Casper — male, calm"],     VOICES["Mathias — male baritone"]],
+    "flower_store": [VOICES["Casper — male, calm"],     VOICES["Mathias — male baritone"]],
+    "bakery":       [VOICES["Camilla — female"],        VOICES["Casper — male, calm"]],
     "restaurant":   [VOICES["Mathias — male baritone"], VOICES["Casper — male, calm"]],
 }
 
