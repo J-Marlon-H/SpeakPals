@@ -1,4 +1,5 @@
 import streamlit as st
+from pipeline import SCENE_CATALOG
 
 st.set_page_config(page_title="Lesson Complete — SpeakPals", page_icon="🎓", layout="centered",
                    initial_sidebar_state="collapsed")
@@ -22,6 +23,10 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
+_scene_by_key = {s["key"]: s for s in SCENE_CATALOG}
+_sk = st.session_state.get("selected_scene", "")
+char_label = _scene_by_key.get(_sk, {}).get("char_name", "Character")
+
 # Show conversation log if available
 log = st.session_state.get("correct_log", [])
 if log:
@@ -33,7 +38,7 @@ if log:
             parts.append(
                 f"<div style='background:#fff;border:1px solid #e2e8f0;border-radius:12px 12px 12px 3px;"
                 f"padding:10px 14px;margin:0 0 6px;font-size:14px;color:#334155;line-height:1.5'>"
-                f"<span style='font:600 10px Segoe UI;color:#94a3b8;text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:3px'>Cashier</span>"
+                f"<span style='font:600 10px Segoe UI;color:#94a3b8;text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:3px'>{char_label}</span>"
                 f"<em>{txt}</em></div>"
             )
         else:
@@ -48,13 +53,16 @@ if log:
 else:
     st.info("Detailed feedback coming in a future update.")
 
-col1, col2 = st.columns(2)
+col1, col2, col3 = st.columns(3)
 with col1:
+    if st.button("🏠 Home", use_container_width=True):
+        st.switch_page("pages/home.py")
+with col2:
     if st.button("← Back to lesson", use_container_width=True):
         st.switch_page("app.py")
-with col2:
+with col3:
     if st.button("🔄 New lesson", type="primary", use_container_width=True):
         from pipeline import LESSON_STATE_KEYS
         for k in LESSON_STATE_KEYS:
             st.session_state.pop(k, None)
-        st.switch_page("app.py")
+        st.switch_page("pages/home.py")

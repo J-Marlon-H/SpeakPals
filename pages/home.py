@@ -95,7 +95,7 @@ LEVEL_LABELS = {"A1": "Beginner", "A2": "Elementary", "B1": "Intermediate", "B2"
 
 # ── Header ─────────────────────────────────────────────────────────────────────
 
-col_hdr, col_acct = st.columns([5, 1])
+col_hdr, col_fb, col_acct = st.columns([5, 1, 1])
 with col_hdr:
     st.markdown(f"""
 <div style='padding:8px 0 4px'>
@@ -107,6 +107,11 @@ with col_hdr:
     &nbsp;·&nbsp; Choose a scene to practise Danish
   </div>
 </div>""", unsafe_allow_html=True)
+with col_fb:
+    st.markdown("<div style='padding-top:18px'>", unsafe_allow_html=True)
+    if st.button("📋 Feedback", use_container_width=True):
+        st.switch_page("pages/feedback.py")
+    st.markdown("</div>", unsafe_allow_html=True)
 with col_acct:
     st.markdown("<div style='padding-top:18px'>", unsafe_allow_html=True)
     if st.button("⚙ Settings", use_container_width=True):
