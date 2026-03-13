@@ -31,6 +31,16 @@ SCENE_SCRIPTS = {
         "Vil du have en kvittering?",
         "Hav en god dag!",
     ],
+    "flower_store": [
+        "Hej! Hvad kan jeg hjælpe dig med i dag?",
+        "Hvilken farve vil du have?",
+        "Det bliver 50 kroner. Betaler du med kort eller kontant?",
+    ],
+    "bakery": [
+        "Godmorgen! Hvad må det være?",
+        "Vil du have en pose med?",
+        "Det er 35 kroner. Værsgo og god dag!",
+    ],
     "restaurant": [
         "Goddag og velkommen! Har du reserveret bord?",
         "Hvad kan jeg bringe dig i dag?",
@@ -42,8 +52,10 @@ SCENE_SCRIPTS = {
 
 # Preference order per scene: first voice that doesn't clash with the tutor's voice is used
 SCENE_CHAR_VOICE = {
-    "supermarket": [VOICES["Camilla — female"],        VOICES["Mathias — male baritone"]],
-    "restaurant":  [VOICES["Mathias — male baritone"], VOICES["Casper — male, calm"]],
+    "supermarket":  [VOICES["Camilla — female"],        VOICES["Mathias — male baritone"]],
+    "flower_store": [VOICES["Camilla — female"],        VOICES["Casper — male, calm"]],
+    "bakery":       [VOICES["Casper — male, calm"],     VOICES["Mathias — male baritone"]],
+    "restaurant":   [VOICES["Mathias — male baritone"], VOICES["Casper — male, calm"]],
 }
 
 SCENE_NEXT_PROMPT = {
