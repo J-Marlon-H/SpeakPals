@@ -182,9 +182,9 @@ for k, v in [
     ("interaction_idx", 0), ("char_audio", []),
     ("scene_celebration", False), ("char_loaded_for", None),
     ("pipeline_error", None), ("pending_student", None), ("avatar_thinking", False),
-    ("correct_log", []), ("lesson_started", False),
+    ("correct_log", []), ("coaching_log", []), ("lesson_started", False),
     ("tutor_play_seq", 0), ("char_play_seq", 0), ("replay_char_seq", 0),
-    ("stop_audio_seq", 0),
+    ("stop_audio_seq", 0), ("current_session_id", None),
 ]:
     if k not in st.session_state:
         st.session_state[k] = v
@@ -480,6 +480,15 @@ if student_text:
         # ── Log: accepted student answer (char question already logged when TTS loaded) ─
         if has_ok and char_question:
             st.session_state.correct_log.append({"who": "student", "text": student_text})
+
+        # ── Log: coaching event (wrong answer) ────────────────────────────────
+        if not has_ok and char_question and script:
+            st.session_state.coaching_log.append({
+                "question":   char_question,
+                "attempt":    student_text,
+                "correction": tutor_text,
+                "bg_lang":    bg_lang,
+            })
 
         # ── Advance interaction ────────────────────────────────────────────────
         if script and has_ok and interaction_idx < len(script):

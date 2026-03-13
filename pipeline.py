@@ -120,8 +120,9 @@ LESSON_STATE_KEYS = [
     "interaction_idx", "char_audio",
     "scene_celebration", "char_loaded_for",
     "pipeline_error", "pending_student", "avatar_thinking",
-    "correct_log", "lesson_started", "tutor_play_seq", "char_play_seq",
-    "replay_char_seq",
+    "correct_log", "coaching_log", "lesson_started",
+    "tutor_play_seq", "char_play_seq", "replay_char_seq",
+    "current_session_id",
 ]
 
 # ── Structured output schema ────────────────────────────────────────────────────
