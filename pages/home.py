@@ -27,6 +27,19 @@ _selP = ", ".join(
 )
 _selP2 = ", ".join(f".st-key-{s['key']} button p" for s in SCENE_CATALOG)
 
+# Per-scene height based on column count — avoids cropping at different widths.
+# 1 col (~900px wide): 380px  2 cols (~450px): 260px  3 cols (~290px): 200px
+_HEIGHT_BY_COLS = {1: "380px", 2: "260px", 3: "200px"}
+
+def _height_css() -> str:
+    parts = []
+    for s in SCENE_CATALOG:
+        scenes_in_level = [x for x in SCENE_CATALOG if x["level"] == s["level"]]
+        n_cols = min(len(scenes_in_level), 3)
+        h = _HEIGHT_BY_COLS[n_cols]
+        parts.append(f".st-key-{s['key']} button{{height:{h}!important}}")
+    return " ".join(parts)
+
 # Initial gradient CSS — injected immediately so buttons show a placeholder
 # colour while base64 images load in the background.
 _grad_css = " ".join(
@@ -64,7 +77,7 @@ st.markdown(f"""<style>
   /* ── Scene card buttons ─────────────────────────────────────────────────── */
   {_sel} {{
     display:block!important;width:100%!important;
-    height:auto!important;aspect-ratio:5/3!important;max-height:320px!important;
+    height:200px!important;
     padding:0!important;margin:0!important;
     border-radius:18px!important;overflow:hidden!important;border:none!important;
     background-size:cover!important;background-position:top center!important;
@@ -96,6 +109,9 @@ st.markdown(f"""<style>
 
   /* Per-scene gradient placeholders (shown while images load) */
   {_grad_css}
+
+  /* Per-scene heights — scaled to column count so nothing gets cropped */
+  {_height_css()}
 </style>""", unsafe_allow_html=True)
 
 
