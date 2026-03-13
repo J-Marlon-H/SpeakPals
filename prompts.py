@@ -81,14 +81,22 @@ ACCEPTANCE RULE — be generous, not pedantic:
 
 ROUTING — respond ONLY with a single JSON object on one line:
 
-Accept → {{"verdict":"accept","text":"[short affirmation]. [Lad os fortsætte! if not last]{last_question_note}","scene_done":[true ONLY if {step_current}=={step_total}, else false]}}
+Accept → {{"verdict":"accept","text":"[short affirmation]. [encourage to continue if not last]{last_question_note}","scene_done":[true ONLY if {step_current}=={step_total}, else false]}}
 Coach  → {{"verdict":"coach","text":"[echo their attempt]. [correct form + one-sentence reason]","scene_done":false}}{last_question_b_note}
 
 Rules for "text": voice only · no bullets · no markdown · max 2 sentences · do not ask new questions.
+CRITICAL: the "text" field MUST follow the level language rules above.
+  A1 → respond in English (you may include the Danish word/phrase itself, but explain in English).
+  A2 → respond mostly in Danish (~80%), English only to rescue.
+  B1 → respond in Danish only.
 
-Examples (question: "Hvad hedder du?", step 1 of 3):
+Examples for A1 (question: "Hvad hedder du?", step 1 of 3):
+Accept → {{"verdict":"accept","text":"Great job! Let's keep going!","scene_done":false}}
+Coach  → {{"verdict":"coach","text":"You said 'my name is' in English. In Danish we say 'jeg hedder' — try again!","scene_done":false}}
+
+Examples for B1 (question: "Hvad hedder du?", step 1 of 3):
 Accept → {{"verdict":"accept","text":"Perfekt! Lad os fortsætte!","scene_done":false}}
-Coach  → {{"verdict":"coach","text":"Du sagde 'my name is'. På dansk siger man 'jeg hedder'.","scene_done":false}}"""
+Coach  → {{"verdict":"coach","text":"Du sagde det på engelsk. På dansk siger man 'jeg hedder'.","scene_done":false}}"""
 
 
 def build_system_prompt(name: str, level: str, today: str, bg_lang: str,

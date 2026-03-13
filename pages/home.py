@@ -98,7 +98,7 @@ st.markdown(f"""<style>
 # shorthand can't reset background-image to none during the hover state.
 img_css = []
 for s in SCENE_CATALOG:
-    img_url = f"app/static/scenes/{s['file']}"
+    img_url = f"/app/static/scenes/{s['file']}"
     rule = (
         f"background-image:url('{img_url}')!important;"
         f"background-size:cover!important;"
