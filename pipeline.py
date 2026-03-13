@@ -56,7 +56,7 @@ SCENE_CATALOG = [
         "level":       "A1",
         "title":       "Meet a Friend",
         "desc":        "Introduce yourself and get to know someone in Danish",
-        "file":        "meet_a_friend.png",
+        "file":        "friend.png",
         "gradient":    "linear-gradient(135deg,#064e3b,#065f46)",
         "char_name":   "Friend",
         "scene_description": "A friendly young Dane smiling at you in a sunny park, ready to chat and get to know you",
