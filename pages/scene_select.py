@@ -28,7 +28,7 @@ st.markdown("""<style>
     filter:brightness(1.08)}
   .scene-card img{
     position:absolute;inset:0;width:100%;height:100%;
-    object-fit:cover;border-radius:18px;
+    object-fit:cover;object-position:top center;border-radius:18px;
     transition:transform .22s ease}
   .scene-card:hover img{transform:scale(1.05)}
   .scene-card-overlay{
