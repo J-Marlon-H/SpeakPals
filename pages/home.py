@@ -159,17 +159,28 @@ for lvl in levels_with_scenes:
 
 # Wire scene cards so clicking the image/card triggers the Start button
 components.html("""<script>
-(function wire() {
+(function() {
   var doc = window.parent.document;
-  var cards = doc.querySelectorAll('.scene-card:not([data-wired])');
-  cards.forEach(function(card) {
-    card.setAttribute('data-wired','1');
+
+  function wireCard(card) {
+    if (card.dataset.wired) return;
+    card.dataset.wired = '1';
+    card.style.cursor = 'pointer';
     card.addEventListener('click', function() {
       var col = card.closest('[data-testid="column"]');
       if (col) { var btn = col.querySelector('button'); if (btn) btn.click(); }
     });
-  });
-  if (doc.querySelectorAll('.scene-card:not([data-wired])').length > 0)
-    setTimeout(wire, 300);
+  }
+
+  function wireAll() {
+    doc.querySelectorAll('.scene-card').forEach(wireCard);
+  }
+
+  // Wire immediately and at several intervals to cover async renders
+  wireAll();
+  [100, 300, 700, 1500].forEach(function(ms) { setTimeout(wireAll, ms); });
+
+  // Keep wiring whenever new nodes appear in the document
+  new MutationObserver(wireAll).observe(doc.body, {childList: true, subtree: true});
 })();
 </script>""", height=0)
