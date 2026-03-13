@@ -40,6 +40,12 @@ SCENE_SCRIPTS = {
     ],
 }
 
+# Preference order per scene: first voice that doesn't clash with the tutor's voice is used
+SCENE_CHAR_VOICE = {
+    "supermarket": [VOICES["Camilla — female"],        VOICES["Mathias — male baritone"]],
+    "restaurant":  [VOICES["Mathias — male baritone"], VOICES["Casper — male, calm"]],
+}
+
 SCENE_NEXT_PROMPT = {
     "supermarket": (
         "interior of a Danish bakery, a friendly baker facing directly toward you "
@@ -120,6 +126,13 @@ st.markdown("""<style>
     border:none!important;display:block!important;margin:0!important}
   /* Chat message slide-in animation */
   @keyframes msgSlideIn{from{opacity:0;transform:translateX(-14px)}to{opacity:1;transform:translateX(0)}}
+  /* Pin last sidebar button (Home) to bottom; add clearance above it */
+  [data-testid="stSidebar"] > div:first-child{padding-bottom:64px!important}
+  [data-testid="stSidebar"] .stButton:last-child{
+    position:fixed!important;bottom:0!important;left:0!important;
+    width:320px!important;padding:10px 16px 14px!important;
+    background:#0b0b1a!important;border-top:1px solid rgba(129,140,248,.15)!important;
+    z-index:100!important}
 </style>""", unsafe_allow_html=True)
 
 # ── Topic ──────────────────────────────────────────────────────────────────────
@@ -180,7 +193,11 @@ else:
 
 voice_id = VOICES[voice_label]
 
-char_voice_id = next(v for v in VOICES.values() if v != voice_id)
+_char_prefs = SCENE_CHAR_VOICE.get(st.session_state.get("selected_scene"), [])
+char_voice_id = next(
+    (v for v in _char_prefs if v != voice_id),
+    next(v for v in VOICES.values() if v != voice_id),
+)
 
 sk              = _scene_key(_scene_src_raw)
 script          = SCENE_SCRIPTS.get(sk, []) if sk else []
@@ -285,7 +302,7 @@ with st.sidebar:
                 )
         st.markdown("".join(parts), unsafe_allow_html=True)
 
-    # ── Replay cashier ────────────────────────────────────────────────────────
+    # ── Replay character ──────────────────────────────────────────────────────
     if st.session_state.lesson_started and st.session_state.char_audio:
         st.markdown("<div style='height:6px'></div>", unsafe_allow_html=True)
         if st.button(f"↺ Replay {char_label.lower()}", use_container_width=True,
@@ -302,6 +319,10 @@ with st.sidebar:
         st.markdown("<div style='height:1px;background:rgba(255,255,255,.07);margin:8px 12px'></div>", unsafe_allow_html=True)
         if st.button("Finish Lecture", type="primary", use_container_width=True):
             st.switch_page("pages/feedback.py")
+
+    # Back to Home — always last → pinned to bottom by CSS
+    if st.button("🏠 Back to Home", use_container_width=True):
+        st.switch_page("pages/home.py")
 
 # ── VAD / scene component ──────────────────────────────────────────────────────
 
