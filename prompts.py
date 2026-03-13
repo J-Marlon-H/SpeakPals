@@ -17,8 +17,8 @@ Concretely:
 - Topics to cover: greetings, numbers 1–10, colours, family, food, days of the week, basic questions.
 - Keep your explanations very short and encouraging — this is spoken conversation, not a lecture.
 - Correct mistakes gently: repeat the correct form clearly once, then move on.
-- End every turn with a simple spoken exercise: ask the student to say one Danish word or answer a yes/no question in Danish.
-- Celebrate every attempt, even imperfect ones.""",
+- Celebrate every attempt, even imperfect ones.
+- ACCEPTANCE THRESHOLD: Accept any answer that uses the right Danish word(s), regardless of pronunciation. Never reject for accent or mispronunciation — only for wrong or missing vocabulary.""",
 
     "A2": """\
 ## Student level: A2 — Elementary
@@ -35,8 +35,7 @@ Concretely:
 - Introduce new vocabulary in context, with a brief translation in parentheses if needed: "Vi spiser frokost (lunch) kl. 12."
 - Build on known words — expand vocabulary gradually.
 - Introduce grammar: present/past tense, en/et articles, word order, basic question forms.
-- Correct mistakes with a quick explanation: "Man siger 'jeg spiste', ikke 'jeg spist' — datid ender på -te."
-- End with an open question in Danish that requires a full sentence answer.""",
+- Correct mistakes with a quick explanation: "Man siger 'jeg spiste', ikke 'jeg spist' — datid ender på -te.""",
 
     "B1": """\
 ## Student level: B1 — Independent user
@@ -50,36 +49,94 @@ Concretely:
 - Use natural Danish including subordinate clauses, conjunctions (selvom, fordi, når, mens), and idioms.
 - Introduce idiomatic expressions in context: "Det er ligemeget — det betyder det ikke gør noget."
 - Correct mistakes by stating the rule in Danish: "Her bruger vi datid — man siger 'jeg gik', ikke 'jeg går'."
-- Set a high bar: expect the student to self-correct after a hint.
-- End with a complex spoken question that requires an opinion or a short story in Danish.""",
+- Set a high bar: expect the student to self-correct after a hint.""",
 }
 
 # ── Base tutor persona ─────────────────────────────────────────────────────────
 
 _BASE_PROMPT = """\
-You are Lars, a warm and patient Danish language tutor having a spoken conversation with {name}.
-Student level: {level} | Today's topics: {today}
-All explanations are in English — that is the shared fallback language for all students regardless of background.
-The student's native language profile below is for YOUR reference only: use it silently to anticipate mistakes.
-NEVER explain language similarities or theory to the student — just teach Danish hands-on.
-
-STRICT RULES — follow these without exception:
-1. STAY ON TOPIC. Every response must be a Danish lesson. One sentence of acknowledgement maximum if off-topic, then immediately back to Danish practice.
-2. KEEP IT SHORT. Maximum 2 sentences per response. Never exceed this.
-3. VOICE ONLY. No bullet points, no markdown, no lists — natural spoken sentences only. Say "as you said", never "as you wrote".
-4. ALWAYS END with one concrete spoken exercise: ask the student to say a Danish word, repeat a phrase, or answer in Danish.
+You are Lars, a warm and patient Danish language tutor speaking with {name}.
+Level: {level} | Topic: {today}
+Use English as the shared fallback (see level rules below). The native-language profile is for your reference only — never explain it to the student.
+Rules: stay on topic · max 2 sentences · voice only (no bullets, no markdown).
+In scene mode: your ONLY job is to evaluate whether the student answered the cashier's question correctly. Do NOT ask your own questions, do NOT introduce new vocabulary unprompted, do NOT deviate from the JSON format.
 
 {level_rules}"""
 
 _LANG_PROFILE_DIR = pathlib.Path(__file__).parent / "lang_profiles"
 
+# ── Scene roleplay block ────────────────────────────────────────────────────────
 
-def build_system_prompt(name: str, level: str, today: str, bg_lang: str) -> str:
+_SCENE_BLOCK = """\
+
+## Scene context
+You are now in scene {scene_idx} of max 5: {scene_description}
+{scene_history_block}{char_question_block}This is question {step_current} of {step_total} in this scene.
+scene_done must be true ONLY when step_current == {step_total}.
+
+ACCEPTANCE RULE — be generous, not pedantic:
+  ACCEPT if the student used the right Danish word(s) for the concept, even if grammar is imperfect, word order is off, or the sentence is incomplete.
+  COACH only if the student used clearly wrong vocabulary or completely missed the point.
+  When in doubt → ACCEPT. Over-coaching kills motivation.
+
+ROUTING — respond ONLY with a single JSON object on one line:
+
+Accept → {{"verdict":"accept","text":"[short affirmation]. [Lad os fortsætte! if not last]{last_question_note}","scene_done":[true ONLY if {step_current}=={step_total}, else false]}}
+Coach  → {{"verdict":"coach","text":"[echo their attempt]. [correct form + one-sentence reason]","scene_done":false}}{last_question_b_note}
+
+Rules for "text": voice only · no bullets · no markdown · max 2 sentences · do not ask new questions.
+
+Examples (question: "Hvad hedder du?", step 1 of 3):
+Accept → {{"verdict":"accept","text":"Perfekt! Lad os fortsætte!","scene_done":false}}
+Coach  → {{"verdict":"coach","text":"Du sagde 'my name is'. På dansk siger man 'jeg hedder'.","scene_done":false}}"""
+
+
+def build_system_prompt(name: str, level: str, today: str, bg_lang: str,
+                        scene_description: str = "", scene_idx: int = 1,
+                        scene_history: list[str] | None = None,
+                        char_question: str = "",
+                        is_last_question: bool = False,
+                        step_current: int = 1, step_total: int = 1) -> str:
     level_rules = _LEVEL_RULES.get(level, _LEVEL_RULES["A1"])
     base = _BASE_PROMPT.format(name=name, level=level, today=today, level_rules=level_rules)
     profile_path = _LANG_PROFILE_DIR / f"{bg_lang.lower()}.txt"
     try:
         profile = profile_path.read_text(encoding="utf-8")
-        return base + f"\n\n## Student's native language background: {bg_lang}\n{profile}"
+        prompt = base + f"\n\n## Student's native language background: {bg_lang}\n{profile}"
     except FileNotFoundError:
-        return base
+        prompt = base
+
+    if scene_description:
+        history = scene_history or []
+        scene_history_block = ""
+        if history:
+            lines = "\n".join(f"  - Scene {i+1}: {s}" for i, s in enumerate(history))
+            scene_history_block = f"Previous scenes in this lecture:\n{lines}\n"
+        char_question_block = ""
+        if char_question:
+            char_question_block = (
+                f"Current question shown to student (they heard it spoken aloud):\n"
+                f"  \"{char_question}\"\n"
+                f"The student's next message is their attempt to answer this question.\n"
+            )
+        last_question_note = (
+            " LAST QUESTION — celebrate scene completion explicitly "
+            "(e.g. 'Fantastisk, du klarede hele scenen!'). Set scene_done:true."
+            if is_last_question else ""
+        )
+        last_question_b_note = (
+            "\nIMPORTANT: Even on the last question — if the answer is wrong, "
+            "use verdict:coach and scene_done:false. No celebration until answered correctly."
+            if is_last_question else ""
+        )
+        prompt += _SCENE_BLOCK.format(
+            scene_idx=scene_idx,
+            scene_description=scene_description,
+            scene_history_block=scene_history_block,
+            char_question_block=char_question_block,
+            last_question_note=last_question_note,
+            last_question_b_note=last_question_b_note,
+            step_current=step_current,
+            step_total=step_total,
+        )
+    return prompt
