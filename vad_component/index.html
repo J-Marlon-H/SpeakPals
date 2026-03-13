@@ -308,6 +308,7 @@ document.getElementById('start-btn').addEventListener('click', function() {
     pendingCharChunks = [];
     playCharChunks(currentCharChunks);
   }
+  prewarm();  // kick off pre-warm so first mic tap is instant
 });
 
 // ── Props from Streamlit ──────────────────────────────────────────────────────
@@ -577,6 +578,9 @@ var listening=false, spokenOnce=false, committed=false, fired=false;
 var lastSound=0, startTime=0, vadTimer=null;
 var lastPartial='';
 
+// ── Pre-warm state — filled on Start Lesson, consumed on first mic click ───────
+var _pwStream=null, _pwAudioCtx=null, _pwWorklet=false, _pwWs=null;
+
 var SILENCE_MS = 1200;
 var PROTECT_MS = 1000;
 var THRESH     = 10;
@@ -617,70 +621,36 @@ async function toggle() {
 }
 
 async function startListening() {
-  try {
-    stream = await navigator.mediaDevices.getUserMedia({audio:true, video:false});
-  } catch(e) { lbl.textContent = 'mic blocked'; return; }
+  // Consume pre-warmed mic stream or acquire fresh
+  if (_pwStream && _pwStream.active) {
+    stream = _pwStream; _pwStream = null;
+  } else {
+    try { stream = await navigator.mediaDevices.getUserMedia({audio:true, video:false}); }
+    catch(e) { lbl.textContent = 'mic blocked'; return; }
+  }
 
   if (!proxyPort && !wsToken) { lbl.textContent = 'not ready'; return; }
-  var wsUrl;
-  if (proxyPort) {
-    wsUrl = 'ws://localhost:' + proxyPort + '?lang=' + lang;
+
+  var wsUrl = proxyPort
+    ? 'ws://localhost:' + proxyPort + '?lang=' + lang
+    : 'wss://api.elevenlabs.io/v1/speech-to-text/realtime'
+        + '?token=' + wsToken + '&model_id=scribe_v2_realtime'
+        + '&language_code=' + lang + '&encoding=pcm_s16le&sample_rate=16000';
+
+  // Use pre-warmed open WS (proxy only) — skips handshake wait
+  if (_pwWs && _pwWs.readyState === WebSocket.OPEN) {
+    ws = _pwWs; _pwWs = null;
+    _attachWsHandlers();
+    await _setupAudioAndListen();
   } else {
-    wsUrl = 'wss://api.elevenlabs.io/v1/speech-to-text/realtime'
-      + '?token=' + wsToken
-      + '&model_id=scribe_v2_realtime'
-      + '&language_code=' + lang
-      + '&encoding=pcm_s16le'
-      + '&sample_rate=16000';
+    ws = new WebSocket(wsUrl);
+    ws.binaryType = 'arraybuffer';
+    ws.onopen = async function() { await _setupAudioAndListen(); };
+    _attachWsHandlers();
   }
-  ws = new WebSocket(wsUrl);
-  ws.binaryType = 'arraybuffer';
+}
 
-  ws.onopen = async function() {
-    audioCtx = new AudioContext({ sampleRate: 16000 });
-    analyser = audioCtx.createAnalyser();
-    analyser.fftSize = 512;
-    var src = audioCtx.createMediaStreamSource(stream);
-    src.connect(analyser);
-
-    var blob = new Blob([WORKLET_CODE], { type: 'application/javascript' });
-    var blobUrl = URL.createObjectURL(blob);
-    await audioCtx.audioWorklet.addModule(blobUrl);
-    URL.revokeObjectURL(blobUrl);
-
-    workletNode = new AudioWorkletNode(audioCtx, 'pcm-processor');
-    src.connect(workletNode);
-
-    workletNode.port.onmessage = function(e) {
-      if (!ws || ws.readyState !== WebSocket.OPEN) return;
-      if (proxyPort) {
-        ws.send(e.data);
-      } else {
-        var bytes = new Uint8Array(e.data);
-        var bin = '';
-        for (var i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
-        ws.send(JSON.stringify({
-          message_type: 'input_audio_chunk',
-          audio_base_64: btoa(bin),
-          commit: false,
-          sample_rate: 16000
-        }));
-      }
-    };
-
-    spokenOnce  = false;
-    committed   = false;
-    fired       = false;
-    lastPartial = '';
-    startTime   = Date.now();
-    lastSound   = 0;
-    listening   = true;
-    btn.classList.add('listening');
-    setMicColor('white', 'white');
-    lbl.textContent = 'listening...';
-    startVAD();
-  };
-
+function _attachWsHandlers() {
   ws.onmessage = function(e) {
     try {
       var msg = JSON.parse(e.data);
@@ -692,17 +662,82 @@ async function startListening() {
       if ((mt === 'committed_transcript' || mt === 'committed_transcript_with_timestamps') && msg.text) {
         lbl.textContent = truncateLabel(msg.text);
         if (!fired) { fired = true; sendToStreamlit(msg.text); }
-        resetUI();  // always close ws and reset label, even if we already fired via lastPartial
+        resetUI();
       }
       if (mt === 'error' || mt === 'auth_error' || mt === 'input_error') {
-        lbl.textContent = 'STT error';
-        resetUI();
+        lbl.textContent = 'STT error'; resetUI();
       }
     } catch(_) {}
   };
-
   ws.onerror = function() { lbl.textContent = 'proxy error'; resetUI(); };
-  ws.onclose = function() { if (ws) resetUI(); };  // ws=null guard prevents re-entry
+  ws.onclose = function() { if (ws) resetUI(); };
+}
+
+async function _setupAudioAndListen() {
+  // Consume pre-warmed AudioContext (worklet already compiled) or build fresh
+  if (_pwAudioCtx && _pwWorklet && _pwAudioCtx.state !== 'closed') {
+    audioCtx = _pwAudioCtx; _pwAudioCtx = null; _pwWorklet = false;
+  } else {
+    audioCtx = new AudioContext({ sampleRate: 16000 });
+    var blob = new Blob([WORKLET_CODE], { type: 'application/javascript' });
+    var blobUrl = URL.createObjectURL(blob);
+    await audioCtx.audioWorklet.addModule(blobUrl);
+    URL.revokeObjectURL(blobUrl);
+  }
+  analyser = audioCtx.createAnalyser();
+  analyser.fftSize = 512;
+  var src = audioCtx.createMediaStreamSource(stream);
+  src.connect(analyser);
+  workletNode = new AudioWorkletNode(audioCtx, 'pcm-processor');
+  src.connect(workletNode);
+  workletNode.port.onmessage = function(e) {
+    if (!ws || ws.readyState !== WebSocket.OPEN) return;
+    if (proxyPort) {
+      ws.send(e.data);
+    } else {
+      var bytes = new Uint8Array(e.data);
+      var bin = '';
+      for (var i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+      ws.send(JSON.stringify({
+        message_type: 'input_audio_chunk', audio_base_64: btoa(bin),
+        commit: false, sample_rate: 16000
+      }));
+    }
+  };
+  spokenOnce=false; committed=false; fired=false; lastPartial='';
+  startTime=Date.now(); lastSound=0;
+  listening=true;
+  btn.classList.add('listening');
+  setMicColor('white', 'white');
+  lbl.textContent = 'listening...';
+  startVAD();
+}
+
+async function prewarm() {
+  if (!rendered) return;
+  // Pre-acquire mic stream
+  if (!_pwStream || !_pwStream.active) {
+    try { _pwStream = await navigator.mediaDevices.getUserMedia({audio:true, video:false}); }
+    catch(e) { return; }
+  }
+  // Pre-build AudioContext + compile worklet module
+  if (!_pwAudioCtx || _pwAudioCtx.state === 'closed') {
+    try {
+      _pwAudioCtx = new AudioContext({ sampleRate: 16000 });
+      var blob = new Blob([WORKLET_CODE], { type: 'application/javascript' });
+      var blobUrl = URL.createObjectURL(blob);
+      await _pwAudioCtx.audioWorklet.addModule(blobUrl);
+      URL.revokeObjectURL(blobUrl);
+      _pwWorklet = true;
+    } catch(e) { _pwAudioCtx = null; }
+  }
+  // Pre-open WebSocket (proxy / local only — cloud tokens are single-use)
+  if (proxyPort && (!_pwWs || _pwWs.readyState > WebSocket.OPEN)) {
+    _pwWs = new WebSocket('ws://localhost:' + proxyPort + '?lang=' + lang);
+    _pwWs.binaryType = 'arraybuffer';
+    _pwWs.onclose = function() { _pwWs = null; };
+    _pwWs.onerror = function() { _pwWs = null; };
+  }
 }
 
 function startVAD() {
@@ -772,6 +807,8 @@ function resetUI() {
   var _ws = ws; ws = null;
   if (_ws) { try { _ws.close(); } catch(_) {} }
   setTimeout(function() { if (!listening) lbl.textContent = 'tap to speak'; }, 1500);
+  // Re-warm immediately so the next tap is also instant
+  if (started) setTimeout(prewarm, 200);
 }
 </script>
 </body></html>
