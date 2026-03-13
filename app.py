@@ -6,7 +6,7 @@ import hashlib, pathlib, base64
 from dotenv import load_dotenv
 import os
 
-from pipeline import (run_pipeline_stream, MODELS, VOICES,
+from pipeline import (run_pipeline_stream, MODELS, VOICES, SCENE_CATALOG,
                       parse_claude_response, generate_scene_image, character_tts_b64)
 from prompts import build_system_prompt
 from ws_proxy import start_in_thread, PROXY_PORT
@@ -30,7 +30,14 @@ SCENE_SCRIPTS = {
         "Vil du betale med kort eller kontanter?",
         "Vil du have en kvittering?",
         "Hav en god dag!",
-    ]
+    ],
+    "restaurant": [
+        "Goddag og velkommen! Har du reserveret bord?",
+        "Hvad kan jeg bringe dig i dag?",
+        "Vil du have noget at drikke til maden?",
+        "Er alt til din tilfredshed?",
+        "Ønsker du dessert eller kaffe?",
+    ],
 }
 
 SCENE_NEXT_PROMPT = {
@@ -39,6 +46,9 @@ SCENE_NEXT_PROMPT = {
         "behind the counter with eye contact, warm morning light, pastries on display"
     )
 }
+
+# Build scene lookup from catalog
+_SCENE_BY_KEY = {s["key"]: s for s in SCENE_CATALOG}
 
 def _scene_key(scene_src: str) -> str | None:
     for key in SCENE_SCRIPTS:
@@ -58,25 +68,6 @@ def _start_proxy():
 
 _start_proxy()
 
-# ── Default scene images (src keys under assets/scenes/) ──────────────────────
-
-_SCENE_ALIASES = {
-    "supermarket": "supermarket",
-    "shopping":    "supermarket",
-    "butik":       "supermarket",
-    "kassen":      "supermarket",
-}
-_DEFAULT_SCENE_DATA = {
-    "supermarket": ("scenes/supermarket_cashier.png",
-                    "Danish supermarket checkout — the cashier is facing you, ready to scan your items"),
-}
-
-def _pick_default_scene(today: str):
-    t = today.lower()
-    for alias, canonical in _SCENE_ALIASES.items():
-        if alias in t:
-            return _DEFAULT_SCENE_DATA[canonical]
-    return None
 
 @st.cache_data
 def _scene_to_data_url(src: str) -> str:
@@ -159,13 +150,18 @@ for k, v in [
     if k not in st.session_state:
         st.session_state[k] = v
 
-# ── Initialise first scene ─────────────────────────────────────────────────────
+# ── Initialise first scene from selected_scene (set by home page) ──────────────
 
 if not st.session_state.scene_images:
-    result = _pick_default_scene(today)
-    if result:
-        src, desc = result
-        st.session_state.scene_images = [{"src": src, "description": desc}]
+    selected = st.session_state.get("selected_scene")
+    scene_data = _SCENE_BY_KEY.get(selected) if selected else None
+    if scene_data:
+        st.session_state.scene_images = [{
+            "src":         f"scenes/{scene_data['file']}",
+            "description": scene_data["scene_description"],
+        }]
+    else:
+        st.switch_page("pages/home.py")
 
 # ── Derived scene values ───────────────────────────────────────────────────────
 
@@ -188,6 +184,7 @@ char_voice_id = next(v for v in VOICES.values() if v != voice_id)
 
 sk              = _scene_key(_scene_src_raw)
 script          = SCENE_SCRIPTS.get(sk, []) if sk else []
+char_label      = _SCENE_BY_KEY[sk]["char_name"] if sk and sk in _SCENE_BY_KEY else "Character"
 interaction_idx = st.session_state.interaction_idx
 char_question   = script[interaction_idx] if script and interaction_idx < len(script) else ""
 is_last_question = bool(script) and interaction_idx == len(script) - 1
@@ -275,7 +272,7 @@ with st.sidebar:
                     f"<div style='background:rgba(255,255,255,.07);border-radius:12px 12px 12px 3px;"
                     f"padding:10px 12px;margin:12px 12px 4px;font-size:13px;line-height:1.5;"
                     f"color:#e2e8f0;word-break:break-word;{anim}'>"
-                    f"<span style='font:600 10px Segoe UI;color:#94a3b8;display:block;margin-bottom:4px;letter-spacing:.5px;text-transform:uppercase'>Cashier</span>"
+                    f"<span style='font:600 10px Segoe UI;color:#94a3b8;display:block;margin-bottom:4px;letter-spacing:.5px;text-transform:uppercase'>{char_label}</span>"
                     f"<em>{txt}</em></div>"
                 )
             else:
@@ -291,8 +288,8 @@ with st.sidebar:
     # ── Replay cashier ────────────────────────────────────────────────────────
     if st.session_state.lesson_started and st.session_state.char_audio:
         st.markdown("<div style='height:6px'></div>", unsafe_allow_html=True)
-        if st.button("↺ Replay cashier", use_container_width=True,
-                     help="Replay cashier's last line"):
+        if st.button(f"↺ Replay {char_label.lower()}", use_container_width=True,
+                     help=f"Replay {char_label.lower()}'s last line"):
             st.session_state.replay_char_seq += 1
             st.rerun()
 

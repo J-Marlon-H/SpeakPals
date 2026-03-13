@@ -1,5 +1,6 @@
 import streamlit as st
 import pathlib, base64
+from pipeline import SCENE_CATALOG, LESSON_STATE_KEYS
 
 st.set_page_config(page_title="Choose a Scene — SpeakPals", page_icon="🎭",
                    layout="wide", initial_sidebar_state="collapsed")
@@ -70,24 +71,7 @@ def _img_data_url(filename: str) -> str | None:
     return f"data:{mime};base64," + base64.b64encode(data).decode()
 
 
-SCENES = [
-    {
-        "key":   "bakery",
-        "file":  "bakery.png",
-        "tag":   "Scene 2",
-        "title": "At the Bakery",
-        "desc":  "Order pastries and coffee from a friendly baker",
-        "gradient": "linear-gradient(135deg,#b45309,#92400e)",
-    },
-    {
-        "key":   "flower_store",
-        "file":  "flower_store.png",
-        "tag":   "Scene 2",
-        "title": "At the Flower Shop",
-        "desc":  "Buy flowers and chat with the florist",
-        "gradient": "linear-gradient(135deg,#065f46,#047857)",
-    },
-]
+level = st.session_state.get("s_level", "A1")
 
 # ── Header ─────────────────────────────────────────────────────────────────────
 
@@ -97,16 +81,20 @@ st.markdown("""
     Choose your next scene
   </div>
   <div style='font:400 14px Segoe UI;color:rgba(129,140,248,.75);margin-top:6px'>
-    Pick where you want to practice Danish today
+    Pick where you want to practice Danish next
   </div>
 </div>
 """, unsafe_allow_html=True)
 
-# ── Scene cards ────────────────────────────────────────────────────────────────
+# ── Scene cards — show scenes matching the user's level ────────────────────────
 
-cols = st.columns(2, gap="large")
+scenes = [s for s in SCENE_CATALOG if s["level"] == level]
+if not scenes:
+    scenes = SCENE_CATALOG  # fallback: show all if level has no scenes
 
-for col, scene in zip(cols, SCENES):
+cols = st.columns(min(len(scenes), 3), gap="large")
+
+for col, scene in zip(cols, scenes):
     with col:
         img_url = _img_data_url(scene["file"])
         if img_url:
@@ -119,7 +107,7 @@ for col, scene in zip(cols, SCENES):
 <div class='scene-card'>
   {img_html}
   <div class='scene-card-overlay'>
-    <div class='scene-card-tag'>{scene['tag']}</div>
+    <div class='scene-card-tag'>{scene['level']}</div>
     <div class='scene-card-title'>{scene['title']}</div>
     <div class='scene-card-desc'>{scene['desc']}</div>
   </div>
@@ -128,14 +116,17 @@ for col, scene in zip(cols, SCENES):
 
         if st.button(f"Choose — {scene['title']}", key=scene["key"], use_container_width=True):
             st.session_state["selected_scene"] = scene["key"]
-            # Clear previous lesson state so the new scene starts fresh
-            from pipeline import LESSON_STATE_KEYS
             for k in LESSON_STATE_KEYS:
                 st.session_state.pop(k, None)
             st.switch_page("app.py")
 
-# ── Back link ──────────────────────────────────────────────────────────────────
+# ── Bottom links ───────────────────────────────────────────────────────────────
 
 st.markdown("<div style='height:24px'></div>", unsafe_allow_html=True)
-if st.button("← Back to lesson", use_container_width=False):
-    st.switch_page("app.py")
+c1, c2 = st.columns(2)
+with c1:
+    if st.button("← Back to lesson", use_container_width=True):
+        st.switch_page("app.py")
+with c2:
+    if st.button("🏠 All scenes", use_container_width=True):
+        st.switch_page("pages/home.py")
