@@ -1,21 +1,9 @@
 import streamlit as st
-import pathlib, base64
 from pipeline import SCENE_CATALOG, LESSON_STATE_KEYS
+from scene_images import img_b64 as _img_b64
 
 st.set_page_config(page_title="SpeakPals", page_icon="🇩🇰",
                    layout="wide", initial_sidebar_state="collapsed")
-
-# ── Image helper ───────────────────────────────────────────────────────────────
-# @st.cache_data caches across ALL sessions — first load pays the cost, every
-# subsequent rerun (and every other user) gets the result instantly.
-@st.cache_data
-def _img_b64(filename: str) -> str | None:
-    path = pathlib.Path(__file__).parent.parent / "assets" / "scenes" / filename
-    if not path.exists():
-        return None
-    data = path.read_bytes()
-    mime = "image/jpeg" if filename.lower().endswith((".jpg", ".jpeg")) else "image/png"
-    return f"data:{mime};base64," + base64.b64encode(data).decode()
 
 # ── Build CSS selectors ────────────────────────────────────────────────────────
 _sel  = ", ".join(f".st-key-{s['key']} button" for s in SCENE_CATALOG)
@@ -40,12 +28,20 @@ def _height_css() -> str:
         parts.append(f".st-key-{s['key']} button{{height:{h}!important}}")
     return " ".join(parts)
 
-# Initial gradient CSS — injected immediately so buttons show a placeholder
-# colour while base64 images load in the background.
-_grad_css = " ".join(
-    f".st-key-{s['key']} button{{background:{s['gradient']}!important}}"
-    for s in SCENE_CATALOG
-)
+# Build background CSS per scene — use image if cached, fall back to gradient.
+def _bg_css() -> str:
+    parts = []
+    for s in SCENE_CATALOG:
+        img = _img_b64(s["file"])
+        if img:
+            rule = (f"background-image:url('{img}')!important;"
+                    f"background-size:cover!important;"
+                    f"background-position:top center!important")
+        else:
+            rule = f"background:{s['gradient']}!important"
+        key = s["key"]
+        parts.append(f".st-key-{key} button,.st-key-{key} button:hover{{{rule}}}")
+    return " ".join(parts)
 
 st.markdown(f"""<style>
   #MainMenu,footer,[data-testid="stToolbar"]{{visibility:hidden}}
@@ -107,8 +103,8 @@ st.markdown(f"""<style>
     font:400 12px 'Segoe UI',sans-serif;color:rgba(255,255,255,.4);
     margin-top:7px;padding:0 2px;line-height:1.5}}
 
-  /* Per-scene gradient placeholders (shown while images load) */
-  {_grad_css}
+  /* Per-scene background images (or gradient fallback if not yet cached) */
+  {_bg_css()}
 
   /* Per-scene heights — scaled to column count so nothing gets cropped */
   {_height_css()}
@@ -171,23 +167,3 @@ for lvl in levels_with_scenes:
                 unsafe_allow_html=True,
             )
 
-
-# ── Inject image CSS AFTER all cards are rendered ─────────────────────────────
-# Buttons already show gradient backgrounds (above). Now we load base64 images
-# and override the gradient. On first load: images appear ~0.5s after the page.
-# On repeat loads: @st.cache_data returns instantly — images appear immediately.
-img_css = []
-for s in SCENE_CATALOG:
-    img = _img_b64(s["file"])
-    if img:
-        rule = (
-            f"background-image:url('{img}')!important;"
-            f"background-size:cover!important;"
-            f"background-position:top center!important"
-        )
-        img_css.append(
-            f".st-key-{s['key']} button,.st-key-{s['key']} button:hover{{{rule}}}"
-        )
-
-if img_css:
-    st.markdown(f"<style>{''.join(img_css)}</style>", unsafe_allow_html=True)

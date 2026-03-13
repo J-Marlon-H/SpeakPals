@@ -10,6 +10,10 @@ from pipeline import (run_pipeline_stream, MODELS, VOICES, SCENE_CATALOG,
                       parse_claude_response, generate_scene_image, character_tts_b64)
 from prompts import build_system_prompt
 from ws_proxy import start_in_thread, PROXY_PORT
+from scene_images import preload_all_images
+
+# Warm the image cache on first server start so home page loads instantly
+preload_all_images()
 
 load_dotenv("keys.env")
 
