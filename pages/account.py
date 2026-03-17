@@ -1,5 +1,5 @@
 import streamlit as st
-from pipeline import VOICES, MODELS, LESSON_STATE_KEYS, SCENE_CATALOG
+from pipeline import VOICES, VOICES_BY_LANG, MODELS, LESSON_STATE_KEYS, SCENE_CATALOG
 
 st.set_page_config(page_title="Account — SpeakPals", page_icon="⚙", layout="centered",
                    initial_sidebar_state="collapsed")
@@ -19,12 +19,17 @@ st.markdown("""<style>
 
   /* Text inputs */
   .stTextInput input{
-    background:rgba(255,255,255,.05)!important;color:#e2e8f0!important;
+    background:#1a1a3a!important;color:#e2e8f0!important;
+    -webkit-text-fill-color:#e2e8f0!important;
     border:1px solid rgba(129,140,248,.25)!important;border-radius:10px!important;
     font-size:15px!important}
   .stTextInput input:focus{
     border-color:rgba(129,140,248,.6)!important;
     box-shadow:0 0 0 3px rgba(129,140,248,.12)!important}
+  .stTextInput input:-webkit-autofill,
+  .stTextInput input:-webkit-autofill:focus{
+    -webkit-box-shadow:0 0 0 100px #1a1a3a inset!important;
+    -webkit-text-fill-color:#e2e8f0!important}
 
   /* Selectboxes */
   .stSelectbox > div > div{
@@ -76,28 +81,51 @@ bg_lang  = st.selectbox("Your language background", bg_langs,
 
 st.markdown("<div class='sec-div'></div>", unsafe_allow_html=True)
 
-# ── Voice & model ──────────────────────────────────────────────────────────────
+# ── Language & voice & model ───────────────────────────────────────────────────
 st.markdown("<div class='sec-label'>Preferences</div>", unsafe_allow_html=True)
 
-voice_keys  = list(VOICES.keys())
+languages = ["Danish", "Portuguese (Brazilian)"]
+language  = st.selectbox(
+    "Language to learn",
+    languages,
+    index=languages.index(
+        st.session_state.get("s_language", "Danish")
+        if st.session_state.get("s_language", "Danish") in languages else "Danish"
+    )
+)
+
+lang_voices = VOICES_BY_LANG.get(language, VOICES)
+voice_keys  = list(lang_voices.keys())
+saved_voice = st.session_state.get("s_voice_label", "")
 voice_label = st.selectbox(
     "Tutor voice",
     voice_keys,
-    index=voice_keys.index(st.session_state.get("s_voice_label", voice_keys[0]))
+    index=voice_keys.index(saved_voice) if saved_voice in voice_keys else 0
 )
 
-# Which scenes would normally use this voice as their primary character voice
+# Scene primary voices mapped per language label
 SCENE_PRIMARY_VOICE = {
-    "meet_a_friend": "Casper — male, calm",
-    "cafe":          "Camilla — female",
-    "supermarket":   "Camilla — female",
-    "flower_store":  "Casper — male, calm",
-    "bakery":        "Camilla — female",
-    "restaurant":    "Mathias — male baritone",
+    "Danish": {
+        "meet_a_friend": "Casper — male, calm",
+        "cafe":          "Camilla — female",
+        "supermarket":   "Camilla — female",
+        "flower_store":  "Casper — male, calm",
+        "bakery":        "Camilla — female",
+        "restaurant":    "Mathias — male baritone",
+    },
+    "Portuguese (Brazilian)": {
+        "meet_a_friend": "Flavio — male, calm",
+        "cafe":          "Camila — female",
+        "supermarket":   "Camila — female",
+        "flower_store":  "Flavio — male, calm",
+        "bakery":        "Camila — female",
+        "restaurant":    "Matheus — male baritone",
+    },
 }
+scene_primary = SCENE_PRIMARY_VOICE.get(language, SCENE_PRIMARY_VOICE["Danish"])
 affected = [
     s["title"] for s in SCENE_CATALOG
-    if SCENE_PRIMARY_VOICE.get(s["key"]) == voice_label
+    if scene_primary.get(s["key"]) == voice_label
 ]
 if affected:
     st.markdown(
@@ -125,6 +153,7 @@ def _save():
     st.session_state["s_name"]        = name
     st.session_state["s_level"]       = level
     st.session_state["s_bg_lang"]     = bg_lang
+    st.session_state["s_language"]    = language
     st.session_state["s_voice_label"] = voice_label
     st.session_state["s_model_label"] = model_label
 

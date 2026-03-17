@@ -45,22 +45,41 @@ st.markdown("""<style>
 # ── Scene lookup ───────────────────────────────────────────────────────────────
 _scene_by_key = {s["key"]: s for s in SCENE_CATALOG}
 
-# ── Background-language tips ───────────────────────────────────────────────────
+# ── Background-language tips — per target language ─────────────────────────────
 BG_LANG_TIPS = {
-    "German":  ("🇩🇪", "Danish has only two genders (en/et) vs. German's three. The V2 rule looks "
-                "similar, but subclauses don't push the verb to the end. Numbers 50–90 use a "
-                "base-20 system — halvtreds = 50, tres = 60 — very different from German."),
-    "English": ("🇬🇧", "The V2 rule inverts subject + verb after a fronted element ('I go' → 'Går jeg'). "
-                "Articles are suffixes: hunden = the dog, huset = the house. "
-                "Many letters are silent — pronunciation is the biggest hurdle."),
-    "Spanish": ("🇪🇸", "Articles are suffixes added to the noun (hund-en = the dog). "
-                "The same verb form is used for jeg/du/han — no conjugation for person. "
-                "Pronunciation will feel unfamiliar at first."),
-    "French":  ("🇫🇷", "Like French, Danish has grammatical gender but only two (en/et). "
-                "No verb agreement with subject. Danish nasal vowels differ from French nasals."),
-    "Dutch":   ("🇳🇱", "Danish and Dutch are closely related — many words look similar. "
-                "Key differences: Danish spelling is less phonetic, and the stød (glottal stop) "
-                "has no Dutch equivalent."),
+    "Danish": {
+        "German":  ("🇩🇪", "Danish has only two genders (en/et) vs. German's three. The V2 rule looks "
+                    "similar, but subclauses don't push the verb to the end. Numbers 50–90 use a "
+                    "base-20 system — halvtreds = 50, tres = 60 — very different from German."),
+        "English": ("🇬🇧", "The V2 rule inverts subject + verb after a fronted element ('I go' → 'Går jeg'). "
+                    "Articles are suffixes: hunden = the dog, huset = the house. "
+                    "Many letters are silent — pronunciation is the biggest hurdle."),
+        "Spanish": ("🇪🇸", "Articles are suffixes added to the noun (hund-en = the dog). "
+                    "The same verb form is used for jeg/du/han — no conjugation for person. "
+                    "Pronunciation will feel unfamiliar at first."),
+        "French":  ("🇫🇷", "Like French, Danish has grammatical gender but only two (en/et). "
+                    "No verb agreement with subject. Danish nasal vowels differ from French nasals."),
+        "Dutch":   ("🇳🇱", "Danish and Dutch are closely related — many words look similar. "
+                    "Key differences: Danish spelling is less phonetic, and the stød (glottal stop) "
+                    "has no Dutch equivalent."),
+    },
+    "Portuguese (Brazilian)": {
+        "German":  ("🇩🇪", "Portuguese has two genders (masculine/feminine) like German, but no neuter. "
+                    "Verbs conjugate for person — 'eu falo', 'você fala', 'ele fala'. "
+                    "Watch out for 'ser' vs 'estar' — both mean 'to be' but are used differently."),
+        "English": ("🇬🇧", "Portuguese verbs conjugate for person and tense — no need for subject "
+                    "pronouns, the ending shows who is speaking. Master the nasal vowels "
+                    "(ã, em, om) and the difference between ser and estar."),
+        "Spanish": ("🇪🇸", "Brazilian Portuguese and Spanish share most vocabulary but sound very "
+                    "different. Key differences: 'você' replaces 'tú/usted', nasal vowels are "
+                    "prominent, and 'ter' is used instead of 'tener' for possession."),
+        "French":  ("🇫🇷", "Like French, Portuguese has nasal vowels and rich verb conjugations. "
+                    "Brazilian Portuguese dropped many silent letters — pronunciation is more "
+                    "direct. Focus on the difference between ser and estar."),
+        "Dutch":   ("🇳🇱", "Portuguese and Dutch are structurally very different. Focus on mastering "
+                    "the 14+ verb tenses, nasal vowels (ã, em), and the ser vs estar distinction "
+                    "— Dutch has no equivalent to this two-verb 'to be' system."),
+    },
 }
 
 # ── Sample sessions ────────────────────────────────────────────────────────────
@@ -113,8 +132,9 @@ if "session_history" not in st.session_state:
     st.session_state["session_history"] = list(SAMPLE_SESSIONS)
 
 _sk          = st.session_state.get("selected_scene", "")
-_level       = st.session_state.get("s_level",   "A1")
-_bg_lang     = st.session_state.get("s_bg_lang", "English")
+_level       = st.session_state.get("s_level",    "A1")
+_bg_lang     = st.session_state.get("s_bg_lang",  "English")
+_target_lang = st.session_state.get("s_language", "Danish")
 correct_log  = st.session_state.get("correct_log",  [])
 coaching_log = st.session_state.get("coaching_log", [])
 
@@ -130,6 +150,7 @@ if (correct_log or coaching_log) and not st.session_state.get("current_session_i
         "scene_title":  _scene_by_key.get(_sk, {}).get("title", "Lesson"),
         "level":        _level,
         "bg_lang":      _bg_lang,
+        "target_lang":  _target_lang,
         "score_ok":     answered,
         "score_total":  total,
         "coaching_log": coaching_log,
@@ -263,7 +284,8 @@ def render_session(s):
         )
 
     # ── Language tip ───────────────────────────────────────────────────────────
-    tip_data = BG_LANG_TIPS.get(s_bg)
+    _tgt      = s.get("target_lang", "Danish")
+    tip_data  = BG_LANG_TIPS.get(_tgt, BG_LANG_TIPS["Danish"]).get(s_bg)
     if tip_data:
         flag, tip_text = tip_data
         st.markdown(
