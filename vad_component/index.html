@@ -635,7 +635,7 @@ async function startListening() {
     ? 'ws://localhost:' + proxyPort + '?lang=' + lang
     : 'wss://api.elevenlabs.io/v1/speech-to-text/realtime'
         + '?token=' + wsToken + '&model_id=scribe_v2_realtime'
-        + '&language_code=' + lang + '&audio_format=pcm_16000';
+        + '&language_code=' + lang + '&encoding=pcm_s16le&sample_rate=16000';
 
   // Use pre-warmed open WS (proxy only) — skips handshake wait
   if (_pwWs && _pwWs.readyState === WebSocket.OPEN) {

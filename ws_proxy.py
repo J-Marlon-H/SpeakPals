@@ -55,7 +55,8 @@ async def proxy(browser_ws):
         f"{EL_WS_BASE}"
         f"?model_id=scribe_v2_realtime"
         f"&language_code={lang}"
-        f"&audio_format=pcm_16000"
+        f"&encoding=pcm_s16le"
+        f"&sample_rate=16000"
     )
 
     # Disable TLS verification — corporate networks often replace certificates
