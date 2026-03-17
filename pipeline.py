@@ -1,3 +1,4 @@
+from __future__ import annotations
 import requests, urllib3, base64, json, re, time, threading
 import streamlit as st
 

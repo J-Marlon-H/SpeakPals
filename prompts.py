@@ -1,3 +1,4 @@
+from __future__ import annotations
 import pathlib
 
 # ── Short display name used inside prompts (avoids "Portuguese (Brazilian)") ────

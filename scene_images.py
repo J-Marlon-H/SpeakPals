@@ -1,3 +1,4 @@
+from __future__ import annotations
 import pathlib, base64
 import streamlit as st
 from pipeline import SCENE_CATALOG

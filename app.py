@@ -1,5 +1,5 @@
 # SpeakPals — Lesson
-
+from __future__ import annotations
 import streamlit as st
 import streamlit.components.v1 as components
 import hashlib, pathlib, base64
