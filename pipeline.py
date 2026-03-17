@@ -66,6 +66,48 @@ def generate_language_tip(conversation_lines: list, bg_lang: str, claude_key: st
     return r.json()["content"][0]["text"].strip()
 
 
+def extract_vocabulary(conversation_lines: list, bg_lang: str, level: str,
+                       claude_key: str, model: str = "claude-haiku-4-5-20251001") -> list:
+    """Extract key vocab from conversation.
+    Returns list of {word, translation, example} dicts (4–6 items)."""
+    conv_text = "\n".join(
+        f"{'Character' if e['who'] == 'character' else 'Student'}: {e['text']}"
+        for e in conversation_lines
+    )
+    prompt = (
+        f"From this Danish conversation (student level: {level}, native language: {bg_lang}):\n\n"
+        f"{conv_text}\n\n"
+        f"Extract 4–6 useful Danish words or short phrases a beginner should practice. "
+        f"Prefer content words (nouns, verbs, useful phrases). Skip bare filler like 'ja' or 'hej' "
+        f"unless there is a genuine nuance worth noting for {bg_lang} speakers. "
+        f"For each word provide:\n"
+        f"  - 'word': the Danish word/phrase as it appeared\n"
+        f"  - 'translation': concise English translation\n"
+        f"  - 'example': a short new Danish sentence (5–8 words) using this word — "
+        f"different from the conversation, appropriate for {level} level\n\n"
+        f"Reply with a JSON array only, no other text:\n"
+        f'[{{"word":"...","translation":"...","example":"..."}}]'
+    )
+    r = get_session().post(
+        "https://api.anthropic.com/v1/messages",
+        headers={"x-api-key": claude_key, "anthropic-version": "2023-06-01",
+                 "Content-Type": "application/json"},
+        json={"model": model, "max_tokens": 500, "temperature": 0.4,
+              "messages": [{"role": "user", "content": prompt}]},
+        timeout=20,
+    )
+    r.raise_for_status()
+    return json.loads(r.json()["content"][0]["text"].strip())
+
+
+SETTINGS_DEFAULTS = {
+    "s_name":        "Marlon",
+    "s_level":       "A1",
+    "s_bg_lang":     "German",
+    "s_voice_label": "Mathias — male baritone",
+    "s_model_label": "Haiku 4.5 — fastest",
+}
+
 MODELS = {
     "Sonnet 4.6 — best quality": "claude-sonnet-4-6",
     "Haiku 4.5 — fastest":       "claude-haiku-4-5-20251001",

@@ -1,8 +1,14 @@
 import streamlit as st
+import streamlit.components.v1 as components
 import datetime
+import base64
 import os
+import pathlib
 from dotenv import load_dotenv
-from pipeline import SCENE_CATALOG, LESSON_STATE_KEYS, generate_language_tip
+from pipeline import (SCENE_CATALOG, LESSON_STATE_KEYS, VOICES, SETTINGS_DEFAULTS,
+                      generate_language_tip, extract_vocabulary, tts_chunk)
+import json as _json
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 load_dotenv("keys.env")
 
@@ -12,7 +18,9 @@ def _secret(key):
     except Exception:
         return os.getenv(key)
 
-CLAUDE_KEY = _secret("CLAUDE_API_KEY")
+CLAUDE_KEY  = _secret("CLAUDE_API_KEY")
+ELEVEN_KEY  = _secret("ELEVENLABS_API_KEY")
+_DEFAULT_VOICE = list(VOICES.values())[0]  # Mathias
 
 st.set_page_config(page_title="Feedback — SpeakPals", page_icon="📋",
                    layout="wide", initial_sidebar_state="collapsed")
@@ -121,12 +129,20 @@ SAMPLE_SESSIONS = [
 ]
 
 # ── Session state init ─────────────────────────────────────────────────────────
+_saved = SETTINGS_DEFAULTS.copy()
+try:
+    _saved.update(_json.loads((pathlib.Path(__file__).parent.parent / "user_settings.json").read_text(encoding="utf-8")))
+except Exception:
+    pass
+for _k, _v in _saved.items():
+    if _k not in st.session_state:
+        st.session_state[_k] = _v
 if "session_history" not in st.session_state:
     st.session_state["session_history"] = list(SAMPLE_SESSIONS)
 
 _sk          = st.session_state.get("selected_scene", "")
-_level       = st.session_state.get("s_level",   "A1")
-_bg_lang     = st.session_state.get("s_bg_lang", "English")
+_level       = st.session_state.get("s_level",   SETTINGS_DEFAULTS["s_level"])
+_bg_lang     = st.session_state.get("s_bg_lang", SETTINGS_DEFAULTS["s_bg_lang"])
 correct_log  = st.session_state.get("correct_log",  [])
 coaching_log = st.session_state.get("coaching_log", [])
 
@@ -135,15 +151,43 @@ if (correct_log or coaching_log) and not st.session_state.get("current_session_i
     answered = sum(1 for e in correct_log if e["who"] == "student")
     total    = answered + len(coaching_log)
 
-    lang_tip = None
     all_lines = correct_log + [
         {"who": "student", "text": e.get("attempt", "")} for e in coaching_log if e.get("attempt")
     ]
+
+    lang_tip = None
+    vocab    = []
     if all_lines and CLAUDE_KEY:
-        try:
-            lang_tip = generate_language_tip(all_lines, _bg_lang, CLAUDE_KEY)
-        except Exception:
-            pass
+        voice_label = st.session_state.get("s_voice_label", "")
+        voice_id    = VOICES.get(voice_label, _DEFAULT_VOICE)
+
+        # Run tip + vocab extraction in parallel
+        with ThreadPoolExecutor(max_workers=2) as ex:
+            fut_tip   = ex.submit(generate_language_tip, all_lines, _bg_lang, CLAUDE_KEY)
+            fut_vocab = ex.submit(extract_vocabulary, all_lines, _bg_lang, _level, CLAUDE_KEY)
+            try:
+                lang_tip = fut_tip.result()
+            except Exception:
+                pass
+            try:
+                items = fut_vocab.result()
+            except Exception:
+                items = []
+
+        # Run all TTS calls in parallel
+        if items and ELEVEN_KEY:
+            def _tts(item):
+                try:
+                    audio = tts_chunk(item["example"], voice_id, ELEVEN_KEY)
+                    item["audio_b64"] = base64.b64encode(audio).decode()
+                except Exception:
+                    pass
+                return item
+
+            with ThreadPoolExecutor(max_workers=len(items)) as ex:
+                items = list(ex.map(_tts, items))
+
+        vocab = items
 
     st.session_state["current_session_id"] = _ts
     st.session_state["session_history"].insert(0, {
@@ -158,6 +202,7 @@ if (correct_log or coaching_log) and not st.session_state.get("current_session_i
         "coaching_log": coaching_log,
         "correct_log":  correct_log,
         "lang_tip":     lang_tip,
+        "vocab":        vocab,
     })
 
 history = st.session_state["session_history"]
@@ -185,6 +230,50 @@ def _score_ring(ok: int, total: int) -> str:
     )
 
 
+# ── Vocabulary section ─────────────────────────────────────────────────────────
+def _render_vocab(s):
+    vocab = s.get("vocab", [])
+    if not vocab:
+        return
+    sid = s["id"]
+    st.markdown(
+        "<div style='font:700 10px Segoe UI;letter-spacing:2px;color:rgba(165,180,252,.4);"
+        "text-transform:uppercase;margin-bottom:14px'>Words from this session</div>",
+        unsafe_allow_html=True,
+    )
+    cols = st.columns(2)
+    for i, item in enumerate(vocab):
+        word      = item.get("word", "")
+        trans     = item.get("translation", "")
+        example   = item.get("example", "")
+        audio_b64 = item.get("audio_b64")
+        with cols[i % 2]:
+            st.markdown(
+                f"<div style='background:rgba(129,140,248,.05);"
+                f"border:1px solid rgba(129,140,248,.14);border-radius:12px;"
+                f"padding:14px 16px;margin-bottom:4px'>"
+                f"  <div style='display:flex;align-items:baseline;gap:8px;margin-bottom:7px'>"
+                f"    <span style='font:700 15px Segoe UI;color:#e0e7ff'>{word}</span>"
+                f"    <span style='font:400 11px Segoe UI;color:rgba(165,180,252,.5)'>{trans}</span>"
+                f"  </div>"
+                f"  <div style='font:400 12px/1.5 Segoe UI;color:rgba(165,180,252,.72);"
+                f"    font-style:italic'>{example}</div>"
+                f"</div>",
+                unsafe_allow_html=True,
+            )
+            if audio_b64:
+                if st.button("▶ Hear it", key=f"play_{sid}_{i}"):
+                    st.session_state[f"_aud_{sid}_{i}"] = True
+                if st.session_state.pop(f"_aud_{sid}_{i}", False):
+                    components.html(
+                        f'<audio autoplay>'
+                        f'<source src="data:audio/mpeg;base64,{audio_b64}" type="audio/mpeg">'
+                        f'</audio>',
+                        height=0,
+                    )
+    st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
+
+
 # ── Render function ────────────────────────────────────────────────────────────
 def render_session(s):
     errors    = s.get("coaching_log", [])
@@ -198,19 +287,16 @@ def render_session(s):
 
     # ── Session header card ────────────────────────────────────────────────────
     ring_svg  = _score_ring(ok, total)
-    perf_tag  = (
+    n_err = len(errors)
+    status_tag = (
         "<span style='background:rgba(52,211,153,.12);border:1px solid rgba(52,211,153,.25);"
         "border-radius:20px;padding:2px 10px;font:600 10px Segoe UI;color:#34d399;"
-        "letter-spacing:.5px;text-transform:uppercase;margin-left:10px'>Perfect</span>"
-        if perfect else ""
-    )
-    n_err = len(errors)
-    err_tag = (
+        "letter-spacing:.5px;text-transform:uppercase;margin-left:10px'>A Dane understood you ✓</span>"
+        if perfect else
         f"<span style='background:rgba(199,160,252,.08);border:1px solid rgba(165,180,252,.2);"
         f"border-radius:20px;padding:2px 10px;font:600 10px Segoe UI;color:#a5b4fc;"
         f"letter-spacing:.5px;text-transform:uppercase;margin-left:8px'>"
-        f"{n_err} mistake{'s' if n_err != 1 else ''} to review</span>"
-        if n_err else ""
+        f"{n_err} to revisit</span>"
     )
 
     st.markdown(
@@ -220,9 +306,10 @@ def render_session(s):
         f"  <div style='flex-shrink:0'>{ring_svg}</div>"
         f"  <div>"
         f"    <div style='font:700 16px/1.2 Segoe UI,sans-serif;color:#e0e7ff;margin-bottom:5px'>"
-        f"      {scene_ttl}{perf_tag}{err_tag}</div>"
+        f"      {scene_ttl}{status_tag}</div>"
         f"    <div style='font:400 12px Segoe UI;color:rgba(165,180,252,.5)'>"
-        f"      Level {s.get('level','')} &nbsp;·&nbsp; {s_bg} &nbsp;·&nbsp; {s.get('date','')}"
+        f"      Task completion &nbsp;·&nbsp; Level {s.get('level','')} &nbsp;·&nbsp; "
+        f"      {s_bg} &nbsp;·&nbsp; {s.get('date','')}"
         f"    </div>"
         f"  </div>"
         f"</div>",
@@ -305,6 +392,9 @@ def render_session(s):
             unsafe_allow_html=True
         )
 
+    # ── Vocabulary ─────────────────────────────────────────────────────────────
+    _render_vocab(s)
+
     # ── Full conversation ──────────────────────────────────────────────────────
     if conv:
         with st.expander("Full conversation"):
@@ -372,22 +462,31 @@ with tab_hist:
             n_err   = len(s.get("coaching_log", []))
             ok      = s.get("score_ok", 0)
             total   = s.get("score_total", 0)
-            suffix  = "Perfect" if not n_err else f"{n_err} mistake{'s' if n_err > 1 else ''}"
+            suffix  = "Understood ✓" if not n_err else f"{n_err} to revisit"
             label   = f"{s.get('scene_title','')}  ·  {s.get('date','')}  ·  {ok}/{total}  ·  {suffix}"
             with st.expander(label):
                 render_session(s)
 
-# ── Navigation ─────────────────────────────────────────────────────────────────
-st.markdown("<div style='height:24px'></div>", unsafe_allow_html=True)
+# ── Momentum nav ───────────────────────────────────────────────────────────────
+st.markdown(
+    "<div style='height:24px'></div>"
+    "<div style='font:700 10px Segoe UI;letter-spacing:2px;color:rgba(165,180,252,.35);"
+    "text-transform:uppercase;margin-bottom:12px;text-align:center'>Keep going</div>",
+    unsafe_allow_html=True,
+)
 col1, col2, col3 = st.columns(3)
 with col1:
-    if st.button("← Back to lesson", use_container_width=True):
+    if st.button("🔁 Same scene again", use_container_width=True):
+        # Keep scene selection, clear only lesson progress
+        for k in LESSON_STATE_KEYS:
+            if k != "selected_scene":
+                st.session_state.pop(k, None)
         st.switch_page("app.py")
 with col2:
-    if st.button("🏠 Home", use_container_width=True):
-        st.switch_page("pages/home.py")
-with col3:
-    if st.button("New lesson", use_container_width=True):
+    if st.button("▶ New scene", use_container_width=True):
         for k in LESSON_STATE_KEYS:
             st.session_state.pop(k, None)
-        st.switch_page("pages/home.py")
+        st.switch_page("pages/scene_select.py")
+with col3:
+    if st.button("← Back to lesson", use_container_width=True):
+        st.switch_page("app.py")
