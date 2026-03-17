@@ -428,12 +428,20 @@ chunks  = st.session_state.last_chunks or []
 caption = ("Generating next scene…" if st.session_state.scene_loading
            else f"Scene {scene_idx_1based}")
 
+@st.cache_data(ttl=600, show_spinner=False)
 def _scribe_token(eleven_key):
+    """Fetch a short-lived single-use token for the ElevenLabs Scribe WS.
+    Cached for 10 min so reruns don't hammer the token endpoint."""
+    if not eleven_key:
+        return None
     try:
         import requests as _req
         r = _req.post(
             "https://api.elevenlabs.io/v1/single-use-token/realtime_scribe",
-            headers={"xi-api-key": eleven_key}, timeout=5)
+            headers={"xi-api-key": eleven_key},
+            timeout=8,
+        )
+        r.raise_for_status()
         return r.json().get("token")
     except Exception:
         return None
