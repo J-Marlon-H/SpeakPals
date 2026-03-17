@@ -38,6 +38,34 @@ def tts_chunk(text, voice_id, eleven_key):
     r.raise_for_status()
 
 
+def generate_language_tip(conversation_lines: list, bg_lang: str, claude_key: str,
+                          model: str = "claude-haiku-4-5-20251001") -> str:
+    """Generate a conversation-specific language tip for a given background language.
+    Returns plain text (2-3 sentences). Raises on API error."""
+    conv_text = "\n".join(
+        f"{'Character' if e['who'] == 'character' else 'Student'}: {e['text']}"
+        for e in conversation_lines
+    )
+    prompt = (
+        f"A student whose native language is {bg_lang} just completed this short Danish conversation:\n\n"
+        f"{conv_text}\n\n"
+        f"Write a short tip (2–3 sentences max) specifically for {bg_lang} speakers, based only on "
+        f"the words that appear in this conversation. Focus on: cognates (Danish words that look or "
+        f"sound similar to {bg_lang}), false friends, or notable pronunciation differences. "
+        f"Reference specific words from the conversation. Plain text only — no markdown, no bullet points."
+    )
+    r = get_session().post(
+        "https://api.anthropic.com/v1/messages",
+        headers={"x-api-key": claude_key, "anthropic-version": "2023-06-01",
+                 "Content-Type": "application/json"},
+        json={"model": model, "max_tokens": 150, "temperature": 0.5,
+              "messages": [{"role": "user", "content": prompt}]},
+        timeout=20,
+    )
+    r.raise_for_status()
+    return r.json()["content"][0]["text"].strip()
+
+
 MODELS = {
     "Sonnet 4.6 — best quality": "claude-sonnet-4-6",
     "Haiku 4.5 — fastest":       "claude-haiku-4-5-20251001",

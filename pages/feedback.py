@@ -1,6 +1,18 @@
 import streamlit as st
 import datetime
-from pipeline import SCENE_CATALOG, LESSON_STATE_KEYS
+import os
+from dotenv import load_dotenv
+from pipeline import SCENE_CATALOG, LESSON_STATE_KEYS, generate_language_tip
+
+load_dotenv("keys.env")
+
+def _secret(key):
+    try:
+        return st.secrets[key]
+    except Exception:
+        return os.getenv(key)
+
+CLAUDE_KEY = _secret("CLAUDE_API_KEY")
 
 st.set_page_config(page_title="Feedback — SpeakPals", page_icon="📋",
                    layout="wide", initial_sidebar_state="collapsed")
@@ -122,6 +134,17 @@ if (correct_log or coaching_log) and not st.session_state.get("current_session_i
     _ts      = str(int(datetime.datetime.now().timestamp()))
     answered = sum(1 for e in correct_log if e["who"] == "student")
     total    = answered + len(coaching_log)
+
+    lang_tip = None
+    all_lines = correct_log + [
+        {"who": "student", "text": e.get("attempt", "")} for e in coaching_log if e.get("attempt")
+    ]
+    if all_lines and CLAUDE_KEY:
+        try:
+            lang_tip = generate_language_tip(all_lines, _bg_lang, CLAUDE_KEY)
+        except Exception:
+            pass
+
     st.session_state["current_session_id"] = _ts
     st.session_state["session_history"].insert(0, {
         "id":           _ts,
@@ -134,6 +157,7 @@ if (correct_log or coaching_log) and not st.session_state.get("current_session_i
         "score_total":  total,
         "coaching_log": coaching_log,
         "correct_log":  correct_log,
+        "lang_tip":     lang_tip,
     })
 
 history = st.session_state["session_history"]
@@ -263,9 +287,11 @@ def render_session(s):
         )
 
     # ── Language tip ───────────────────────────────────────────────────────────
-    tip_data = BG_LANG_TIPS.get(s_bg)
-    if tip_data:
-        flag, tip_text = tip_data
+    dynamic_tip = s.get("lang_tip")
+    static_tip  = BG_LANG_TIPS.get(s_bg)
+    if dynamic_tip or static_tip:
+        flag      = static_tip[0] if static_tip else "💡"
+        tip_text  = dynamic_tip if dynamic_tip else static_tip[1]
         st.markdown(
             f"<div style='background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.07);"
             f"border-radius:14px;padding:16px 20px;margin-bottom:20px'>"
