@@ -1,6 +1,12 @@
 """
 WebSocket proxy: browser → this server → ElevenLabs Scribe v2 Realtime
 Keeps the ElevenLabs API key server-side (browsers can't set custom headers on WS).
+
+Language protocol:
+  Browser sends {"type": "init", "lang": "por"} messages before audio.
+  The proxy accepts ALL init messages until the first audio chunk arrives,
+  so the mic-tap init always wins over any stale prewarm init.
+  ElevenLabs is only connected once the first real audio chunk is received.
 """
 import asyncio
 import json
@@ -17,8 +23,34 @@ PROXY_PORT  = 8502
 
 
 async def proxy(browser_ws):
-    qs   = browser_ws.request.path if hasattr(browser_ws, "request") else ""
-    lang = "en" if "lang=en" in qs else "da"
+    # ── Phase 1: consume all messages until first audio chunk ─────────────────
+    # Accept every init message so the mic-tap init (sent right before audio)
+    # always overrides any prewarm init that may have used a stale language.
+    lang        = "da"   # safe default
+    first_audio = None
+    try:
+        async for msg in browser_ws:
+            if isinstance(msg, str):
+                try:
+                    data = json.loads(msg)
+                    if data.get("type") == "init" and data.get("lang"):
+                        lang = str(data["lang"])   # keep updating until audio
+                        print(f"[proxy] init received → lang={lang}", flush=True)
+                except Exception:
+                    pass
+            elif isinstance(msg, bytes):
+                if len(msg) >= 2:
+                    first_audio = msg
+                    break
+    except Exception:
+        return   # connection closed before audio — nothing to do
+
+    if first_audio is None:
+        return   # no audio received
+
+    print(f"[proxy] connecting to ElevenLabs with language_code={lang}", flush=True)
+
+    # ── Phase 2: connect to ElevenLabs with the final language ────────────────
     el_url = (
         f"{EL_WS_BASE}"
         f"?model_id=scribe_v2_realtime"
@@ -40,6 +72,14 @@ async def proxy(browser_ws):
             ping_interval=20,
             open_timeout=10,
         ) as el_ws:
+
+            # Send the first audio chunk that triggered the EL connection
+            await el_ws.send(json.dumps({
+                "message_type": "input_audio_chunk",
+                "audio_base_64": base64.b64encode(first_audio).decode(),
+                "commit": False,
+                "sample_rate": 16000,
+            }))
 
             async def browser_to_el():
                 async for msg in browser_ws:

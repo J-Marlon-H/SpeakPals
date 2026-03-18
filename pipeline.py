@@ -1,3 +1,4 @@
+from __future__ import annotations
 import requests, urllib3, base64, json, re, time, threading
 import streamlit as st
 
@@ -20,13 +21,13 @@ def clean_for_tts(text):
     return text.strip()
 
 
-def tts_chunk(text, voice_id, eleven_key):
+def tts_chunk(text, voice_id, eleven_key, lang_code="da"):
     for attempt in range(3):
         r = get_session().post(
             f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}/stream",
             headers={"xi-api-key": eleven_key, "Content-Type": "application/json"},
-            json={"text": text.strip(), "model_id": "eleven_turbo_v2_5",
-                  "language_code": "da",
+            json={"text": text.strip(), "model_id": TTS_MODEL.get(lang_code, "eleven_turbo_v2_5"),
+                  "language_code": lang_code,
                   "voice_settings": {"stability": 0.4, "similarity_boost": 0.75, "speed": 0.92}},
             stream=True, timeout=30,
         )
@@ -49,17 +50,44 @@ VOICES = {
     "Casper — male, calm":     "ADRrvIX3j1uTFlD5q6DE",
 }
 
+# Per-language voice menus — Brazilian voices use native Brazilian-accented voice IDs
+VOICES_BY_LANG = {
+    "Danish": VOICES,
+    "Portuguese (Brazilian)": {
+        "Matheus — male baritone": "36rVQA1AOIPwpA3Hg1tC",  # Native Brazilian male
+        "Camila — female":         "4RklGmuxoAskAbGXplXN",  # Multilingual female (shared)
+        "Flavio — male, calm":     "x6uRgOliu4lpcrqMH3s1",  # Native Brazilian male, narrative
+    },
+}
+
+TTS_LANG_CODE = {
+    "Danish":                 "da",
+    "Portuguese (Brazilian)": "pt",
+}
+
+# STT (Scribe v2 realtime) uses ISO 639-3 codes — different from TTS ISO 639-1 codes
+STT_LANG_CODE = {
+    "Danish":                 "da",
+    "Portuguese (Brazilian)": "por",   # "por" is the confirmed Scribe ISO 639-3 code
+}
+
+# TTS model per language — keeps Danish on its proven model, Portuguese on the newer Flash model
+TTS_MODEL = {
+    "da": "eleven_turbo_v2_5",
+    "pt": "eleven_flash_v2_5",
+}
+
 # ── Scene catalog — single source of truth for all scenes ──────────────────────
 SCENE_CATALOG = [
     {
         "key":         "meet_a_friend",
         "level":       "A1",
         "title":       "Meet a Friend",
-        "desc":        "Introduce yourself and get to know someone in Danish",
+        "desc":        "Introduce yourself and get to know someone",
         "file":        "friend.jpg",
         "gradient":    "linear-gradient(135deg,#064e3b,#065f46)",
         "char_name":   "Friend",
-        "scene_description": "A friendly young Dane smiling at you in a sunny park, ready to chat and get to know you",
+        "scene_description": "A friendly young person smiling at you in a sunny park, ready to chat and get to know you",
     },
     {
         "key":         "cafe",
@@ -69,7 +97,7 @@ SCENE_CATALOG = [
         "file":        "cafe.jpg",
         "gradient":    "linear-gradient(135deg,#451a03,#78350f)",
         "char_name":   "Barista",
-        "scene_description": "A cosy Danish café — the barista is at the counter with coffee cups and pastries, ready to take your order",
+        "scene_description": "A cosy café — the barista is at the counter with coffee cups and pastries, ready to take your order",
     },
     {
         "key":         "supermarket",
@@ -79,37 +107,37 @@ SCENE_CATALOG = [
         "file":        "supermarket_cashier.jpg",
         "gradient":    "linear-gradient(135deg,#1e3a8a,#312e81)",
         "char_name":   "Cashier",
-        "scene_description": "Danish supermarket checkout — the cashier is facing you, ready to scan your items",
+        "scene_description": "Supermarket checkout — the cashier is facing you, ready to scan your items",
     },
     {
         "key":         "flower_store",
         "level":       "A2",
         "title":       "At the Flower Shop",
-        "desc":        "Buy flowers and chat with the florist in Danish",
+        "desc":        "Buy flowers and chat with the florist",
         "file":        "flower_store.jpg",
         "gradient":    "linear-gradient(135deg,#4a1942,#831843)",
         "char_name":   "Florist",
-        "scene_description": "Danish flower shop — the florist is behind the counter, surrounded by colourful flowers, ready to help you",
+        "scene_description": "A flower shop — the florist is behind the counter, surrounded by colourful flowers, ready to help you",
     },
     {
         "key":         "bakery",
         "level":       "A2",
         "title":       "At the Bakery",
-        "desc":        "Order pastries and bread from the baker in Danish",
+        "desc":        "Order pastries and bread from the baker",
         "file":        "bakery.jpg",
         "gradient":    "linear-gradient(135deg,#78350f,#92400e)",
         "char_name":   "Baker",
-        "scene_description": "Danish bakery — the baker is at the counter with fresh pastries and bread on display",
+        "scene_description": "A bakery — the baker is at the counter with fresh pastries and bread on display",
     },
     {
         "key":         "restaurant",
         "level":       "B1",
         "title":       "At the Restaurant",
-        "desc":        "Order a meal and interact with the waiter in Danish",
+        "desc":        "Order a meal and interact with the waiter",
         "file":        "restaurant.jpg",
         "gradient":    "linear-gradient(135deg,#7c2d12,#9a3412)",
         "char_name":   "Waiter",
-        "scene_description": "Danish restaurant — a waiter is at your table, ready to take your order",
+        "scene_description": "A restaurant — a waiter is at your table, ready to take your order",
     },
 ]
 
@@ -140,7 +168,7 @@ VERDICT_SCHEMA = {
 
 
 def run_pipeline_stream(system, user_input, history, voice_id, claude_key, eleven_key,
-                        model="claude-sonnet-4-6", use_structured=False):
+                        model="claude-sonnet-4-6", use_structured=False, lang_code="da"):
     """Generator: yields (raw_claude_text, chunk_b64).
     Streams Claude fully, then makes a single TTS call for the complete response.
     When use_structured=True, enforces VERDICT_SCHEMA via the structured outputs API
@@ -201,7 +229,7 @@ def run_pipeline_stream(system, user_input, history, voice_id, claude_key, eleve
         tts_text = clean_for_tts(raw_claude)
 
     if tts_text:
-        audio = tts_chunk(tts_text, voice_id, eleven_key)
+        audio = tts_chunk(tts_text, voice_id, eleven_key, lang_code)
         yield raw_claude, base64.b64encode(audio).decode()
     else:
         yield raw_claude, ""
@@ -276,10 +304,10 @@ def parse_claude_response(raw: str) -> tuple[str, bool, bool]:
     return text, has_ok, bool(scene_directive)
 
 
-def character_tts_b64(text: str, voice_id: str, eleven_key: str) -> str | None:
+def character_tts_b64(text: str, voice_id: str, eleven_key: str, lang_code: str = "da") -> str | None:
     """Synthesize a short line with the given voice; returns base64 string or None."""
     try:
-        audio = tts_chunk(text, voice_id, eleven_key)
+        audio = tts_chunk(text, voice_id, eleven_key, lang_code)
         return base64.b64encode(audio).decode()
     except Exception:
         return None

@@ -583,7 +583,7 @@ var _pwStream=null, _pwAudioCtx=null, _pwWorklet=false, _pwWs=null;
 
 var SILENCE_MS = 1200;
 var PROTECT_MS = 1000;
-var THRESH     = 10;
+var THRESH     = 5;
 
 var WORKLET_CODE = `
 class PCMProcessor extends AudioWorkletProcessor {
@@ -640,12 +640,16 @@ async function startListening() {
   // Use pre-warmed open WS (proxy only) — skips handshake wait
   if (_pwWs && _pwWs.readyState === WebSocket.OPEN) {
     ws = _pwWs; _pwWs = null;
+    if (proxyPort) ws.send(JSON.stringify({type: "init", lang: lang}));
     _attachWsHandlers();
     await _setupAudioAndListen();
   } else {
     ws = new WebSocket(wsUrl);
     ws.binaryType = 'arraybuffer';
-    ws.onopen = async function() { await _setupAudioAndListen(); };
+    ws.onopen = async function() {
+      if (proxyPort) ws.send(JSON.stringify({type: "init", lang: lang}));
+      await _setupAudioAndListen();
+    };
     _attachWsHandlers();
   }
 }
@@ -735,6 +739,7 @@ async function prewarm() {
   if (proxyPort && (!_pwWs || _pwWs.readyState > WebSocket.OPEN)) {
     _pwWs = new WebSocket('ws://localhost:' + proxyPort + '?lang=' + lang);
     _pwWs.binaryType = 'arraybuffer';
+    _pwWs.onopen = function() { _pwWs.send(JSON.stringify({type: "init", lang: lang})); };
     _pwWs.onclose = function() { _pwWs = null; };
     _pwWs.onerror = function() { _pwWs = null; };
   }

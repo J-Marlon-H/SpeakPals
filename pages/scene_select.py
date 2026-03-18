@@ -1,3 +1,4 @@
+from __future__ import annotations
 import streamlit as st
 import pathlib, base64
 from pipeline import SCENE_CATALOG, LESSON_STATE_KEYS
@@ -71,17 +72,18 @@ def _img_data_url(filename: str) -> str | None:
     return f"data:{mime};base64," + base64.b64encode(data).decode()
 
 
-level = st.session_state.get("s_level", "A1")
+level       = st.session_state.get("s_level",    "A1")
+target_lang = st.session_state.get("s_language", "Danish")
 
 # ── Header ─────────────────────────────────────────────────────────────────────
 
-st.markdown("""
+st.markdown(f"""
 <div style='text-align:center;margin-bottom:36px'>
   <div style='font:800 28px Segoe UI,sans-serif;color:#e0e7ff;letter-spacing:-.5px'>
     Choose your next scene
   </div>
   <div style='font:400 14px Segoe UI;color:rgba(129,140,248,.75);margin-top:6px'>
-    Pick where you want to practice Danish next
+    Pick where you want to practice {target_lang} next
   </div>
 </div>
 """, unsafe_allow_html=True)

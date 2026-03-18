@@ -1,13 +1,13 @@
 # SpeakPals — Lesson
-
+from __future__ import annotations
 import streamlit as st
 import streamlit.components.v1 as components
 import hashlib, pathlib, base64
 from dotenv import load_dotenv
 import os
 
-from pipeline import (run_pipeline_stream, MODELS, VOICES, SCENE_CATALOG,
-                      parse_claude_response, generate_scene_image, character_tts_b64)
+from pipeline import (run_pipeline_stream, MODELS, VOICES, VOICES_BY_LANG, TTS_LANG_CODE, STT_LANG_CODE,
+                      SCENE_CATALOG, parse_claude_response, generate_scene_image, character_tts_b64)
 from prompts import build_system_prompt
 from ws_proxy import start_in_thread, PROXY_PORT
 from scene_images import preload_all_images
@@ -27,41 +27,77 @@ CLAUDE_KEY = _secret("CLAUDE_API_KEY")
 ELEVEN_KEY = _secret("ELEVENLABS_API_KEY")
 FAL_KEY    = _secret("FAL_KEY")
 
-# ── Scene scripts ──────────────────────────────────────────────────────────────
+# ── Scene scripts — per language ───────────────────────────────────────────────
 
-SCENE_SCRIPTS = {
-    "meet_a_friend": [
-        "Hej! Hvad hedder du?",
-        "Hvor gammel er du?",
-        "Hvor bor du?",
-    ],
-    "cafe": [
-        "Hej! Hvad må det være?",
-        "Vil du have mælk i din kaffe?",
-        "Det er 35 kroner. Betaler du med kort?",
-    ],
-    "supermarket": [
-        "Vil du betale med kort eller kontanter?",
-        "Vil du have en kvittering?",
-        "Hav en god dag!",
-    ],
-    "flower_store": [
-        "Hej! Hvad kan jeg hjælpe dig med i dag?",
-        "Hvilken farve vil du have?",
-        "Det bliver 50 kroner. Betaler du med kort eller kontant?",
-    ],
-    "bakery": [
-        "Godmorgen! Hvad må det være?",
-        "Vil du have en pose med?",
-        "Det er 35 kroner. Værsgo og god dag!",
-    ],
-    "restaurant": [
-        "Goddag og velkommen! Har du reserveret bord?",
-        "Hvad kan jeg bringe dig i dag?",
-        "Vil du have noget at drikke til maden?",
-        "Er alt til din tilfredshed?",
-        "Ønsker du dessert eller kaffe?",
-    ],
+SCENE_SCRIPTS_BY_LANG = {
+    "Danish": {
+        "meet_a_friend": [
+            "Hej! Hvad hedder du?",
+            "Hvor gammel er du?",
+            "Hvor bor du?",
+        ],
+        "cafe": [
+            "Hej! Hvad må det være?",
+            "Vil du have mælk i din kaffe?",
+            "Det er 35 kroner. Betaler du med kort?",
+        ],
+        "supermarket": [
+            "Vil du betale med kort eller kontanter?",
+            "Vil du have en kvittering?",
+            "Hav en god dag!",
+        ],
+        "flower_store": [
+            "Hej! Hvad kan jeg hjælpe dig med i dag?",
+            "Hvilken farve vil du have?",
+            "Det bliver 50 kroner. Betaler du med kort eller kontant?",
+        ],
+        "bakery": [
+            "Godmorgen! Hvad må det være?",
+            "Vil du have en pose med?",
+            "Det er 35 kroner. Værsgo og god dag!",
+        ],
+        "restaurant": [
+            "Goddag og velkommen! Har du reserveret bord?",
+            "Hvad kan jeg bringe dig i dag?",
+            "Vil du have noget at drikke til maden?",
+            "Er alt til din tilfredshed?",
+            "Ønsker du dessert eller kaffe?",
+        ],
+    },
+    "Portuguese (Brazilian)": {
+        "meet_a_friend": [
+            "Oi! Qual é o seu nome?",
+            "Quantos anos você tem?",
+            "Onde você mora?",
+        ],
+        "cafe": [
+            "Olá! O que vai ser?",
+            "Quer leite no seu café?",
+            "São quinze reais. Vai pagar no cartão?",
+        ],
+        "supermarket": [
+            "Vai pagar no débito ou no crédito?",
+            "Quer o recibo?",
+            "Tenha um bom dia!",
+        ],
+        "flower_store": [
+            "Oi! Em que posso ajudar você hoje?",
+            "Qual cor você prefere?",
+            "São cinquenta reais. Vai pagar no cartão ou em dinheiro?",
+        ],
+        "bakery": [
+            "Bom dia! O que vai ser?",
+            "Quer uma sacola?",
+            "São quinze reais. Obrigado e bom dia!",
+        ],
+        "restaurant": [
+            "Boa tarde e bem-vindo! Tem reserva?",
+            "O que posso trazer para você hoje?",
+            "Gostaria de algo para beber com a refeição?",
+            "Está tudo ao seu gosto?",
+            "Deseja sobremesa ou café?",
+        ],
+    },
 }
 
 # Preference order per scene: first voice that doesn't clash with the tutor's voice is used
@@ -157,8 +193,8 @@ st.markdown("""<style>
   /* Each sidebar element — no gap collapse, no overflow issues */
   [data-testid="stSidebar"] [data-testid="stVerticalBlock"]{
     gap:0!important;overflow:visible!important}
-  /* Pin last sidebar button (Home) to bottom */
-  [data-testid="stSidebar"] .stButton:last-child{
+  /* Pin Back-to-Home button to bottom — keyed so it ONLY matches that button */
+  [data-testid="stSidebar"] .st-key-btn_home{
     position:fixed!important;bottom:0!important;left:0!important;
     width:320px!important;padding:10px 16px 14px!important;
     background:#0b0b1a!important;border-top:1px solid rgba(129,140,248,.15)!important;
@@ -171,12 +207,18 @@ today = "Daily life, shopping"
 
 # ── Read settings from session state (written by pages/account.py) ─────────────
 
-name        = st.session_state.get("s_name",        "Marlon")
-level       = st.session_state.get("s_level",       "A1")
-bg_lang     = st.session_state.get("s_bg_lang",     "German")
-voice_label = st.session_state.get("s_voice_label", list(VOICES.keys())[0])
-model_label = st.session_state.get("s_model_label", "Haiku 4.5 — fastest")
-model_id    = MODELS[model_label]
+name         = st.session_state.get("s_name",        "Marlon")
+level        = st.session_state.get("s_level",       "A1")
+bg_lang      = st.session_state.get("s_bg_lang",     "German")
+target_lang  = st.session_state.get("s_language",    "Danish")
+tts_lang_code = TTS_LANG_CODE.get(target_lang, "da")
+stt_lang_code = STT_LANG_CODE.get(target_lang, "da")   # ISO 639-3 for Scribe
+model_label  = st.session_state.get("s_model_label", "Haiku 4.5 — fastest")
+model_id     = MODELS[model_label]
+
+lang_voices  = VOICES_BY_LANG.get(target_lang, VOICES)
+saved_voice  = st.session_state.get("s_voice_label", "")
+voice_label  = saved_voice if saved_voice in lang_voices else list(lang_voices.keys())[0]
 
 # ── Session state ──────────────────────────────────────────────────────────────
 
@@ -221,16 +263,17 @@ if _scene_src_raw and not _scene_src_raw.startswith(("http", "data:")):
 else:
     scene_src = _scene_src_raw
 
-voice_id = VOICES[voice_label]
+voice_id = lang_voices[voice_label]
 
 _char_prefs = SCENE_CHAR_VOICE.get(st.session_state.get("selected_scene"), [])
 char_voice_id = next(
     (v for v in _char_prefs if v != voice_id),
-    next(v for v in VOICES.values() if v != voice_id),
+    next(v for v in lang_voices.values() if v != voice_id),
 )
 
 sk              = _scene_key(_scene_src_raw)
-script          = SCENE_SCRIPTS.get(sk, []) if sk else []
+_lang_scripts   = SCENE_SCRIPTS_BY_LANG.get(target_lang, SCENE_SCRIPTS_BY_LANG["Danish"])
+script          = _lang_scripts.get(sk, []) if sk else []
 char_label      = _SCENE_BY_KEY[sk]["char_name"] if sk and sk in _SCENE_BY_KEY else "Character"
 interaction_idx = st.session_state.interaction_idx
 char_question   = script[interaction_idx] if script and interaction_idx < len(script) else ""
@@ -238,6 +281,7 @@ is_last_question = bool(script) and interaction_idx == len(script) - 1
 
 system = build_system_prompt(
     name, level, today, bg_lang,
+    target_lang=target_lang,
     scene_description=scene_description,
     scene_idx=scene_idx_1based,
     scene_history=scene_history,
@@ -257,7 +301,7 @@ if (script
         and st.session_state.char_loaded_for != char_loaded_key
         and ELEVEN_KEY):
     line = script[interaction_idx]
-    b64  = character_tts_b64(line, char_voice_id, ELEVEN_KEY)
+    b64  = character_tts_b64(line, char_voice_id, ELEVEN_KEY, lang_code=tts_lang_code)
     if b64:
         st.session_state.char_audio = [b64]
         st.session_state.char_play_seq += 1  # new seq → component always detects new audio
@@ -316,20 +360,29 @@ with st.sidebar:
             txt  = entry["text"].replace("<", "&lt;").replace(">", "&gt;")
             anim = "animation:msgSlideIn .4s cubic-bezier(.34,1.56,.64,1) both;" if i == last_i else ""
             if entry["who"] == "character":
-                st.markdown(
-                    f"<div style='background:rgba(255,255,255,.07);border-radius:12px 12px 12px 3px;"
-                    f"padding:10px 12px;margin:12px 12px 4px;font-size:13px;line-height:1.5;"
-                    f"color:#e2e8f0;word-break:break-word;{anim}'>"
-                    f"<span style='font:600 10px Segoe UI;color:#94a3b8;display:block;margin-bottom:4px;letter-spacing:.5px;text-transform:uppercase'>{char_label}</span>"
-                    f"<em>{txt}</em></div>",
-                    unsafe_allow_html=True
-                )
-                # Replay button — only on the latest character message
-                if i == last_char_i and st.session_state.char_audio:
-                    if st.button("↺ replay", key=f"rch_{i}",
-                                 help=f"Replay {char_label.lower()}"):
-                        st.session_state.replay_char_seq += 1
-                        st.rerun()
+                show_replay = (i == last_char_i and bool(st.session_state.char_audio))
+                if show_replay:
+                    cb, rb = st.columns([5, 1])
+                else:
+                    cb = st.container()
+                with cb:
+                    st.markdown(
+                        f"<div style='background:rgba(255,255,255,.07);border-radius:12px 12px 12px 3px;"
+                        f"padding:10px 12px;margin:12px 12px 4px;font-size:13px;line-height:1.5;"
+                        f"color:#e2e8f0;word-break:break-word;{anim}'>"
+                        f"<span style='font:600 10px Segoe UI;color:#94a3b8;display:block;margin-bottom:4px;letter-spacing:.5px;text-transform:uppercase'>{char_label}</span>"
+                        f"<em>{txt}</em></div>",
+                        unsafe_allow_html=True
+                    )
+                if show_replay:
+                    with rb:
+                        st.markdown("<div style='padding:20px 0 0 0'>", unsafe_allow_html=True)
+                        if st.button("↺", key=f"rch_{i}",
+                                     help=f"Replay {char_label.lower()}",
+                                     use_container_width=True):
+                            st.session_state.replay_char_seq += 1
+                            st.rerun()
+                        st.markdown("</div>", unsafe_allow_html=True)
             else:
                 st.markdown(
                     f"<div style='background:rgba(129,140,248,.18);border-radius:12px 12px 3px 12px;"
@@ -350,29 +403,9 @@ with st.sidebar:
         if st.button("Finish Lecture", type="primary", use_container_width=True):
             st.switch_page("pages/feedback.py")
 
-    # Back to Home — always last → pinned to bottom by CSS
-    if st.button("🏠 Back to Home", use_container_width=True):
+    # Back to Home — always last → pinned to bottom by CSS (.st-key-btn_home)
+    if st.button("🏠 Back to Home", key="btn_home", use_container_width=True):
         st.switch_page("pages/home.py")
-
-# ── Style inline replay buttons via JS ────────────────────────────────────────
-components.html("""<script>
-(function styleReplay() {
-  var doc = window.parent.document;
-  var btns = Array.from(doc.querySelectorAll('[data-testid="stSidebar"] button'));
-  btns.forEach(function(btn) {
-    if (btn.textContent.trim() === '\u21BA replay') {
-      btn.style.cssText = [
-        'padding:1px 8px','font-size:10px','line-height:1.6',
-        'background:rgba(255,255,255,.05)','border:1px solid rgba(255,255,255,.10)',
-        'color:rgba(255,255,255,.38)','border-radius:20px',
-        'min-height:0','height:auto','cursor:pointer','display:inline-block'
-      ].join('!important;') + '!important';
-      btn.parentElement.style.cssText = 'padding:0!important;margin:-4px 12px 6px!important;text-align:right!important';
-    }
-  });
-  setTimeout(styleReplay, 400);
-})();
-</script>""", height=0)
 
 # ── VAD / scene component ──────────────────────────────────────────────────────
 
@@ -395,18 +428,26 @@ chunks  = st.session_state.last_chunks or []
 caption = ("Generating next scene…" if st.session_state.scene_loading
            else f"Scene {scene_idx_1based}")
 
+@st.cache_data(ttl=600, show_spinner=False)
 def _scribe_token(eleven_key):
+    """Fetch a short-lived single-use token for the ElevenLabs Scribe WS.
+    Cached for 10 min so reruns don't hammer the token endpoint."""
+    if not eleven_key:
+        return None
     try:
         import requests as _req
         r = _req.post(
             "https://api.elevenlabs.io/v1/single-use-token/realtime_scribe",
-            headers={"xi-api-key": eleven_key}, timeout=5)
+            headers={"xi-api-key": eleven_key},
+            timeout=8,
+        )
+        r.raise_for_status()
         return r.json().get("token")
     except Exception:
         return None
 
 mic_props = dict(
-    lang              = "da",
+    lang              = stt_lang_code,
     scene_src         = scene_src,
     scene_caption     = caption,
     avatar_chunks     = chunks,
@@ -462,7 +503,7 @@ if student_text:
         for raw_tutor_text, chunk_b64 in run_pipeline_stream(
                 system, student_text, st.session_state.chat, voice_id,
                 CLAUDE_KEY, ELEVEN_KEY, model=model_id,
-                use_structured=bool(script)):
+                use_structured=bool(script), lang_code=tts_lang_code):
             if chunk_b64:
                 all_chunks.append(chunk_b64)
 

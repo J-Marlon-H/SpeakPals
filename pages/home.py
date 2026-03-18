@@ -114,19 +114,51 @@ st.markdown(f"""<style>
 # ── Settings ───────────────────────────────────────────────────────────────────
 name  = st.session_state.get("s_name",  "there")
 level = st.session_state.get("s_level", "A1")
+language = st.session_state.get("s_language", "Danish")
 LEVEL_LABELS = {"A1": "Beginner", "A2": "Elementary", "B1": "Intermediate", "B2": "Upper Intermediate"}
+# Inline SVG flag images — no external files, crisp at any size
+_FLAG_SVG = {
+    "Danish": (
+        '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 37 28">'
+        '<rect width="37" height="28" fill="#C60C30"/>'
+        '<rect x="12" y="0" width="5" height="28" fill="#fff"/>'
+        '<rect x="0" y="11.5" width="37" height="5" fill="#fff"/>'
+        '</svg>'
+    ),
+    "Portuguese (Brazilian)": (
+        '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 28">'
+        '<rect width="40" height="28" fill="#009B3A"/>'
+        '<polygon points="20,2 38,14 20,26 2,14" fill="#FEDF00"/>'
+        '<circle cx="20" cy="14" r="7.5" fill="#002776"/>'
+        '<path d="M12.8,11.2 A8.5,8.5 0 0 1 27.2,11.2" stroke="#fff" stroke-width="1.6" fill="none"/>'
+        '<rect x="12.5" y="13.2" width="15" height="1.6" fill="#fff"/>'
+        '</svg>'
+    ),
+}
+
+def _flag_img(lang: str, height: int = 32) -> str:
+    import base64
+    svg = _FLAG_SVG.get(lang, "")
+    if not svg:
+        return ""
+    b64 = base64.b64encode(svg.encode()).decode()
+    return (f"<img src='data:image/svg+xml;base64,{b64}' "
+            f"height='{height}' style='vertical-align:middle;border-radius:4px;"
+            f"box-shadow:0 2px 8px rgba(0,0,0,.45);margin-left:10px'>")
+
+flag_img = _flag_img(language, height=30)
 
 # ── Header ─────────────────────────────────────────────────────────────────────
 col_hdr, col_fb, col_acct = st.columns([5, 1, 1])
 with col_hdr:
     st.markdown(f"""
 <div style='padding:8px 0 4px'>
-  <div style='font:800 30px/1.1 Segoe UI,sans-serif;color:#e0e7ff;letter-spacing:-.5px'>
-    Hej, {name}! 👋
+  <div style='font:800 30px/1.1 Segoe UI,sans-serif;color:#e0e7ff;letter-spacing:-.5px;display:flex;align-items:center;gap:0'>
+    Hej, {name}! 👋{flag_img}
   </div>
   <div style='font:400 14px Segoe UI;color:rgba(129,140,248,.75);margin-top:6px'>
     Your level: <span style='color:#a5b4fc;font-weight:600'>{level} — {LEVEL_LABELS.get(level,"")}</span>
-    &nbsp;·&nbsp; Choose a scene to practise Danish
+    &nbsp;·&nbsp; Choose a scene to practise {language}
   </div>
 </div>""", unsafe_allow_html=True)
 with col_fb:
