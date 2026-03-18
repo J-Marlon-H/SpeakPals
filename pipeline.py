@@ -71,10 +71,10 @@ STT_LANG_CODE = {
     "Portuguese (Brazilian)": "por",   # "por" is the confirmed Scribe ISO 639-3 code
 }
 
-# TTS model per language — keeps Danish on its proven model, Portuguese on the newer Flash model
+# TTS model per language — turbo_v2_5 gives the best pronunciation quality for both
 TTS_MODEL = {
     "da": "eleven_turbo_v2_5",
-    "pt": "eleven_flash_v2_5",
+    "pt": "eleven_turbo_v2_5",
 }
 
 # ── Scene catalog — single source of truth for all scenes ──────────────────────

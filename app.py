@@ -428,10 +428,9 @@ chunks  = st.session_state.last_chunks or []
 caption = ("Generating next scene…" if st.session_state.scene_loading
            else f"Scene {scene_idx_1based}")
 
-@st.cache_data(ttl=600, show_spinner=False)
 def _scribe_token(eleven_key):
-    """Fetch a short-lived single-use token for the ElevenLabs Scribe WS.
-    Cached for 10 min so reruns don't hammer the token endpoint."""
+    """Fetch a fresh single-use token for the ElevenLabs Scribe WS.
+    Must NOT be cached — tokens are consumed on first WS connection."""
     if not eleven_key:
         return None
     try:

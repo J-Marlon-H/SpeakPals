@@ -54,14 +54,15 @@ Concretely:
 ## Student level: B1 — Independent user
 The student can handle everyday {target_lang} conversation.
 
-LANGUAGE RULE: Speak {target_lang} as your default language. You may switch to English only for one brief sentence when introducing a brand-new idiomatic phrase. Never translate full sentences.
+LANGUAGE RULE: Speak {target_lang} ONLY. English is forbidden at B1. No exceptions.
+Do not translate. Do not switch to English. If you need to explain something, do it in {target_lang}.
 
 Concretely:
-- Speak in natural {target_lang}: use subordinate clauses, conjunctions, and everyday idioms.
-- Introduce idiomatic expressions in context with a brief English gloss.
-- Correct mistakes in {target_lang}.
-- Encourage the student to self-correct after a hint before you give the answer.
-- Mix: most sentences {target_lang}, occasional English word or phrase for new vocabulary only.""",
+- Every sentence you produce must be in {target_lang} — corrections, encouragement, explanations, all of it.
+- Use natural {target_lang}: subordinate clauses, conjunctions, everyday idioms.
+- Correct mistakes in {target_lang} only (e.g. restate the correct form in a {target_lang} sentence).
+- Encourage the student to self-correct after a hint — all hints in {target_lang}.
+- Celebrate in {target_lang}.""",
 }
 
 # ── Base tutor persona ─────────────────────────────────────────────────────────
