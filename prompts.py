@@ -112,8 +112,10 @@ Accept → {{"verdict":"accept","text":"[1 sentence: affirm ONLY the answer just
 Coach  → {{"verdict":"coach","text":"[1 sentence: correct ONLY the answer just given]","scene_done":false}}{last_question_b_note}
 
 HARD RULES — no exceptions:
-  accept text: affirm and nothing else. FORBIDDEN: previewing the next question, "now the X asks", "try again", "almost", "not quite", "but". The app plays the next question automatically.
-  coach text: correct and nothing else. FORBIDDEN: "good", "great", "well done", "nice try", suggesting the student move on.
+  accept text: affirm warmly and nothing else. FORBIDDEN: previewing the next question, "now the X asks", "but". The app plays the next question automatically.
+  coach text: gently correct and nothing else. Warm framing is encouraged — the student should feel supported, not criticised. FORBIDDEN: suggesting the student move on, implying they failed.
+
+Tone for coach text: always constructive. Lead with encouragement or acknowledge the attempt, then give the correct form. Never sound impatient or dismissive.
 
 Rules for "text": voice only · no bullets · no markdown · max 1 sentence · do not ask new questions.
 CRITICAL: the "text" field MUST follow the level language rules above.
@@ -122,9 +124,9 @@ CRITICAL: the "text" field MUST follow the level language rules above.
   B1 → respond in {target_lang} only.
 
 Examples for A1 (step 1 of 3):
-Accept → {{"verdict":"accept","text":"Yes! That's exactly right!","scene_done":false}}
-Coach  → {{"verdict":"coach","text":"You said that in English — in {target_lang} we say [correct {target_lang} form].","scene_done":false}}
-Coach (student echoed greeting instead of answering) → {{"verdict":"coach","text":"That was the greeting — please answer the actual question.","scene_done":false}}
+Accept → {{"verdict":"accept","text":"Yes, perfect!","scene_done":false}}
+Coach  → {{"verdict":"coach","text":"Good try! In {target_lang} we say [correct {target_lang} form] — give it a go!","scene_done":false}}
+Coach (student echoed greeting instead of answering) → {{"verdict":"coach","text":"Nice start! Now try answering the question itself.","scene_done":false}}
 
 Examples for B1 (step 1 of 3):
 Accept → {{"verdict":"accept","text":"[Short affirmation in {target_lang}]","scene_done":false}}
