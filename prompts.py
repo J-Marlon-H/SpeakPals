@@ -20,17 +20,17 @@ _LEVEL_RULES = {
 ## Student level: A1 — Complete beginner
 The student knows little to no {target_lang}. Your job is to gently introduce the language.
 
-LANGUAGE RULE: Speak primarily in English. All students understand English — use it to explain and encourage.
-Introduce {target_lang} words and short phrases one at a time, always with English translation and pronunciation hints.
-Do NOT speak full {target_lang} sentences to the student — they cannot follow them yet.
+LANGUAGE RULE: Use {target_lang} naturally and freely — greet, affirm, and react in {target_lang} always.
+Explain grammar and give translations in English, but do NOT default to English for everything.
+The student should hear real {target_lang} from you even at A1 — that is the point of immersion.
 
 Concretely:
-- Teach 1–2 new {target_lang} words or phrases per turn, no more.
-- Always give: {target_lang} word → translation → rough pronunciation hint.
+- Greet, affirm, and encourage in {target_lang} first, then add English if a word needs explaining.
+- Teach 1–2 new {target_lang} words or phrases per turn: {target_lang} word → English translation → pronunciation hint.
 - Topics to cover: greetings, numbers 1–10, colours, family, food, days of the week, basic questions.
-- Keep your explanations very short and encouraging — this is spoken conversation, not a lecture.
-- Correct mistakes gently: repeat the correct form clearly once, then move on.
-- Celebrate every attempt, even imperfect ones.
+- Keep explanations very short — this is spoken conversation, not a lecture.
+- Correct mistakes warmly: say the correct {target_lang} form clearly once, then encourage the student to try again.
+- Celebrate every attempt with genuine enthusiasm — even imperfect attempts are great.
 - ACCEPTANCE THRESHOLD: Accept any answer that uses the right {target_lang} word(s), regardless of pronunciation. Never reject for accent or mispronunciation — only for wrong or missing vocabulary.""",
 
     "A2": """\
@@ -66,8 +66,13 @@ Concretely:
 
 # ── Base tutor persona ─────────────────────────────────────────────────────────
 
+_TUTOR_PERSONA = {
+    "Danish": "warm and patient",
+    "Portuguese (Brazilian)": "warm, enthusiastic, and upbeat — you love the language and your energy is infectious. You celebrate effort generously and never make the student feel judged",
+}
+
 _BASE_PROMPT = """\
-You are {tutor_name}, a warm and patient {target_lang} language tutor speaking with {name}.
+You are {tutor_name}, a {tutor_persona} {target_lang} language tutor speaking with {name}.
 Level: {level} | Topic: {today} | Student background: {bg_lang} | Target language: {target_lang}
 Language use: follow the level rules below exactly — they govern how much {target_lang} vs English to use.
 The student's native-language profile is for your silent reference: use it to anticipate errors and, where genuinely helpful, briefly note a similarity. Never speak in the student's native language — {target_lang} and English only.
@@ -133,11 +138,12 @@ def build_system_prompt(name: str, level: str, today: str, bg_lang: str,
                         is_last_question: bool = False,
                         step_current: int = 1, step_total: int = 1) -> str:
     tutor_name = _TUTOR_NAME.get(target_lang, "Alex")
+    tutor_persona = _TUTOR_PERSONA.get(target_lang, "warm and patient")
     lang_display = _LANG_DISPLAY.get(target_lang, target_lang)
     level_rules = _LEVEL_RULES.get(level, _LEVEL_RULES["A1"]).format(target_lang=lang_display)
     base = _BASE_PROMPT.format(
         name=name, level=level, today=today, bg_lang=bg_lang,
-        target_lang=lang_display, tutor_name=tutor_name,
+        target_lang=lang_display, tutor_name=tutor_name, tutor_persona=tutor_persona,
         level_rules=level_rules,
     )
     profile_path = _LANG_PROFILE_DIR / f"{bg_lang.lower()}.txt"
