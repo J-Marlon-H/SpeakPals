@@ -173,8 +173,9 @@ if "session_history" not in st.session_state:
     st.session_state["session_history"] = list(SAMPLE_SESSIONS)
 
 _sk          = st.session_state.get("selected_scene", "")
-_level       = st.session_state.get("s_level",   SETTINGS_DEFAULTS["s_level"])
-_bg_lang     = st.session_state.get("s_bg_lang", SETTINGS_DEFAULTS["s_bg_lang"])
+_level       = st.session_state.get("s_level",    SETTINGS_DEFAULTS["s_level"])
+_bg_lang     = st.session_state.get("s_bg_lang",  SETTINGS_DEFAULTS["s_bg_lang"])
+_target_lang = st.session_state.get("s_language", SETTINGS_DEFAULTS["s_language"])
 correct_log  = st.session_state.get("correct_log",  [])
 coaching_log = st.session_state.get("coaching_log", [])
 
