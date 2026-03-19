@@ -187,6 +187,8 @@ st.markdown("""<style>
     position:fixed!important;top:0!important;left:320px!important;
     height:100vh!important;width:calc(100vw - 320px)!important;
     border:none!important;display:block!important;margin:0!important}
+  /* Prevent Streamlit from fading/dimming content during reruns */
+  [data-stale="true"],[data-stale="true"] *{opacity:1!important;transition:none!important}
   /* Chat message slide-in animation */
   @keyframes msgSlideIn{from{opacity:0;transform:translateX(-14px)}to{opacity:1;transform:translateX(0)}}
   /* Sidebar scroll area — leaves room for the pinned Home button */
