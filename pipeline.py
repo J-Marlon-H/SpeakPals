@@ -97,7 +97,11 @@ def extract_vocabulary(conversation_lines: list, bg_lang: str, level: str,
         timeout=20,
     )
     r.raise_for_status()
-    return json.loads(r.json()["content"][0]["text"].strip())
+    raw = r.json()["content"][0]["text"].strip()
+    # Strip markdown code fences Claude sometimes adds (```json ... ```)
+    raw = re.sub(r'^```[a-z]*\s*', '', raw)
+    raw = re.sub(r'\s*```$', '', raw)
+    return json.loads(raw)
 
 
 SETTINGS_DEFAULTS = {

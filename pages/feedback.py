@@ -107,6 +107,12 @@ SAMPLE_SESSIONS = [
             {"who": "character", "text": "Hvor bor du?"},
             {"who": "student",   "text": "Jeg bor i København"},
         ],
+        "vocab": [
+            {"word": "hedder",    "translation": "am called / is called", "example": "Hvad hedder din ven?"},
+            {"word": "gammel",    "translation": "old / years old",        "example": "Jeg er tyve år gammel."},
+            {"word": "bor",       "translation": "live / lives",           "example": "Hun bor i Aarhus."},
+            {"word": "København", "translation": "Copenhagen",             "example": "København er Danmarks hovedstad."},
+        ],
     },
     {
         "id": "sample_1",
@@ -124,6 +130,13 @@ SAMPLE_SESSIONS = [
             {"who": "student",   "text": "Nej tak"},
             {"who": "character", "text": "Hav en god dag!"},
             {"who": "student",   "text": "Tak, i lige måde!"},
+        ],
+        "vocab": [
+            {"word": "betale",      "translation": "to pay",     "example": "Jeg vil gerne betale nu."},
+            {"word": "kort",        "translation": "card",       "example": "Har du et kreditkort?"},
+            {"word": "kontanter",   "translation": "cash",       "example": "Jeg har ingen kontanter med."},
+            {"word": "kvittering",  "translation": "receipt",    "example": "Kan jeg få en kvittering?"},
+            {"word": "i lige måde", "translation": "likewise / same to you", "example": "God aften! — Tak, i lige måde!"},
         ],
     },
 ]
@@ -299,12 +312,20 @@ def _render_vocab(s):
         "text-transform:uppercase;margin-bottom:14px'>Words from this session</div>",
         unsafe_allow_html=True,
     )
+    voice_label = st.session_state.get("s_voice_label", "")
+    voice_id    = VOICES.get(voice_label, _DEFAULT_VOICE)
     cols = st.columns(2)
     for i, item in enumerate(vocab):
         word      = item.get("word", "")
         trans     = item.get("translation", "")
         example   = item.get("example", "")
-        audio_b64 = item.get("audio_b64")
+        _aud_key  = f"_auddata_{sid}_{i}"
+        _play_key = f"_playing_{sid}_{i}"
+
+        # Cache pre-generated audio into session state on first render
+        if item.get("audio_b64") and _aud_key not in st.session_state:
+            st.session_state[_aud_key] = item["audio_b64"]
+
         with cols[i % 2]:
             st.markdown(
                 f"<div style='background:rgba(129,140,248,.05);"
@@ -319,16 +340,24 @@ def _render_vocab(s):
                 f"</div>",
                 unsafe_allow_html=True,
             )
-            if audio_b64:
-                if st.button("▶ Hear it", key=f"play_{sid}_{i}"):
-                    st.session_state[f"_aud_{sid}_{i}"] = True
-                if st.session_state.pop(f"_aud_{sid}_{i}", False):
-                    components.html(
-                        f'<audio autoplay>'
-                        f'<source src="data:audio/mpeg;base64,{audio_b64}" type="audio/mpeg">'
-                        f'</audio>',
-                        height=0,
-                    )
+            if st.session_state.pop(_play_key, False):
+                # Replace button with audio player
+                aud = st.session_state.get(_aud_key, "")
+                if aud:
+                    st.audio(base64.b64decode(aud), format="audio/mpeg", autoplay=True)
+            else:
+                if st.button("▶ Hear it", key=f"play_{sid}_{i}",
+                             disabled=not (_aud_key in st.session_state or ELEVEN_KEY)):
+                    if _aud_key not in st.session_state and ELEVEN_KEY:
+                        with st.spinner(""):
+                            try:
+                                audio = tts_chunk(example, voice_id, ELEVEN_KEY)
+                                st.session_state[_aud_key] = base64.b64encode(audio).decode()
+                            except Exception:
+                                pass
+                    if _aud_key in st.session_state:
+                        st.session_state[_play_key] = True
+                        st.rerun()
     st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
 
 
