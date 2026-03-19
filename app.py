@@ -6,8 +6,9 @@ import hashlib, pathlib, base64
 from dotenv import load_dotenv
 import os
 
-from pipeline import (run_pipeline_stream, MODELS, VOICES, SCENE_CATALOG, SETTINGS_DEFAULTS,
-                      parse_claude_response, generate_scene_image, character_tts_b64)
+from pipeline import (run_pipeline_stream, MODELS, VOICES, VOICES_BY_LANG, SCENE_CATALOG,
+                      SETTINGS_DEFAULTS, parse_claude_response, generate_scene_image,
+                      character_tts_b64)
 from prompts import build_system_prompt
 from ws_proxy import start_in_thread, PROXY_PORT
 from scene_images import preload_all_images
