@@ -376,10 +376,10 @@ def parse_claude_response(raw: str) -> tuple[str, bool, bool]:
     return text, has_ok, bool(scene_directive)
 
 
-def character_tts_b64(text: str, voice_id: str, eleven_key: str) -> str | None:
+def character_tts_b64(text: str, voice_id: str, eleven_key: str, lang_code: str = "da") -> str | None:
     """Synthesize a short line with the given voice; returns base64 string or None."""
     try:
-        audio = tts_chunk(text, voice_id, eleven_key)
+        audio = tts_chunk(text, voice_id, eleven_key, lang_code=lang_code)
         return base64.b64encode(audio).decode()
     except Exception:
         return None
