@@ -223,6 +223,8 @@ bg_lang     = st.session_state.get("s_bg_lang",     SETTINGS_DEFAULTS["s_bg_lang
 voice_label = st.session_state.get("s_voice_label", SETTINGS_DEFAULTS["s_voice_label"])
 model_label = st.session_state.get("s_model_label", SETTINGS_DEFAULTS["s_model_label"])
 model_id    = MODELS[model_label]
+target_lang = st.session_state.get("s_language",    SETTINGS_DEFAULTS["s_language"])
+lang_voices = VOICES_BY_LANG.get(target_lang, VOICES)
 
 # ── Session state ──────────────────────────────────────────────────────────────
 

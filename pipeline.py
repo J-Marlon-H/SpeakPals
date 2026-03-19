@@ -108,6 +108,7 @@ SETTINGS_DEFAULTS = {
     "s_name":        "Marlon",
     "s_level":       "A1",
     "s_bg_lang":     "German",
+    "s_language":    "Danish",
     "s_voice_label": "Mathias — male baritone",
     "s_model_label": "Haiku 4.5 — fastest",
 }
