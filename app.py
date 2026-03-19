@@ -7,8 +7,8 @@ from dotenv import load_dotenv
 import os
 
 from pipeline import (run_pipeline_stream, MODELS, VOICES, VOICES_BY_LANG, SCENE_CATALOG,
-                      SETTINGS_DEFAULTS, parse_claude_response, generate_scene_image,
-                      character_tts_b64)
+                      SETTINGS_DEFAULTS, TTS_LANG_CODE, STT_LANG_CODE,
+                      parse_claude_response, generate_scene_image, character_tts_b64)
 from prompts import build_system_prompt
 from ws_proxy import start_in_thread, PROXY_PORT
 from scene_images import preload_all_images
@@ -223,8 +223,10 @@ bg_lang     = st.session_state.get("s_bg_lang",     SETTINGS_DEFAULTS["s_bg_lang
 voice_label = st.session_state.get("s_voice_label", SETTINGS_DEFAULTS["s_voice_label"])
 model_label = st.session_state.get("s_model_label", SETTINGS_DEFAULTS["s_model_label"])
 model_id    = MODELS[model_label]
-target_lang = st.session_state.get("s_language",    SETTINGS_DEFAULTS["s_language"])
-lang_voices = VOICES_BY_LANG.get(target_lang, VOICES)
+target_lang    = st.session_state.get("s_language", SETTINGS_DEFAULTS["s_language"])
+lang_voices    = VOICES_BY_LANG.get(target_lang, VOICES)
+tts_lang_code  = TTS_LANG_CODE.get(target_lang, "da")
+stt_lang_code  = STT_LANG_CODE.get(target_lang, "da")
 
 # ── Session state ──────────────────────────────────────────────────────────────
 
