@@ -2,7 +2,7 @@
 
 # SpeakPals
 
-**AI-powered Danish language tutor with real-time voice conversation**
+**AI-powered language tutor with real-time voice conversation**
 
 [![Python](https://img.shields.io/badge/Python-3.10+-3776AB?style=flat-square&logo=python&logoColor=white)](https://python.org)
 [![Streamlit](https://img.shields.io/badge/Streamlit-1.55-FF4B4B?style=flat-square&logo=streamlit&logoColor=white)](https://streamlit.io)
@@ -15,7 +15,7 @@
 
 ## What is SpeakPals?
 
-SpeakPals is a conversational Danish tutor for beginners (A1–B1). Tap the mic, speak into a scene (e.g. a supermarket checkout), and the tutor responds in natural Danish — transcribed via ElevenLabs Scribe, understood by Claude, and spoken back through an animated avatar in roughly 3–4 seconds.
+SpeakPals is a conversational language tutor for beginners (A1–B1). Currently supports **Danish** and **Brazilian Portuguese**. Tap the mic, speak into a scene (e.g. a café or supermarket), and the tutor responds in the target language — transcribed via ElevenLabs Scribe, understood by Claude, and spoken back through an animated avatar in roughly 3–4 seconds.
 
 ---
 
@@ -45,7 +45,7 @@ You speak
                                              ▼
                                   ┌──────────────────────┐
                                   │  ElevenLabs TTS      │
-                                  │  Turbo v2.5          │
+                                  │  Turbo / Flash v2.5  │
                                   └──────────┬────────────┘
                                              │ base64 audio
                                              ▼
@@ -62,7 +62,7 @@ You speak
 | VAD silence detection | ~1.2 s |
 | ElevenLabs STT commit → transcript | ~0.3 s |
 | Claude response (streaming) | ~0.8 s |
-| ElevenLabs TTS (single call, turbo) | ~0.6 s |
+| ElevenLabs TTS (single call) | ~0.6 s |
 | Streamlit rerun + component render | ~0.2 s |
 
 ---
@@ -71,19 +71,29 @@ You speak
 
 | Feature | Detail |
 |---|---|
-| **Realtime STT** | ElevenLabs Scribe v2 Realtime — streaming PCM over WebSocket |
+| **Realtime STT** | ElevenLabs Scribe v2 Realtime — streaming PCM over WebSocket, language set via init message |
 | **Secure local proxy** | `ws_proxy.py` keeps the API key server-side; browser connects to `localhost:8502` |
 | **Cloud fallback** | On Streamlit Cloud, a single-use token is issued server-side; browser connects directly to ElevenLabs |
 | **VAD** | AudioWorklet-based voice activity detection — 1.2 s silence threshold |
 | **LLM** | Claude Sonnet 4.6 (quality) or Haiku 4.5 (speed), streamed, max 180 tokens |
-| **TTS** | ElevenLabs Turbo v2.5 — single call per response; three Danish voice options |
-| **Character TTS** | Scene character (cashier, baker…) speaks questions in a separate voice |
+| **TTS** | ElevenLabs Turbo v2.5 (Danish) / Flash v2.5 (Portuguese) — per-language model selection |
+| **Character TTS** | Scene character (barista, cashier…) speaks questions in a separate native-accented voice |
 | **Animated avatar** | SVG with blink, breathe, and lip-sync animations |
-| **Scene scripts** | Scripted interactions per scene — tutor routes responses via PATH A / PATH B |
+| **Scene scripts** | Scripted interactions per scene — tutor evaluates responses via structured JSON output |
 | **Language profiles** | Tutor adapts silently based on student's native language (EN / DE / SV) |
-| **Conversation log** | Accepted answers shown in sidebar chat; replay cashier / show tutor text |
-| **Scene selection** | Choose between scenes at the end of a session |
-| **AI image generation** | fal.ai Flux Schnell generates scene transition images (optional) |
+| **Multi-language** | Danish and Brazilian Portuguese — each with native voice IDs, correct STT language code, and per-language TTS model |
+| **Conversation log** | Accepted answers shown in sidebar chat; replay character audio |
+| **Scene selection** | Six scenes across A1–B1 levels |
+| **AI image generation** | fal.ai Flux Schnell generates scene transition images (optional, requires FAL_KEY) |
+
+---
+
+## Supported Languages
+
+| Language | Tutor | STT code | TTS model | Voices |
+|---|---|---|---|---|
+| Danish | Lars | `da` | eleven_turbo_v2_5 | Mathias, Camilla, Casper |
+| Brazilian Portuguese | João | `por` | eleven_flash_v2_5 | Matheus, Camila, Flavio |
 
 ---
 
@@ -149,7 +159,9 @@ SpeakPals/
 ├── pipeline.py              # Claude LLM streaming + ElevenLabs TTS + fal.ai image gen
 ├── prompts.py               # System prompts, level rules, language profile loader
 ├── ws_proxy.py              # Local WebSocket proxy: browser → ElevenLabs STT
+├── scene_images.py          # Scene image loader with base64 caching
 ├── pages/
+│   ├── home.py              # Home screen with language/scene selection
 │   ├── account.py           # Student settings (name, level, voice, model)
 │   ├── feedback.py          # End-of-lesson conversation summary
 │   └── scene_select.py      # Scene selection screen (bakery, flower shop, …)
@@ -161,9 +173,12 @@ SpeakPals/
 │   └── swedish.txt          # Teaching tips for Swedish speakers
 ├── assets/
 │   └── scenes/
-│       ├── supermarket_cashier.png
-│       ├── bakery.png        # drop your own image here
-│       └── flower_store.png  # drop your own image here
+│       ├── friend.jpg
+│       ├── cafe.jpg
+│       ├── supermarket_cashier.jpg
+│       ├── flower_store.jpg
+│       ├── bakery.jpg
+│       └── restaurant.jpg
 ├── requirements.txt
 └── keys.env                 # API keys — never commit this file
 ```
@@ -175,112 +190,86 @@ SpeakPals/
 | Setting | Options | Description |
 |---|---|---|
 | **Name** | text | Used in the tutor's system prompt |
+| **Language** | Danish / Portuguese (Brazilian) | Target language for the lesson |
 | **Level** | A1 / A2 / B1 | CEFR proficiency level — controls language mix and expectations |
 | **Native language** | English / German / Swedish | Loads a language-specific teaching profile |
-| **Tutor voice** | Mathias / Camilla / Casper | ElevenLabs voice for the tutor |
+| **Tutor voice** | Per-language voice menu | ElevenLabs voice for the tutor |
 | **AI model** | Sonnet 4.6 / Haiku 4.5 | Quality vs speed |
 
 ---
 
-## Turn Flow — one complete exchange
+## Scene Catalog
+
+| Scene | Level | Character |
+|---|---|---|
+| Meet a Friend | A1 | Friend |
+| At the Café | A1 | Barista |
+| Supermarket Checkout | A1 | Cashier |
+| At the Flower Shop | A2 | Florist |
+| At the Bakery | A2 | Baker |
+| At the Restaurant | B1 | Waiter |
+
+---
+
+## Turn Flow
 
 ```
 1. SCENE LOADS
-   │  Character TTS pre-fetched (cashier voice, separate voice ID)
-   │  Character Q0 audio queued but NOT played yet
-   │
+   Character TTS pre-fetched (character voice, native accent)
+   Character Q0 audio queued but NOT played yet
+
 2. STUDENT clicks "Start lesson"
-   │  Component → sends "__started__" → Python sets lesson_started=True
-   │  Queued cashier audio plays immediately
-   │  Sidebar chat reveals (cashier Q0 already logged there)
-   │
+   Component → sends "__started__" → Python sets lesson_started=True
+   Queued character audio plays immediately
+   Sidebar chat reveals (character Q0 already logged)
+
 3. STUDENT speaks
-   │  VAD (AudioWorklet) streams 16 kHz PCM → WebSocket → ElevenLabs Scribe
-   │  Silence > 1.2 s → transcript committed
-   │  Component → sends transcript string → Python: pending_student set, avatar_thinking=True
-   │
+   VAD (AudioWorklet) streams 16 kHz PCM → WebSocket → ElevenLabs Scribe
+   Silence > 1.2 s → transcript committed
+   Component → sends transcript string → Python: pending_student set
+
 4. PIPELINE (Python)
-   │  Claude receives: system prompt + full chat history + student transcript
-   │  Claude streams response (max 180 tokens)
-   │  Full response assembled → TTS call with language_code="da"
-   │  tutor_play_seq incremented → component detects new audio
+   Claude receives: system prompt + full chat history + student transcript
+   Claude streams structured JSON response (verdict + text)
+   Full response assembled → TTS call in target language
+   tutor_play_seq incremented → component detects new audio
+
+5. TUTOR SPEAKS
+   Avatar mouth animates, "Speaking…" label shown
+   Character's next audio queued for after tutor finishes
+
+6. ROUTING — Claude verdict is either:
+
+   ├── ACCEPT: student answered correctly
+   │   Student answer logged to sidebar chat
+   │   interaction_idx advances
+   │   Tutor finishes → 350 ms pause → character plays next question
+   │   If last question: confetti + "Scene complete!" overlay
    │
-5. TUTOR SPEAKS (in component)
-   │  Avatar mouth animates, "Speaking…" label shown
-   │  Cashier's next audio queued in pendingCharAfterTutor
-   │
-6. ROUTING — Claude's response contains either:
-   │
-   ├── PATH A (accepted): ends with literal token <ok/>
-   │   │  Python: has_ok=True
-   │   │  Student answer logged to sidebar chat
-   │   │  interaction_idx advances
-   │   │  Tutor finishes → 350 ms pause → cashier Q_next plays
-   │   │  If last question: scene_celebration=True → confetti + "Scene complete!" overlay
-   │   │  If all scenes done: "Finish Lecture" available in sidebar
-   │   │
-   │   └── Last question of scene: tutor explicitly celebrates before <ok/>
-   │
-   └── PATH B (coach): NO <ok/> anywhere in response
-       │  Python: has_ok=False — interaction_idx stays the same
-       │  Student answer NOT logged (not accepted)
-       │  Tutor finishes → cashier replays the SAME question
-       │  Student must answer again
-   │
+   └── COACH: student did not answer correctly
+       Tutor corrects the answer
+       Tutor finishes → character replays the SAME question
+       Student must answer again
+
 7. BETWEEN SCENES (if FAL_KEY set)
-      Scene image generated in background thread (fal.ai Flux Schnell)
-      On completion: scene_idx advances, new image loads
-      Cashier Q0 of next scene pre-fetched and queued
+   Scene image generated in background thread (fal.ai Flux Schnell)
+   On completion: scene_idx advances, new image loads
+   Character Q0 of next scene pre-fetched and queued
 ```
-
-## Routing Rules in Detail
-
-### PATH A — Accept
-
-Triggered when: the student's answer is correct enough for their CEFR level.
-
-Required Claude output format:
-```
-[affirmation]. [Lad os fortsætte! — if more questions remain] <ok/>
-```
-- `<ok/>` must be the **very last token** — nothing after it
-- On the last question: Claude celebrates the scene instead of "Lad os fortsætte!"
-- Python only counts `<ok/>` as valid if it appears at the end of the stripped response (regex `<ok\s*/>\s*$`) — prevents false positives from coaching messages that reference the tag
-
-### PATH B — Coach
-
-Triggered when: the answer is wrong or incomplete.
-
-Required Claude output format:
-```
-[echo what they said]. [correct Danish form + brief explanation]
-```
-- **No `<ok/>` anywhere** — not at the end, not mid-sentence
-- Same question will repeat; cashier asks it again after tutor finishes coaching
-- Claude is explicitly told: writing `<ok/>` advances the lesson even mid-sentence
-
-### Anti-hallucination safeguards
-
-| Safeguard | Purpose |
-|---|---|
-| `_OK_AT_END` regex (end-anchored) | Rejects `<ok/>` in coaching responses that mention it as an example |
-| `is_last_question` flag in system prompt | Tells Claude this is the final exchange → explicit celebration required |
-| `language_code: "da"` in TTS | Forces ElevenLabs to use Danish phonemes, not English guesses |
-| Max 180 tokens | Prevents long responses that drift off-script |
 
 ---
 
 ## Tech Stack
 
 - **Frontend** — [Streamlit](https://streamlit.io) + custom HTML/JS components
-- **LLM** — [Claude Sonnet 4.6 / Haiku 4.5](https://anthropic.com) via Anthropic API (streaming)
+- **LLM** — [Claude Sonnet 4.6 / Haiku 4.5](https://anthropic.com) via Anthropic API (streaming, structured outputs)
 - **STT** — [ElevenLabs Scribe v2 Realtime](https://elevenlabs.io/speech-to-text) over WebSocket
-- **TTS** — [ElevenLabs Turbo v2.5](https://elevenlabs.io/text-to-speech) — tutor and character voices
-- **Image gen** — [fal.ai Flux Schnell](https://fal.ai/) — scene transition images
+- **TTS** — [ElevenLabs Turbo / Flash v2.5](https://elevenlabs.io/text-to-speech) — tutor and character voices
+- **Image gen** — [fal.ai Flux Schnell](https://fal.ai/) — scene transition images (optional)
 - **Avatar** — Inline SVG + CSS animations
 
 ---
 
 <div align="center">
-  <sub>Built for X-Tech · Danish A1–B1 learners</sub>
+  <sub>Built for X-Tech · A1–B1 language learners</sub>
 </div>
