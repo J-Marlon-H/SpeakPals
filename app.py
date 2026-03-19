@@ -375,11 +375,12 @@ with st.sidebar:
                     cb = st.container()
                 with cb:
                     st.markdown(
+                        f"<div style='padding:8px 12px 2px'>"
                         f"<div style='background:rgba(255,255,255,.07);border-radius:12px 12px 12px 3px;"
-                        f"padding:10px 12px;margin:12px 12px 4px;font-size:13px;line-height:1.5;"
+                        f"padding:10px 12px;font-size:13px;line-height:1.5;"
                         f"color:#e2e8f0;word-break:break-word;{anim}'>"
                         f"<span style='font:600 10px Segoe UI;color:#94a3b8;display:block;margin-bottom:4px;letter-spacing:.5px;text-transform:uppercase'>{char_label}</span>"
-                        f"<em>{txt}</em></div>",
+                        f"<em>{txt}</em></div></div>",
                         unsafe_allow_html=True
                     )
                 if show_replay:
@@ -392,11 +393,12 @@ with st.sidebar:
                             st.rerun()
             else:
                 st.markdown(
+                    f"<div style='padding:2px 12px 8px'>"
                     f"<div style='background:rgba(129,140,248,.18);border-radius:12px 12px 3px 12px;"
-                    f"padding:10px 12px;margin:4px 12px 12px;font-size:13px;line-height:1.5;"
+                    f"padding:10px 12px;font-size:13px;line-height:1.5;"
                     f"color:#c7d2fe;word-break:break-word;{anim}'>"
                     f"<span style='font:600 10px Segoe UI;color:#818cf8;display:block;margin-bottom:4px;letter-spacing:.5px;text-transform:uppercase'>You ✓</span>"
-                    f"{txt}</div>",
+                    f"{txt}</div></div>",
                     unsafe_allow_html=True
                 )
 
