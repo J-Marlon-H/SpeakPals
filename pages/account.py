@@ -1,6 +1,6 @@
 import streamlit as st
 import json, pathlib
-from pipeline import VOICES, MODELS, LESSON_STATE_KEYS, SCENE_CATALOG, SETTINGS_DEFAULTS
+from pipeline import VOICES, VOICES_BY_LANG, MODELS, LESSON_STATE_KEYS, SCENE_CATALOG, SETTINGS_DEFAULTS
 
 # ── Persistent settings helpers ────────────────────────────────────────────────
 _SETTINGS_FILE = pathlib.Path(__file__).parent.parent / "user_settings.json"
