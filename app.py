@@ -362,45 +362,40 @@ with st.sidebar:
         )
     else:
         last_i = len(log) - 1
-        # Find index of the last character entry (for replay button placement)
         last_char_i = next((i for i in range(len(log)-1, -1, -1) if log[i]["who"] == "character"), None)
+        # Build entire chat as one HTML block to avoid Streamlit element spacing issues
+        parts = []
         for i, entry in enumerate(log):
             txt  = entry["text"].replace("<", "&lt;").replace(">", "&gt;")
             anim = "animation:msgSlideIn .4s cubic-bezier(.34,1.56,.64,1) both;" if i == last_i else ""
             if entry["who"] == "character":
-                show_replay = (i == last_char_i and bool(st.session_state.char_audio))
-                if show_replay:
-                    cb, rb = st.columns([5, 1])
-                else:
-                    cb = st.container()
-                with cb:
-                    st.markdown(
-                        f"<div style='padding:8px 12px 2px'>"
-                        f"<div style='background:rgba(255,255,255,.07);border-radius:12px 12px 12px 3px;"
-                        f"padding:10px 12px;font-size:13px;line-height:1.5;"
-                        f"color:#e2e8f0;word-break:break-word;{anim}'>"
-                        f"<span style='font:600 10px Segoe UI;color:#94a3b8;display:block;margin-bottom:4px;letter-spacing:.5px;text-transform:uppercase'>{char_label}</span>"
-                        f"<em>{txt}</em></div></div>",
-                        unsafe_allow_html=True
-                    )
-                if show_replay:
-                    with rb:
-                        st.markdown("<div style='height:16px'></div>", unsafe_allow_html=True)
-                        if st.button("↺", key=f"rch_{i}",
-                                     help=f"Replay {char_label.lower()}",
-                                     use_container_width=True):
-                            st.session_state.replay_char_seq += 1
-                            st.rerun()
+                parts.append(
+                    f"<div style='padding:8px 12px 4px'>"
+                    f"<div style='background:rgba(255,255,255,.07);border-radius:12px 12px 12px 3px;"
+                    f"padding:10px 12px;font-size:13px;line-height:1.5;"
+                    f"color:#e2e8f0;word-break:break-word;{anim}'>"
+                    f"<span style='font:600 10px Segoe UI;color:#94a3b8;display:block;margin-bottom:4px;letter-spacing:.5px;text-transform:uppercase'>{char_label}</span>"
+                    f"<em>{txt}</em></div></div>"
+                )
             else:
-                st.markdown(
-                    f"<div style='padding:2px 12px 8px'>"
+                parts.append(
+                    f"<div style='padding:4px 12px 8px'>"
                     f"<div style='background:rgba(129,140,248,.18);border-radius:12px 12px 3px 12px;"
                     f"padding:10px 12px;font-size:13px;line-height:1.5;"
                     f"color:#c7d2fe;word-break:break-word;{anim}'>"
                     f"<span style='font:600 10px Segoe UI;color:#818cf8;display:block;margin-bottom:4px;letter-spacing:.5px;text-transform:uppercase'>You ✓</span>"
-                    f"{txt}</div></div>",
-                    unsafe_allow_html=True
+                    f"{txt}</div></div>"
                 )
+        st.markdown("".join(parts), unsafe_allow_html=True)
+        # Replay button rendered separately after the chat block
+        if last_char_i is not None and st.session_state.char_audio:
+            _, rb = st.columns([5, 1])
+            with rb:
+                if st.button("↺", key=f"rch_{last_char_i}",
+                             help=f"Replay {char_label.lower()}",
+                             use_container_width=True):
+                    st.session_state.replay_char_seq += 1
+                    st.rerun()
 
     # Error debug
     if st.session_state.get("pipeline_error"):
