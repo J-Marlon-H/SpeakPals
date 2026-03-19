@@ -240,7 +240,7 @@ VERDICT_SCHEMA = {
 
 
 def run_pipeline_stream(system, user_input, history, voice_id, claude_key, eleven_key,
-                        model="claude-sonnet-4-6", use_structured=False):
+                        model="claude-sonnet-4-6", use_structured=False, lang_code="da"):
     """Generator: yields (raw_claude_text, chunk_b64).
     Streams Claude fully, then makes a single TTS call for the complete response.
     When use_structured=True, enforces VERDICT_SCHEMA via the structured outputs API
@@ -301,7 +301,7 @@ def run_pipeline_stream(system, user_input, history, voice_id, claude_key, eleve
         tts_text = clean_for_tts(raw_claude)
 
     if tts_text:
-        audio = tts_chunk(tts_text, voice_id, eleven_key)
+        audio = tts_chunk(tts_text, voice_id, eleven_key, lang_code=lang_code)
         yield raw_claude, base64.b64encode(audio).decode()
     else:
         yield raw_claude, ""
