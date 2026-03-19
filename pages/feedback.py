@@ -146,7 +146,46 @@ _bg_lang     = st.session_state.get("s_bg_lang", SETTINGS_DEFAULTS["s_bg_lang"])
 correct_log  = st.session_state.get("correct_log",  [])
 coaching_log = st.session_state.get("coaching_log", [])
 
+_loading_slot = st.empty()
+
 if (correct_log or coaching_log) and not st.session_state.get("current_session_id"):
+    _loading_slot.markdown("""
+    <style>
+      @keyframes _sp_spin  { to { transform: rotate(360deg); } }
+      @keyframes _sp_pulse { 0%,100%{opacity:.35} 50%{opacity:.9} }
+      .sp-overlay {
+        position:fixed;top:0;left:0;width:100%;height:100%;
+        background:#080812;
+        display:flex;flex-direction:column;align-items:center;justify-content:center;
+        z-index:9999;
+      }
+      .sp-ring {
+        width:52px;height:52px;border-radius:50%;
+        border:4px solid rgba(129,140,248,.15);
+        border-top-color:#818cf8;
+        animation:_sp_spin .85s linear infinite;
+        margin-bottom:28px;
+      }
+      .sp-label {
+        font:600 15px/1 Segoe UI,sans-serif;
+        color:rgba(165,180,252,.75);
+        letter-spacing:.4px;
+        animation:_sp_pulse 1.8s ease-in-out infinite;
+        margin-bottom:10px;
+      }
+      .sp-sub {
+        font:400 12px Segoe UI;
+        color:rgba(165,180,252,.32);
+        letter-spacing:.2px;
+      }
+    </style>
+    <div class="sp-overlay">
+      <div class="sp-ring"></div>
+      <div class="sp-label">Analysing your lesson</div>
+      <div class="sp-sub">Extracting vocabulary · Generating tip</div>
+    </div>
+    """, unsafe_allow_html=True)
+
     _ts      = str(int(datetime.datetime.now().timestamp()))
     answered = sum(1 for e in correct_log if e["who"] == "student")
     total    = answered + len(coaching_log)
@@ -189,6 +228,7 @@ if (correct_log or coaching_log) and not st.session_state.get("current_session_i
 
         vocab = items
 
+    _loading_slot.empty()
     st.session_state["current_session_id"] = _ts
     st.session_state["session_history"].insert(0, {
         "id":           _ts,
