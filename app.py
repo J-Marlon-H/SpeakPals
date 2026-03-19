@@ -192,9 +192,9 @@ st.markdown("""<style>
   /* Sidebar scroll area — leaves room for the pinned Home button */
   [data-testid="stSidebar"] > div:first-child{
     padding-bottom:80px!important;overflow-y:auto!important}
-  /* Each sidebar element — no gap collapse, no overflow issues */
+  /* Each sidebar element — small gap so bubbles don't collapse */
   [data-testid="stSidebar"] [data-testid="stVerticalBlock"]{
-    gap:0!important;overflow:visible!important}
+    gap:2px!important;overflow:visible!important}
   /* Pin Back-to-Home button to bottom — keyed so it ONLY matches that button */
   [data-testid="stSidebar"] .st-key-btn_home{
     position:fixed!important;bottom:0!important;left:0!important;
@@ -384,13 +384,12 @@ with st.sidebar:
                     )
                 if show_replay:
                     with rb:
-                        st.markdown("<div style='padding:20px 0 0 0'>", unsafe_allow_html=True)
+                        st.markdown("<div style='height:16px'></div>", unsafe_allow_html=True)
                         if st.button("↺", key=f"rch_{i}",
                                      help=f"Replay {char_label.lower()}",
                                      use_container_width=True):
                             st.session_state.replay_char_seq += 1
                             st.rerun()
-                        st.markdown("</div>", unsafe_allow_html=True)
             else:
                 st.markdown(
                     f"<div style='background:rgba(129,140,248,.18);border-radius:12px 12px 3px 12px;"
