@@ -20,13 +20,13 @@ def clean_for_tts(text):
     return text.strip()
 
 
-def tts_chunk(text, voice_id, eleven_key):
+def tts_chunk(text, voice_id, eleven_key, lang_code="da"):
     for attempt in range(3):
         r = get_session().post(
             f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}/stream",
             headers={"xi-api-key": eleven_key, "Content-Type": "application/json"},
-            json={"text": text.strip(), "model_id": "eleven_turbo_v2_5",
-                  "language_code": "da",
+            json={"text": text.strip(), "model_id": TTS_MODEL.get(lang_code, "eleven_turbo_v2_5"),
+                  "language_code": lang_code,
                   "voice_settings": {"stability": 0.4, "similarity_boost": 0.75, "speed": 0.92}},
             stream=True, timeout=30,
         )
@@ -121,6 +121,31 @@ VOICES = {
     "Mathias — male baritone": "ygiXC2Oa1BiHksD3WkJZ",
     "Camilla — female":        "4RklGmuxoAskAbGXplXN",
     "Casper — male, calm":     "ADRrvIX3j1uTFlD5q6DE",
+}
+
+# Per-language voice menus
+VOICES_BY_LANG = {
+    "Danish": VOICES,
+    "Portuguese (Brazilian)": {
+        "Matheus — male baritone": "36rVQA1AOIPwpA3Hg1tC",
+        "Camila — female":         "4RklGmuxoAskAbGXplXN",
+        "Flavio — male, calm":     "x6uRgOliu4lpcrqMH3s1",
+    },
+}
+
+TTS_LANG_CODE = {
+    "Danish":                 "da",
+    "Portuguese (Brazilian)": "pt",
+}
+
+STT_LANG_CODE = {
+    "Danish":                 "da",
+    "Portuguese (Brazilian)": "por",
+}
+
+TTS_MODEL = {
+    "da": "eleven_turbo_v2_5",
+    "pt": "eleven_turbo_v2_5",
 }
 
 # ── Scene catalog — single source of truth for all scenes ──────────────────────
