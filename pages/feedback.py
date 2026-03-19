@@ -208,26 +208,44 @@ if (correct_log or coaching_log) and not st.session_state.get("current_session_i
 history = st.session_state["session_history"]
 
 
-# ── Score ring SVG ─────────────────────────────────────────────────────────────
-def _score_ring(ok: int, total: int) -> str:
-    pct   = ok / total if total else 0
-    color = "#818cf8" if pct < 1 else "#34d399"
-    r, cx, cy, sw = 26, 34, 34, 6
-    circ  = 2 * 3.14159 * r
-    dash  = circ * pct
-    return (
-        f"<svg width='68' height='68' viewBox='0 0 68 68'>"
-        f"<circle cx='{cx}' cy='{cy}' r='{r}' fill='none' "
-        f"  stroke='rgba(255,255,255,.07)' stroke-width='{sw}'/>"
-        f"<circle cx='{cx}' cy='{cy}' r='{r}' fill='none' "
-        f"  stroke='{color}' stroke-width='{sw}' stroke-linecap='round' "
-        f"  stroke-dasharray='{dash:.1f} {circ:.1f}' "
-        f"  transform='rotate(-90 {cx} {cy})'/>"
-        f"<text x='{cx}' y='{cy+1}' text-anchor='middle' dominant-baseline='middle' "
-        f"  font-family='Segoe UI' font-size='13' font-weight='700' fill='{color}'>"
-        f"{ok}/{total}</text>"
-        f"</svg>"
-    )
+# ── Intelligibility verdict ─────────────────────────────────────────────────────
+def _intelligibility(ok: int, total: int) -> tuple[str, str, str, str, str]:
+    """Returns (verdict, sub_text, color, bg, border)."""
+    if total == 0:
+        return ("—", "Complete a lesson to see your result.",
+                "#818cf8", "rgba(129,140,248,.05)", "rgba(129,140,248,.12)")
+    pct = ok / total
+    if pct >= 1.0:
+        return (
+            "Yes, absolutely!",
+            "Perfect accuracy — every answer landed. A native speaker would follow you without hesitation.",
+            "#34d399", "rgba(52,211,153,.07)", "rgba(52,211,153,.18)",
+        )
+    elif pct >= 0.67:
+        return (
+            "Mostly yes",
+            f"You got {ok} of {total} answers across — a native speaker would follow you, even if a few needed a second try.",
+            "#818cf8", "rgba(129,140,248,.07)", "rgba(129,140,248,.18)",
+        )
+    else:
+        return (
+            "Not yet — keep at it",
+            f"{ok} of {total} answers landed clearly. Each session builds your confidence faster than you think.",
+            "#f59e0b", "rgba(245,158,11,.07)", "rgba(245,158,11,.18)",
+        )
+
+
+# ── Next scene helper ───────────────────────────────────────────────────────────
+def _next_scene(current_key: str) -> dict | None:
+    """Return the next scene dict in SCENE_CATALOG after current_key, or None."""
+    keys = [sc["key"] for sc in SCENE_CATALOG]
+    try:
+        idx = keys.index(current_key)
+        if idx + 1 < len(SCENE_CATALOG):
+            return SCENE_CATALOG[idx + 1]
+    except ValueError:
+        pass
+    return None
 
 
 # ── Vocabulary section ─────────────────────────────────────────────────────────
@@ -283,34 +301,40 @@ def render_session(s):
     total     = s.get("score_total", 0)
     char_lbl  = _scene_by_key.get(s.get("scene_key", ""), {}).get("char_name", "Character")
     scene_ttl = s.get("scene_title", "")
-    perfect   = len(errors) == 0 and total > 0
 
-    # ── Session header card ────────────────────────────────────────────────────
-    ring_svg  = _score_ring(ok, total)
+    # ── Intelligibility hero card ───────────────────────────────────────────────
     n_err = len(errors)
-    status_tag = (
-        "<span style='background:rgba(52,211,153,.12);border:1px solid rgba(52,211,153,.25);"
-        "border-radius:20px;padding:2px 10px;font:600 10px Segoe UI;color:#34d399;"
-        "letter-spacing:.5px;text-transform:uppercase;margin-left:10px'>A Dane understood you ✓</span>"
-        if perfect else
-        f"<span style='background:rgba(199,160,252,.08);border:1px solid rgba(165,180,252,.2);"
-        f"border-radius:20px;padding:2px 10px;font:600 10px Segoe UI;color:#a5b4fc;"
-        f"letter-spacing:.5px;text-transform:uppercase;margin-left:8px'>"
-        f"{n_err} to revisit</span>"
+    verdict, verdict_sub, v_color, v_bg, v_border = _intelligibility(ok, total)
+
+    correct_chip = (
+        f"<span style='background:rgba(52,211,153,.12);border:1px solid rgba(52,211,153,.22);"
+        f"border-radius:20px;padding:3px 12px;font:600 11px Segoe UI;color:#34d399;"
+        f"letter-spacing:.3px'>{ok}/{total} answered correctly</span>"
+    )
+    mistake_chip = (
+        "<span style='background:rgba(52,211,153,.08);border:1px solid rgba(52,211,153,.15);"
+        "border-radius:20px;padding:3px 12px;font:600 11px Segoe UI;color:#6ee7b7;"
+        "letter-spacing:.3px'>No mistakes</span>"
+        if n_err == 0 else
+        f"<span style='background:rgba(129,140,248,.1);border:1px solid rgba(165,180,252,.2);"
+        f"border-radius:20px;padding:3px 12px;font:600 11px Segoe UI;color:#a5b4fc;"
+        f"letter-spacing:.3px'>{n_err} mistake{'s' if n_err != 1 else ''} to review</span>"
     )
 
     st.markdown(
-        f"<div style='background:linear-gradient(135deg,rgba(30,27,75,.9),rgba(17,24,39,.9));"
-        f"border:1px solid rgba(129,140,248,.18);border-radius:20px;"
-        f"padding:20px 24px;margin-bottom:28px;display:flex;align-items:center;gap:20px'>"
-        f"  <div style='flex-shrink:0'>{ring_svg}</div>"
-        f"  <div>"
-        f"    <div style='font:700 16px/1.2 Segoe UI,sans-serif;color:#e0e7ff;margin-bottom:5px'>"
-        f"      {scene_ttl}{status_tag}</div>"
-        f"    <div style='font:400 12px Segoe UI;color:rgba(165,180,252,.5)'>"
-        f"      Task completion &nbsp;·&nbsp; Level {s.get('level','')} &nbsp;·&nbsp; "
-        f"      {s_bg} &nbsp;·&nbsp; {s.get('date','')}"
-        f"    </div>"
+        f"<div style='background:{v_bg};border:1px solid {v_border};border-radius:20px;"
+        f"padding:24px 28px;margin-bottom:20px'>"
+        f"  <div style='font:600 10px Segoe UI;color:{v_color};letter-spacing:2px;"
+        f"text-transform:uppercase;margin-bottom:10px'>Would a native speaker understand you?</div>"
+        f"  <div style='font:800 26px/1.1 Segoe UI,sans-serif;color:{v_color};"
+        f"letter-spacing:-.3px;margin-bottom:8px'>{verdict}</div>"
+        f"  <div style='font:400 13px/1.6 Segoe UI;color:rgba(200,210,255,.65);"
+        f"margin-bottom:16px'>{verdict_sub}</div>"
+        f"  <div style='display:flex;flex-wrap:wrap;align-items:center;gap:8px'>"
+        f"    {correct_chip}{mistake_chip}"
+        f"    <span style='font:400 12px Segoe UI;color:rgba(165,180,252,.4)'>"
+        f"      &nbsp;·&nbsp; {scene_ttl} &nbsp;·&nbsp; Level {s.get('level','')} &nbsp;·&nbsp; {s.get('date','')}"
+        f"    </span>"
         f"  </div>"
         f"</div>",
         unsafe_allow_html=True
@@ -442,6 +466,43 @@ tab_latest, tab_hist = st.tabs(["Latest Session", hist_label])
 with tab_latest:
     if history:
         render_session(history[0])
+
+        # ── Keep the momentum ──────────────────────────────────────────────────
+        _s0       = history[0]
+        _sk0      = _s0.get("scene_key", "")
+        _n_err0   = len(_s0.get("coaching_log", []))
+        _next_sc  = _next_scene(_sk0)
+
+        st.markdown(
+            "<div style='background:linear-gradient(135deg,rgba(49,46,129,.35) 0%,rgba(17,24,39,.2) 100%);"
+            "border:1px solid rgba(129,140,248,.2);border-radius:20px;"
+            "padding:24px 28px;margin-top:8px;margin-bottom:20px'>"
+            "<div style='font:700 16px Segoe UI,sans-serif;color:#e0e7ff;margin-bottom:6px'>"
+            "Keep the momentum going</div>"
+            f"<div style='font:400 13px Segoe UI;color:rgba(165,180,252,.55)'>"
+            f"{'Try again for a clean run — you can do it.' if _n_err0 > 0 else 'Perfect run! Ready for the next challenge?'}"
+            "</div>"
+            "</div>",
+            unsafe_allow_html=True,
+        )
+        _col_a, _col_b = st.columns(2)
+        with _col_a:
+            _replay_lbl = "↺ Try again — aim for no mistakes" if _n_err0 > 0 else f"↺ Replay {_s0.get('scene_title','')}"
+            if st.button(_replay_lbl, use_container_width=True, key="momentum_replay"):
+                for k in LESSON_STATE_KEYS:
+                    st.session_state.pop(k, None)
+                st.session_state["selected_scene"] = _sk0
+                st.switch_page("app.py")
+        with _col_b:
+            _next_lbl = f"Next: {_next_sc['title']} →" if _next_sc else "Browse scenes →"
+            if st.button(_next_lbl, use_container_width=True, key="momentum_next"):
+                for k in LESSON_STATE_KEYS:
+                    st.session_state.pop(k, None)
+                if _next_sc:
+                    st.session_state["selected_scene"] = _next_sc["key"]
+                    st.switch_page("app.py")
+                else:
+                    st.switch_page("pages/scene_select.py")
     else:
         st.markdown(
             "<div style='color:rgba(255,255,255,.3);font-size:13px;padding:40px 0;text-align:center'>"
@@ -467,26 +528,12 @@ with tab_hist:
             with st.expander(label):
                 render_session(s)
 
-# ── Momentum nav ───────────────────────────────────────────────────────────────
-st.markdown(
-    "<div style='height:24px'></div>"
-    "<div style='font:700 10px Segoe UI;letter-spacing:2px;color:rgba(165,180,252,.35);"
-    "text-transform:uppercase;margin-bottom:12px;text-align:center'>Keep going</div>",
-    unsafe_allow_html=True,
-)
-col1, col2, col3 = st.columns(3)
-with col1:
-    if st.button("🔁 Same scene again", use_container_width=True):
-        # Keep scene selection, clear only lesson progress
-        for k in LESSON_STATE_KEYS:
-            if k != "selected_scene":
-                st.session_state.pop(k, None)
-        st.switch_page("app.py")
-with col2:
-    if st.button("▶ New scene", use_container_width=True):
-        for k in LESSON_STATE_KEYS:
-            st.session_state.pop(k, None)
-        st.switch_page("pages/scene_select.py")
-with col3:
+# ── Navigation ─────────────────────────────────────────────────────────────────
+st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
+_nav1, _nav2 = st.columns(2)
+with _nav1:
     if st.button("← Back to lesson", use_container_width=True):
         st.switch_page("app.py")
+with _nav2:
+    if st.button("🏠 Home", use_container_width=True):
+        st.switch_page("pages/home.py")
