@@ -1,5 +1,25 @@
 import streamlit as st
-from pipeline import VOICES, VOICES_BY_LANG, MODELS, LESSON_STATE_KEYS, SCENE_CATALOG
+import json, pathlib
+from pipeline import VOICES, MODELS, LESSON_STATE_KEYS, SCENE_CATALOG, SETTINGS_DEFAULTS
+
+# ── Persistent settings helpers ────────────────────────────────────────────────
+_SETTINGS_FILE = pathlib.Path(__file__).parent.parent / "user_settings.json"
+
+def load_settings() -> dict:
+    try:
+        return {**SETTINGS_DEFAULTS, **json.loads(_SETTINGS_FILE.read_text(encoding="utf-8"))}
+    except Exception:
+        return dict(SETTINGS_DEFAULTS)
+
+def save_settings(data: dict) -> None:
+    current = load_settings()
+    current.update({k: data[k] for k in SETTINGS_DEFAULTS if k in data})
+    _SETTINGS_FILE.write_text(json.dumps(current, indent=2), encoding="utf-8")
+
+# Seed session_state from saved file
+for _k, _v in load_settings().items():
+    if _k not in st.session_state:
+        st.session_state[_k] = _v
 
 st.set_page_config(page_title="Account — SpeakPals", page_icon="⚙", layout="centered",
                    initial_sidebar_state="collapsed")
@@ -150,12 +170,12 @@ st.markdown("<div class='sec-div'></div>", unsafe_allow_html=True)
 
 # ── Save & navigate ────────────────────────────────────────────────────────────
 def _save():
-    st.session_state["s_name"]        = name
-    st.session_state["s_level"]       = level
-    st.session_state["s_bg_lang"]     = bg_lang
-    st.session_state["s_language"]    = language
-    st.session_state["s_voice_label"] = voice_label
-    st.session_state["s_model_label"] = model_label
+    data = {
+        "s_name": name, "s_level": level, "s_bg_lang": bg_lang,
+        "s_voice_label": voice_label, "s_model_label": model_label,
+    }
+    save_settings(data)
+    st.session_state.update(data)
 
 col_save, col_home, col_back = st.columns(3)
 with col_save:

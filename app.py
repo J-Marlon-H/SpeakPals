@@ -6,11 +6,12 @@ import hashlib, pathlib, base64
 from dotenv import load_dotenv
 import os
 
-from pipeline import (run_pipeline_stream, MODELS, VOICES, VOICES_BY_LANG, TTS_LANG_CODE, STT_LANG_CODE,
-                      SCENE_CATALOG, parse_claude_response, generate_scene_image, character_tts_b64)
+from pipeline import (run_pipeline_stream, MODELS, VOICES, SCENE_CATALOG, SETTINGS_DEFAULTS,
+                      parse_claude_response, generate_scene_image, character_tts_b64)
 from prompts import build_system_prompt
 from ws_proxy import start_in_thread, PROXY_PORT
 from scene_images import preload_all_images
+import json as _json
 
 # Warm the image cache on first server start so home page loads instantly
 preload_all_images()
@@ -206,19 +207,21 @@ st.markdown("""<style>
 today = "Daily life, shopping"
 
 # ── Read settings from session state (written by pages/account.py) ─────────────
+_saved = SETTINGS_DEFAULTS.copy()
+try:
+    _saved.update(_json.loads(pathlib.Path("user_settings.json").read_text(encoding="utf-8")))
+except Exception:
+    pass
+for _k, _v in _saved.items():
+    if _k not in st.session_state:
+        st.session_state[_k] = _v
 
-name         = st.session_state.get("s_name",        "Marlon")
-level        = st.session_state.get("s_level",       "A1")
-bg_lang      = st.session_state.get("s_bg_lang",     "German")
-target_lang  = st.session_state.get("s_language",    "Danish")
-tts_lang_code = TTS_LANG_CODE.get(target_lang, "da")
-stt_lang_code = STT_LANG_CODE.get(target_lang, "da")   # ISO 639-3 for Scribe
-model_label  = st.session_state.get("s_model_label", "Haiku 4.5 — fastest")
-model_id     = MODELS[model_label]
-
-lang_voices  = VOICES_BY_LANG.get(target_lang, VOICES)
-saved_voice  = st.session_state.get("s_voice_label", "")
-voice_label  = saved_voice if saved_voice in lang_voices else list(lang_voices.keys())[0]
+name        = st.session_state.get("s_name",        SETTINGS_DEFAULTS["s_name"])
+level       = st.session_state.get("s_level",       SETTINGS_DEFAULTS["s_level"])
+bg_lang     = st.session_state.get("s_bg_lang",     SETTINGS_DEFAULTS["s_bg_lang"])
+voice_label = st.session_state.get("s_voice_label", SETTINGS_DEFAULTS["s_voice_label"])
+model_label = st.session_state.get("s_model_label", SETTINGS_DEFAULTS["s_model_label"])
+model_id    = MODELS[model_label]
 
 # ── Session state ──────────────────────────────────────────────────────────────
 
