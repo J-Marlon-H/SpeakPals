@@ -30,36 +30,36 @@ st.markdown("""<style>
   [data-testid="stHeader"],header,.stAppHeader{display:none!important}
   [data-testid="collapsedControl"],[data-testid="stSidebarCollapseButton"],
   [data-testid="stSidebarNav"]{display:none!important}
-  [data-testid="stAppViewContainer"],[data-testid="stMain"]{background:#080812!important}
+  [data-testid="stAppViewContainer"],[data-testid="stMain"]{background:#ffffff!important}
   .block-container{padding:2.5rem 3rem!important;max-width:860px!important;margin:auto}
 
   /* Tabs */
   .stTabs [data-baseweb="tab-list"]{background:transparent!important;
-    border-bottom:1px solid rgba(129,140,248,.18)!important;gap:4px}
-  .stTabs [data-baseweb="tab"]{color:rgba(165,180,252,.45)!important;
+    border-bottom:1px solid rgba(17,24,39,.12)!important;gap:4px}
+  .stTabs [data-baseweb="tab"]{color:rgba(17,24,39,.4)!important;
     border-radius:8px 8px 0 0!important;padding:8px 22px!important;font-size:13px!important;
     font-weight:500!important}
-  .stTabs [aria-selected="true"]{color:#e0e7ff!important;
-    border-bottom:2px solid #818cf8!important;background:rgba(129,140,248,.07)!important}
+  .stTabs [aria-selected="true"]{color:#111827!important;
+    border-bottom:2px solid #0d9488!important;background:rgba(13,148,136,.06)!important}
   .stTabs [data-baseweb="tab-panel"]{padding-top:24px!important}
 
   /* Expander */
   [data-testid="stExpander"]{
-    background:rgba(255,255,255,.02)!important;
-    border:1px solid rgba(255,255,255,.07)!important;
+    background:rgba(0,0,0,.02)!important;
+    border:1px solid rgba(17,24,39,.08)!important;
     border-radius:12px!important;margin-bottom:10px!important}
-  [data-testid="stExpander"] summary{color:rgba(165,180,252,.6)!important;font-size:13px!important}
+  [data-testid="stExpander"] summary{color:rgba(17,24,39,.6)!important;font-size:13px!important}
 
   /* Buttons */
   .stButton button{
     border-radius:10px!important;font-weight:600!important;font-size:13px!important;
-    background:rgba(129,140,248,.1)!important;
-    border:1px solid rgba(129,140,248,.25)!important;
-    color:#c7d2fe!important;
+    background:rgba(13,148,136,.1)!important;
+    border:1px solid rgba(13,148,136,.28)!important;
+    color:#0d9488!important;
     transition:background .2s,border-color .2s}
   .stButton button:hover{
-    background:rgba(129,140,248,.2)!important;
-    border-color:rgba(129,140,248,.48)!important}
+    background:rgba(13,148,136,.2)!important;
+    border-color:rgba(13,148,136,.48)!important}
 </style>""", unsafe_allow_html=True)
 
 # ── Scene lookup ───────────────────────────────────────────────────────────────
@@ -188,27 +188,27 @@ if (correct_log or coaching_log) and not st.session_state.get("current_session_i
       @keyframes _sp_pulse { 0%,100%{opacity:.35} 50%{opacity:.9} }
       .sp-overlay {
         position:fixed;top:0;left:0;width:100%;height:100%;
-        background:#080812;
+        background:#ffffff;
         display:flex;flex-direction:column;align-items:center;justify-content:center;
         z-index:9999;
       }
       .sp-ring {
         width:52px;height:52px;border-radius:50%;
-        border:4px solid rgba(129,140,248,.15);
-        border-top-color:#818cf8;
+        border:4px solid rgba(13,148,136,.15);
+        border-top-color:#0d9488;
         animation:_sp_spin .85s linear infinite;
         margin-bottom:28px;
       }
       .sp-label {
         font:600 15px/1 Segoe UI,sans-serif;
-        color:rgba(165,180,252,.75);
+        color:rgba(17,24,39,.65);
         letter-spacing:.4px;
         animation:_sp_pulse 1.8s ease-in-out infinite;
         margin-bottom:10px;
       }
       .sp-sub {
         font:400 12px Segoe UI;
-        color:rgba(165,180,252,.32);
+        color:rgba(17,24,39,.35);
         letter-spacing:.2px;
       }
     </style>
@@ -287,25 +287,25 @@ def _intelligibility(ok: int, total: int) -> tuple[str, str, str, str, str]:
     """Returns (verdict, sub_text, color, bg, border)."""
     if total == 0:
         return ("—", "Complete a lesson to see your result.",
-                "#818cf8", "rgba(129,140,248,.05)", "rgba(129,140,248,.12)")
+                "#0d9488", "rgba(13,148,136,.06)", "rgba(13,148,136,.18)")
     pct = ok / total
     if pct >= 1.0:
         return (
             "Yes, absolutely!",
             "Perfect accuracy — every answer landed. A native speaker would follow you without hesitation.",
-            "#34d399", "rgba(52,211,153,.07)", "rgba(52,211,153,.18)",
+            "#059669", "rgba(5,150,105,.07)", "rgba(5,150,105,.22)",
         )
     elif pct >= 0.67:
         return (
             "Mostly yes",
             f"You got {ok} of {total} answers across — a native speaker would follow you, even if a few needed a second try.",
-            "#818cf8", "rgba(129,140,248,.07)", "rgba(129,140,248,.18)",
+            "#0d9488", "rgba(13,148,136,.07)", "rgba(13,148,136,.22)",
         )
     else:
         return (
             "Not yet — keep at it",
             f"{ok} of {total} answers landed clearly. Each session builds your confidence faster than you think.",
-            "#f59e0b", "rgba(245,158,11,.07)", "rgba(245,158,11,.18)",
+            "#b45309", "rgba(180,83,9,.07)", "rgba(180,83,9,.22)",
         )
 
 
@@ -329,7 +329,7 @@ def _render_vocab(s):
         return
     sid = s["id"]
     st.markdown(
-        "<div style='font:700 10px Segoe UI;letter-spacing:2px;color:rgba(165,180,252,.4);"
+        "<div style='font:700 10px Segoe UI;letter-spacing:2px;color:rgba(17,24,39,.4);"
         "text-transform:uppercase;margin-bottom:14px'>Words from this session</div>",
         unsafe_allow_html=True,
     )
@@ -349,14 +349,14 @@ def _render_vocab(s):
 
         with cols[i % 2]:
             st.markdown(
-                f"<div style='background:rgba(129,140,248,.05);"
-                f"border:1px solid rgba(129,140,248,.14);border-radius:12px;"
+                f"<div style='background:#ffffff;"
+                f"border:1px solid #e5e5e5;border-radius:12px;"
                 f"padding:14px 16px;margin-bottom:4px'>"
                 f"  <div style='display:flex;align-items:baseline;gap:8px;margin-bottom:7px'>"
-                f"    <span style='font:700 15px Segoe UI;color:#e0e7ff'>{word}</span>"
-                f"    <span style='font:400 11px Segoe UI;color:rgba(165,180,252,.5)'>{trans}</span>"
+                f"    <span style='font:700 15px Segoe UI;color:#111827'>{word}</span>"
+                f"    <span style='font:400 11px Segoe UI;color:rgba(17,24,39,.5)'>{trans}</span>"
                 f"  </div>"
-                f"  <div style='font:400 12px/1.5 Segoe UI;color:rgba(165,180,252,.72);"
+                f"  <div style='font:400 12px/1.5 Segoe UI;color:rgba(17,24,39,.6);"
                 f"    font-style:italic'>{example}</div>"
                 f"</div>",
                 unsafe_allow_html=True,
@@ -397,17 +397,17 @@ def render_session(s):
     verdict, verdict_sub, v_color, v_bg, v_border = _intelligibility(ok, total)
 
     correct_chip = (
-        f"<span style='background:rgba(52,211,153,.12);border:1px solid rgba(52,211,153,.22);"
-        f"border-radius:20px;padding:3px 12px;font:600 11px Segoe UI;color:#34d399;"
+        f"<span style='background:rgba(5,150,105,.1);border:1px solid rgba(5,150,105,.25);"
+        f"border-radius:20px;padding:3px 12px;font:600 11px Segoe UI;color:#059669;"
         f"letter-spacing:.3px'>{ok}/{total} answered correctly</span>"
     )
     mistake_chip = (
-        "<span style='background:rgba(52,211,153,.08);border:1px solid rgba(52,211,153,.15);"
-        "border-radius:20px;padding:3px 12px;font:600 11px Segoe UI;color:#6ee7b7;"
+        "<span style='background:rgba(5,150,105,.08);border:1px solid rgba(5,150,105,.2);"
+        "border-radius:20px;padding:3px 12px;font:600 11px Segoe UI;color:#059669;"
         "letter-spacing:.3px'>No mistakes</span>"
         if n_err == 0 else
-        f"<span style='background:rgba(129,140,248,.1);border:1px solid rgba(165,180,252,.2);"
-        f"border-radius:20px;padding:3px 12px;font:600 11px Segoe UI;color:#a5b4fc;"
+        f"<span style='background:rgba(13,148,136,.1);border:1px solid rgba(13,148,136,.22);"
+        f"border-radius:20px;padding:3px 12px;font:600 11px Segoe UI;color:#0d9488;"
         f"letter-spacing:.3px'>{n_err} mistake{'s' if n_err != 1 else ''} to review</span>"
     )
 
@@ -418,11 +418,11 @@ def render_session(s):
         f"text-transform:uppercase;margin-bottom:10px'>Would a native speaker understand you?</div>"
         f"  <div style='font:800 26px/1.1 Segoe UI,sans-serif;color:{v_color};"
         f"letter-spacing:-.3px;margin-bottom:8px'>{verdict}</div>"
-        f"  <div style='font:400 13px/1.6 Segoe UI;color:rgba(200,210,255,.65);"
+        f"  <div style='font:400 13px/1.6 Segoe UI;color:rgba(17,24,39,.6);"
         f"margin-bottom:16px'>{verdict_sub}</div>"
         f"  <div style='display:flex;flex-wrap:wrap;align-items:center;gap:8px'>"
         f"    {correct_chip}{mistake_chip}"
-        f"    <span style='font:400 12px Segoe UI;color:rgba(165,180,252,.4)'>"
+        f"    <span style='font:400 12px Segoe UI;color:rgba(17,24,39,.35)'>"
         f"      &nbsp;·&nbsp; {scene_ttl} &nbsp;·&nbsp; Level {s.get('level','')} &nbsp;·&nbsp; {s.get('date','')}"
         f"    </span>"
         f"  </div>"
@@ -433,7 +433,7 @@ def render_session(s):
     # ── Mistakes section ───────────────────────────────────────────────────────
     if errors:
         st.markdown(
-            "<div style='font:700 10px Segoe UI;letter-spacing:2px;color:rgba(165,180,252,.4);"
+            "<div style='font:700 10px Segoe UI;letter-spacing:2px;color:rgba(17,24,39,.4);"
             "text-transform:uppercase;margin-bottom:14px'>Mistakes to review</div>",
             unsafe_allow_html=True
         )
@@ -444,31 +444,31 @@ def render_session(s):
             n   = i + 1
             st.markdown(
                 # Card with left accent bar
-                f"<div style='border-left:3px solid rgba(129,140,248,.4);"
-                f"background:rgba(129,140,248,.04);border-radius:0 14px 14px 0;"
+                f"<div style='border-left:3px solid rgba(13,148,136,.4);"
+                f"background:rgba(13,148,136,.04);border-radius:0 14px 14px 0;"
                 f"padding:18px 20px;margin-bottom:14px'>"
                 # Number + question
                 f"<div style='display:flex;align-items:baseline;gap:10px;margin-bottom:14px'>"
-                f"  <span style='font:700 11px Segoe UI;color:rgba(129,140,248,.5)'>{n:02d}</span>"
-                f"  <span style='font:500 14px/1.4 Segoe UI;color:#e2e8f0'>{q}</span>"
+                f"  <span style='font:700 11px Segoe UI;color:rgba(13,148,136,.5)'>{n:02d}</span>"
+                f"  <span style='font:500 14px/1.4 Segoe UI;color:#111827'>{q}</span>"
                 f"</div>"
                 # Two columns: You said / Correction
                 f"<div style='display:grid;grid-template-columns:1fr 1.5fr;gap:12px'>"
                 # You said
                 f"  <div>"
-                f"    <div style='font:600 9px Segoe UI;color:rgba(165,180,252,.4);letter-spacing:.8px;"
+                f"    <div style='font:600 9px Segoe UI;color:rgba(17,24,39,.4);letter-spacing:.8px;"
                 f"text-transform:uppercase;margin-bottom:6px'>You said</div>"
-                f"    <div style='font:400 13px Segoe UI;color:rgba(220,220,240,.55);"
-                f"padding:8px 12px;background:rgba(255,255,255,.03);border-radius:8px;"
-                f"border:1px solid rgba(255,255,255,.06)'>{att}</div>"
+                f"    <div style='font:400 13px Segoe UI;color:rgba(17,24,39,.5);"
+                f"padding:8px 12px;background:rgba(0,0,0,.03);border-radius:8px;"
+                f"border:1px solid rgba(17,24,39,.08)'>{att}</div>"
                 f"  </div>"
                 # Correction
                 f"  <div>"
-                f"    <div style='font:600 9px Segoe UI;color:rgba(165,180,252,.4);letter-spacing:.8px;"
+                f"    <div style='font:600 9px Segoe UI;color:rgba(17,24,39,.4);letter-spacing:.8px;"
                 f"text-transform:uppercase;margin-bottom:6px'>Correction</div>"
-                f"    <div style='font:400 13px/1.5 Segoe UI;color:#c7d2fe;"
-                f"padding:8px 12px;background:rgba(129,140,248,.08);border-radius:8px;"
-                f"border:1px solid rgba(129,140,248,.12)'>{cor}</div>"
+                f"    <div style='font:400 13px/1.5 Segoe UI;color:#0f3d39;"
+                f"padding:8px 12px;background:rgba(13,148,136,.08);border-radius:8px;"
+                f"border:1px solid rgba(13,148,136,.18)'>{cor}</div>"
                 f"  </div>"
                 f"</div>"
                 f"</div>",
@@ -477,12 +477,12 @@ def render_session(s):
     else:
         st.markdown(
             "<div style='display:flex;align-items:center;gap:16px;"
-            "background:rgba(52,211,153,.05);border:1px solid rgba(52,211,153,.15);"
+            "background:rgba(5,150,105,.06);border:1px solid rgba(5,150,105,.18);"
             "border-radius:14px;padding:20px 24px;margin-bottom:20px'>"
             "<div style='font-size:32px;line-height:1'>🎉</div>"
             "<div>"
-            "  <div style='font:600 15px Segoe UI;color:#6ee7b7;margin-bottom:3px'>Clean session</div>"
-            "  <div style='font:400 12px Segoe UI;color:rgba(110,231,183,.55)'>No mistakes this time — great work!</div>"
+            "  <div style='font:600 15px Segoe UI;color:#059669;margin-bottom:3px'>Clean session</div>"
+            "  <div style='font:400 12px Segoe UI;color:rgba(5,150,105,.55)'>No mistakes this time — great work!</div>"
             "</div></div>",
             unsafe_allow_html=True
         )
@@ -494,14 +494,14 @@ def render_session(s):
         flag      = static_tip[0] if static_tip else "💡"
         tip_text  = dynamic_tip if dynamic_tip else static_tip[1]
         st.markdown(
-            f"<div style='background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.07);"
+            f"<div style='background:rgba(0,0,0,.03);border:1px solid rgba(17,24,39,.08);"
             f"border-radius:14px;padding:16px 20px;margin-bottom:20px'>"
             f"<div style='display:flex;align-items:center;gap:8px;margin-bottom:8px'>"
             f"  <span style='font-size:18px'>{flag}</span>"
-            f"  <span style='font:600 10px Segoe UI;color:rgba(165,180,252,.5);letter-spacing:1.5px;"
+            f"  <span style='font:600 10px Segoe UI;color:rgba(17,24,39,.45);letter-spacing:1.5px;"
             f"text-transform:uppercase'>Tip for {s_bg} speakers</span>"
             f"</div>"
-            f"<div style='font:400 12px/1.7 Segoe UI;color:rgba(165,180,252,.65)'>{tip_text}</div>"
+            f"<div style='font:400 12px/1.7 Segoe UI;color:rgba(17,24,39,.6)'>{tip_text}</div>"
             f"</div>",
             unsafe_allow_html=True
         )
@@ -517,19 +517,19 @@ def render_session(s):
                 txt = entry["text"].replace("<","&lt;").replace(">","&gt;")
                 if entry["who"] == "character":
                     parts.append(
-                        f"<div style='background:rgba(255,255,255,.04);border-radius:4px 14px 14px 14px;"
+                        f"<div style='background:rgba(0,0,0,.04);border-radius:4px 14px 14px 14px;"
                         f"padding:10px 14px;margin:6px 0;max-width:78%'>"
-                        f"<span style='font:600 9px Segoe UI;color:rgba(165,180,252,.45);text-transform:uppercase;"
+                        f"<span style='font:600 9px Segoe UI;color:rgba(17,24,39,.4);text-transform:uppercase;"
                         f"letter-spacing:.5px;display:block;margin-bottom:4px'>{char_lbl}</span>"
-                        f"<span style='font:400 13px/1.4 Segoe UI;color:#e2e8f0'><em>{txt}</em></span></div>"
+                        f"<span style='font:400 13px/1.4 Segoe UI;color:#111827'><em>{txt}</em></span></div>"
                     )
                 else:
                     parts.append(
-                        f"<div style='background:rgba(129,140,248,.14);border-radius:14px 4px 14px 14px;"
+                        f"<div style='background:rgba(13,148,136,.12);border-radius:14px 4px 14px 14px;"
                         f"padding:10px 14px;margin:6px 0 6px auto;max-width:78%;text-align:right'>"
-                        f"<span style='font:600 9px Segoe UI;color:rgba(165,180,252,.5);text-transform:uppercase;"
+                        f"<span style='font:600 9px Segoe UI;color:rgba(17,24,39,.4);text-transform:uppercase;"
                         f"letter-spacing:.5px;display:block;margin-bottom:4px'>You</span>"
-                        f"<span style='font:400 13px/1.4 Segoe UI;color:#c7d2fe'>{txt}</span></div>"
+                        f"<span style='font:400 13px/1.4 Segoe UI;color:#0f3d39'>{txt}</span></div>"
                     )
             st.markdown(
                 f"<div style='display:flex;flex-direction:column'>{''.join(parts)}</div>",
@@ -540,11 +540,11 @@ def render_session(s):
 # ── Page header ────────────────────────────────────────────────────────────────
 st.markdown("""
 <div style='margin-bottom:32px;padding:28px 32px;
-  background:linear-gradient(135deg,rgba(49,46,129,.55) 0%,rgba(17,24,39,.2) 100%);
-  border:1px solid rgba(129,140,248,.2);border-radius:24px'>
-  <div style='font:800 28px/1 Segoe UI,sans-serif;color:#e0e7ff;letter-spacing:-.5px;
+  background:rgba(13,148,136,.08);
+  border:1px solid rgba(13,148,136,.2);border-radius:24px'>
+  <div style='font:800 28px/1 Segoe UI,sans-serif;color:#111827;letter-spacing:-.5px;
               margin-bottom:8px'>📋 Your Progress</div>
-  <div style='font:400 13px Segoe UI;color:rgba(165,180,252,.6)'>
+  <div style='font:400 13px Segoe UI;color:rgba(17,24,39,.55)'>
     Review mistakes, track corrections, and see how far you've come
   </div>
 </div>""", unsafe_allow_html=True)
@@ -564,12 +564,12 @@ with tab_latest:
         _next_sc  = _next_scene(_sk0)
 
         st.markdown(
-            "<div style='background:linear-gradient(135deg,rgba(49,46,129,.35) 0%,rgba(17,24,39,.2) 100%);"
-            "border:1px solid rgba(129,140,248,.2);border-radius:20px;"
+            "<div style='background:rgba(13,148,136,.07);"
+            "border:1px solid rgba(13,148,136,.2);border-radius:20px;"
             "padding:24px 28px;margin-top:8px;margin-bottom:20px'>"
-            "<div style='font:700 16px Segoe UI,sans-serif;color:#e0e7ff;margin-bottom:6px'>"
+            "<div style='font:700 16px Segoe UI,sans-serif;color:#111827;margin-bottom:6px'>"
             "Keep the momentum going</div>"
-            f"<div style='font:400 13px Segoe UI;color:rgba(165,180,252,.55)'>"
+            f"<div style='font:400 13px Segoe UI;color:rgba(17,24,39,.55)'>"
             f"{'Try again for a clean run — you can do it.' if _n_err0 > 0 else 'Perfect run! Ready for the next challenge?'}"
             "</div>"
             "</div>",
@@ -595,7 +595,7 @@ with tab_latest:
                     st.switch_page("pages/scene_select.py")
     else:
         st.markdown(
-            "<div style='color:rgba(255,255,255,.3);font-size:13px;padding:40px 0;text-align:center'>"
+            "<div style='color:rgba(17,24,39,.35);font-size:13px;padding:40px 0;text-align:center'>"
             "No session yet — complete a lesson to see feedback here.</div>",
             unsafe_allow_html=True
         )
@@ -604,7 +604,7 @@ with tab_hist:
     past = history[1:]
     if not past:
         st.markdown(
-            "<div style='color:rgba(255,255,255,.3);font-size:13px;padding:40px 0;text-align:center'>"
+            "<div style='color:rgba(17,24,39,.35);font-size:13px;padding:40px 0;text-align:center'>"
             "Complete more lessons to build your history.</div>",
             unsafe_allow_html=True
         )

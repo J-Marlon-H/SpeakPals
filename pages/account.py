@@ -29,58 +29,58 @@ st.markdown("""<style>
   [data-testid="stHeader"],header,.stAppHeader{display:none!important}
   [data-testid="collapsedControl"],[data-testid="stSidebarCollapseButton"],
   [data-testid="stSidebarNav"]{display:none!important}
-  [data-testid="stAppViewContainer"],[data-testid="stMain"]{background:#0b0b1a!important}
+  [data-testid="stAppViewContainer"],[data-testid="stMain"]{background:#ffffff!important}
   .block-container{padding:3rem 2rem!important;max-width:520px!important;margin:auto}
 
   /* Labels */
   label,.stSelectbox label,.stTextInput label{
-    color:rgba(165,180,252,.7)!important;font-size:12px!important;
+    color:rgba(17,24,39,.65)!important;font-size:12px!important;
     font-weight:600!important;letter-spacing:.5px!important}
 
   /* Text inputs */
   .stTextInput input{
-    background:#1a1a3a!important;color:#e2e8f0!important;
-    -webkit-text-fill-color:#e2e8f0!important;
-    border:1px solid rgba(129,140,248,.25)!important;border-radius:10px!important;
+    background:#ffffff!important;color:#111827!important;
+    -webkit-text-fill-color:#111827!important;
+    border:1px solid #e5e5e5!important;border-radius:10px!important;
     font-size:15px!important}
   .stTextInput input:focus{
-    border-color:rgba(129,140,248,.6)!important;
-    box-shadow:0 0 0 3px rgba(129,140,248,.12)!important}
+    border-color:#0d9488!important;
+    box-shadow:0 0 0 3px rgba(13,148,136,.12)!important}
   .stTextInput input:-webkit-autofill,
   .stTextInput input:-webkit-autofill:focus{
-    -webkit-box-shadow:0 0 0 100px #1a1a3a inset!important;
-    -webkit-text-fill-color:#e2e8f0!important}
+    -webkit-box-shadow:0 0 0 100px #ffffff inset!important;
+    -webkit-text-fill-color:#111827!important}
 
   /* Selectboxes */
   .stSelectbox > div > div{
-    background:rgba(255,255,255,.05)!important;color:#e2e8f0!important;
-    border:1px solid rgba(129,140,248,.25)!important;border-radius:10px!important}
+    background:#ffffff!important;color:#111827!important;
+    border:1px solid #e5e5e5!important;border-radius:10px!important}
 
   /* Buttons */
   .stButton button{
     border-radius:10px!important;font-weight:600!important;font-size:13px!important;
-    background:rgba(129,140,248,.12)!important;
-    border:1px solid rgba(129,140,248,.28)!important;
-    color:#c7d2fe!important;
+    background:rgba(13,148,136,.1)!important;
+    border:1px solid rgba(13,148,136,.28)!important;
+    color:#0d9488!important;
     transition:background .2s,border-color .2s}
   .stButton button:hover{
-    background:rgba(129,140,248,.22)!important;
-    border-color:rgba(129,140,248,.5)!important}
+    background:rgba(13,148,136,.2)!important;
+    border-color:rgba(13,148,136,.5)!important}
 
   div[data-testid="stVerticalBlock"]{gap:0.5rem!important}
 
   /* Section divider */
-  .sec-div{height:1px;background:rgba(129,140,248,.12);margin:22px 0 18px}
+  .sec-div{height:1px;background:rgba(17,24,39,.1);margin:22px 0 18px}
   .sec-label{font:700 10px 'Segoe UI',sans-serif;letter-spacing:2px;
-    color:rgba(165,180,252,.45);text-transform:uppercase;margin:0 0 10px}
+    color:rgba(17,24,39,.4);text-transform:uppercase;margin:0 0 10px}
 </style>""", unsafe_allow_html=True)
 
 # ── Page header ────────────────────────────────────────────────────────────────
 st.markdown("""
 <div style='padding:4px 0 28px'>
-  <div style='font:800 26px/1 Segoe UI,sans-serif;color:#e0e7ff;letter-spacing:-.5px;
+  <div style='font:800 26px/1 Segoe UI,sans-serif;color:#111827;letter-spacing:-.5px;
               margin-bottom:6px'>⚙ Settings</div>
-  <div style='font:400 13px Segoe UI;color:rgba(129,140,248,.6)'>
+  <div style='font:400 13px Segoe UI;color:rgba(17,24,39,.55)'>
     Personalise your SpeakPals experience
   </div>
 </div>""", unsafe_allow_html=True)
@@ -149,10 +149,10 @@ affected = [
 ]
 if affected:
     st.markdown(
-        f"<div style='background:rgba(129,140,248,.07);border:1px solid rgba(129,140,248,.18);"
+        f"<div style='background:rgba(13,148,136,.07);border:1px solid rgba(13,148,136,.2);"
         f"border-radius:10px;padding:10px 14px;margin-top:4px;font:400 12px Segoe UI;"
-        f"color:rgba(165,180,252,.65)'>"
-        f"Auto-swap: <span style='color:#a5b4fc'>{', '.join(affected)}</span> "
+        f"color:rgba(17,24,39,.65)'>"
+        f"Auto-swap: <span style='color:#0d9488'>{', '.join(affected)}</span> "
         f"will use a different character voice to avoid your tutor voice."
         f"</div>",
         unsafe_allow_html=True

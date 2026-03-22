@@ -166,16 +166,16 @@ st.markdown("""<style>
   [data-testid="stSidebarNav"]{display:none!important}
   [data-testid="stHeader"],header[data-testid="stHeader"],.stAppHeader{
     display:none!important;height:0!important;min-height:0!important}
-  [data-testid="stAppViewContainer"]{background:#1a1a2e}
-  /* Sidebar — dark conversation panel, 320px wide */
-  [data-testid="stSidebar"]{background:#0b0b1a!important;border-right:1px solid rgba(129,140,248,.15)!important;width:320px!important;min-width:320px!important;color:#e2e8f0!important}
-  [data-testid="stSidebar"] *{color:#e2e8f0!important}
+  [data-testid="stAppViewContainer"]{background:#ffffff}
+  /* Sidebar — warm conversation panel, 320px wide */
+  [data-testid="stSidebar"]{background:#f5f5f5!important;border-right:1px solid #e5e5e5!important;width:320px!important;min-width:320px!important;color:#111827!important}
+  [data-testid="stSidebar"] *{color:#111827!important}
   [data-testid="stSidebar"] section{padding:0!important}
   [data-testid="stSidebar"] .stButton button{
-    background:rgba(129,140,248,.12)!important;color:#a5b4fc!important;
-    border:1px solid rgba(129,140,248,.25)!important;border-radius:8px!important;
+    background:rgba(13,148,136,.1)!important;color:#0d9488!important;
+    border:1px solid rgba(13,148,136,.25)!important;border-radius:8px!important;
     font-size:13px!important}
-  [data-testid="stSidebar"] .stButton button:hover{background:rgba(129,140,248,.22)!important}
+  [data-testid="stSidebar"] .stButton button:hover{background:rgba(13,148,136,.2)!important}
   /* Remove ALL Streamlit main padding */
   .stMainBlockContainer,.block-container{padding:0!important;margin:0!important;max-width:100%!important}
   [data-testid="stVerticalBlock"]{gap:0!important;padding:0!important}
@@ -201,7 +201,7 @@ st.markdown("""<style>
   [data-testid="stSidebar"] .st-key-btn_home{
     position:fixed!important;bottom:0!important;left:0!important;
     width:320px!important;padding:10px 16px 14px!important;
-    background:#0b0b1a!important;border-top:1px solid rgba(129,140,248,.15)!important;
+    background:#f5f5f5!important;border-top:1px solid #e5e5e5!important;
     z-index:100!important}
 </style>""", unsafe_allow_html=True)
 
@@ -331,8 +331,8 @@ with st.sidebar:
     with col_title:
         st.markdown(
             "<div style='padding:20px 0 0 16px'>"
-            "<div style='font:800 18px/1.2 Segoe UI,sans-serif;color:#e0e7ff;letter-spacing:-.3px'>Lesson Chat</div>"
-            f"<div style='font:500 12px Segoe UI;color:rgba(129,140,248,.7);margin-top:4px'>Scene {scene_idx_1based} · {level} · {name}</div>"
+            "<div style='font:800 18px/1.2 Segoe UI,sans-serif;color:#111827;letter-spacing:-.3px'>Lesson Chat</div>"
+            f"<div style='font:500 12px Segoe UI;color:rgba(17,24,39,.55);margin-top:4px'>Scene {scene_idx_1based} · {level} · {name}</div>"
             "</div>",
             unsafe_allow_html=True
         )
@@ -342,7 +342,7 @@ with st.sidebar:
             st.switch_page("pages/account.py")
         st.markdown("</div>", unsafe_allow_html=True)
     st.markdown(
-        "<div style='height:1px;background:linear-gradient(90deg,rgba(129,140,248,.3),transparent);margin:4px 16px 0'></div>",
+        "<div style='height:1px;background:linear-gradient(90deg,rgba(13,148,136,.3),transparent);margin:4px 16px 0'></div>",
         unsafe_allow_html=True
     )
 
@@ -350,14 +350,14 @@ with st.sidebar:
     log = st.session_state.correct_log
     if not st.session_state.lesson_started:
         st.markdown(
-            "<div style='padding:16px;font-size:12px;color:rgba(255,255,255,.55);font-style:italic'>"
+            "<div style='padding:16px;font-size:12px;color:rgba(17,24,39,.45);font-style:italic'>"
             "Press Start Lesson to begin."
             "</div>",
             unsafe_allow_html=True
         )
     elif not log:
         st.markdown(
-            "<div style='padding:16px;font-size:12px;color:rgba(255,255,255,.55);font-style:italic'>"
+            "<div style='padding:16px;font-size:12px;color:rgba(17,24,39,.45);font-style:italic'>"
             "Start speaking — your accepted answers will appear here."
             "</div>",
             unsafe_allow_html=True
@@ -373,19 +373,19 @@ with st.sidebar:
             if entry["who"] == "character":
                 parts.append(
                     f"<div style='padding:8px 12px 4px'>"
-                    f"<div style='background:rgba(255,255,255,.07);border-radius:12px 12px 12px 3px;"
+                    f"<div style='background:#ffffff;border:1px solid #e5e5e5;border-radius:12px 12px 12px 3px;"
                     f"padding:10px 12px;font-size:13px;line-height:1.5;"
-                    f"color:#e2e8f0;word-break:break-word;{anim}'>"
-                    f"<span style='font:600 10px Segoe UI;color:#94a3b8;display:block;margin-bottom:4px;letter-spacing:.5px;text-transform:uppercase'>{char_label}</span>"
+                    f"color:#111827;word-break:break-word;{anim}'>"
+                    f"<span style='font:600 10px Segoe UI;color:#9ca3af;display:block;margin-bottom:4px;letter-spacing:.5px;text-transform:uppercase'>{char_label}</span>"
                     f"<em>{txt}</em></div></div>"
                 )
             else:
                 parts.append(
                     f"<div style='padding:4px 12px 8px'>"
-                    f"<div style='background:rgba(129,140,248,.18);border-radius:12px 12px 3px 12px;"
+                    f"<div style='background:rgba(13,148,136,.1);border:1px solid rgba(13,148,136,.2);border-radius:12px 12px 3px 12px;"
                     f"padding:10px 12px;font-size:13px;line-height:1.5;"
-                    f"color:#c7d2fe;word-break:break-word;{anim}'>"
-                    f"<span style='font:600 10px Segoe UI;color:#818cf8;display:block;margin-bottom:4px;letter-spacing:.5px;text-transform:uppercase'>You ✓</span>"
+                    f"color:#0f3d39;word-break:break-word;{anim}'>"
+                    f"<span style='font:600 10px Segoe UI;color:#0d9488;display:block;margin-bottom:4px;letter-spacing:.5px;text-transform:uppercase'>You ✓</span>"
                     f"{txt}</div></div>"
                 )
         st.markdown("".join(parts), unsafe_allow_html=True)
@@ -401,11 +401,11 @@ with st.sidebar:
 
     # Error debug
     if st.session_state.get("pipeline_error"):
-        st.markdown(f"<div style='margin:8px 12px;padding:8px 10px;background:rgba(248,113,113,.12);border-radius:8px;color:#fca5a5;font-size:11px;word-break:break-word'>⚠ {st.session_state.pipeline_error}</div>", unsafe_allow_html=True)
+        st.markdown(f"<div style='margin:8px 12px;padding:8px 10px;background:rgba(220,38,38,.08);border-radius:8px;color:#dc2626;font-size:11px;word-break:break-word'>⚠ {st.session_state.pipeline_error}</div>", unsafe_allow_html=True)
 
     # Finish button
     if st.session_state.get("scene_idx", 0) >= 1:
-        st.markdown("<div style='height:1px;background:rgba(255,255,255,.07);margin:8px 12px'></div>", unsafe_allow_html=True)
+        st.markdown("<div style='height:1px;background:rgba(17,24,39,.1);margin:8px 12px'></div>", unsafe_allow_html=True)
         if st.button("Finish Lecture", type="primary", use_container_width=True):
             st.switch_page("pages/feedback.py")
 
