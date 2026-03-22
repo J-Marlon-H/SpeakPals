@@ -25,6 +25,8 @@ st.set_page_config(page_title="Account — SpeakPals", page_icon="⚙", layout="
                    initial_sidebar_state="collapsed")
 
 st.markdown("""<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+  html,body{font-family:'Inter',sans-serif!important}
   #MainMenu,footer,[data-testid="stToolbar"]{visibility:hidden}
   [data-testid="stHeader"],header,.stAppHeader{display:none!important}
   [data-testid="collapsedControl"],[data-testid="stSidebarCollapseButton"],
@@ -71,16 +73,16 @@ st.markdown("""<style>
 
   /* Section divider */
   .sec-div{height:1px;background:rgba(17,24,39,.1);margin:22px 0 18px}
-  .sec-label{font:700 10px 'Segoe UI',sans-serif;letter-spacing:2px;
+  .sec-label{font:700 10px 'Inter',sans-serif;letter-spacing:2px;
     color:rgba(17,24,39,.4);text-transform:uppercase;margin:0 0 10px}
 </style>""", unsafe_allow_html=True)
 
 # ── Page header ────────────────────────────────────────────────────────────────
 st.markdown("""
 <div style='padding:4px 0 28px'>
-  <div style='font:800 26px/1 Segoe UI,sans-serif;color:#111827;letter-spacing:-.5px;
+  <div style='font:800 26px/1 Inter,sans-serif;color:#111827;letter-spacing:-.5px;
               margin-bottom:6px'>⚙ Settings</div>
-  <div style='font:400 13px Segoe UI;color:rgba(17,24,39,.55)'>
+  <div style='font:400 13px Inter;color:rgba(17,24,39,.55)'>
     Personalise your SpeakPals experience
   </div>
 </div>""", unsafe_allow_html=True)
@@ -150,7 +152,7 @@ affected = [
 if affected:
     st.markdown(
         f"<div style='background:rgba(13,148,136,.07);border:1px solid rgba(13,148,136,.2);"
-        f"border-radius:10px;padding:10px 14px;margin-top:4px;font:400 12px Segoe UI;"
+        f"border-radius:10px;padding:10px 14px;margin-top:4px;font:400 12px Inter;"
         f"color:rgba(17,24,39,.65)'>"
         f"Auto-swap: <span style='color:#0d9488'>{', '.join(affected)}</span> "
         f"will use a different character voice to avoid your tutor voice."

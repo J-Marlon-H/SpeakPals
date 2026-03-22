@@ -44,6 +44,8 @@ def _bg_css() -> str:
     return " ".join(parts)
 
 st.markdown(f"""<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+  html,body{{font-family:'Inter',sans-serif!important}}
   #MainMenu,footer,[data-testid="stToolbar"]{{visibility:hidden}}
   [data-testid="stHeader"],header,.stAppHeader{{display:none!important}}
   [data-testid="collapsedControl"],[data-testid="stSidebarCollapseButton"],
@@ -52,7 +54,7 @@ st.markdown(f"""<style>
   .block-container{{padding:2.5rem 3rem!important;max-width:960px!important;margin:auto}}
 
   .section-head{{
-    font:700 11px/1 'Segoe UI',sans-serif;letter-spacing:2px;
+    font:700 11px/1 'Inter',sans-serif;letter-spacing:2px;
     text-transform:uppercase;color:rgba(17,24,39,.4);
     margin:32px 0 14px;padding-bottom:8px;
     border-bottom:1px solid rgba(17,24,39,.1)}}
@@ -96,11 +98,11 @@ st.markdown(f"""<style>
     border-radius:0 0 18px 18px!important;
     text-align:left!important;pointer-events:none!important;margin:0!important}}
   {_selP2} {{
-    font:800 17px/1.2 'Segoe UI',sans-serif!important;
+    font:800 17px/1.2 'Inter',sans-serif!important;
     color:#fff!important;text-align:left!important;margin:0!important}}
 
   .scene-desc{{
-    font:400 12px 'Segoe UI',sans-serif;color:rgba(17,24,39,.5);
+    font:400 12px 'Inter',sans-serif;color:rgba(17,24,39,.5);
     margin-top:7px;padding:0 2px;line-height:1.5}}
 
   /* Per-scene background images (or gradient fallback if not yet cached) */
@@ -153,10 +155,10 @@ col_hdr, col_fb, col_acct = st.columns([5, 1, 1])
 with col_hdr:
     st.markdown(f"""
 <div style='padding:8px 0 4px'>
-  <div style='font:800 30px/1.1 Segoe UI,sans-serif;color:#111827;letter-spacing:-.5px;display:flex;align-items:center;gap:0'>
+  <div style='font:800 30px/1.1 Inter,sans-serif;color:#111827;letter-spacing:-.5px;display:flex;align-items:center;gap:0'>
     Hej, {name}! 👋{flag_img}
   </div>
-  <div style='font:400 14px Segoe UI;color:rgba(17,24,39,.6);margin-top:6px'>
+  <div style='font:400 14px Inter;color:rgba(17,24,39,.6);margin-top:6px'>
     Your level: <span style='color:#0d9488;font-weight:600'>{level} — {LEVEL_LABELS.get(level,"")}</span>
     &nbsp;·&nbsp; Choose a scene to practise {language}
   </div>

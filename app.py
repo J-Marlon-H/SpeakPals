@@ -160,6 +160,8 @@ Object.keys(localStorage).forEach(function(k){
 </script>""", height=0)
 
 st.markdown("""<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+  html,body{font-family:'Inter',sans-serif!important}
   #MainMenu,footer,[data-testid="stToolbar"]{visibility:hidden}
   [data-testid="collapsedControl"]{display:none!important}
   [data-testid="stSidebarCollapseButton"]{display:none!important}
@@ -331,8 +333,8 @@ with st.sidebar:
     with col_title:
         st.markdown(
             "<div style='padding:20px 0 0 16px'>"
-            "<div style='font:800 18px/1.2 Segoe UI,sans-serif;color:#111827;letter-spacing:-.3px'>Lesson Chat</div>"
-            f"<div style='font:500 12px Segoe UI;color:rgba(17,24,39,.55);margin-top:4px'>Scene {scene_idx_1based} · {level} · {name}</div>"
+            "<div style='font:800 18px/1.2 Inter,sans-serif;color:#111827;letter-spacing:-.3px'>Lesson Chat</div>"
+            f"<div style='font:500 12px Inter;color:rgba(17,24,39,.55);margin-top:4px'>Scene {scene_idx_1based} · {level} · {name}</div>"
             "</div>",
             unsafe_allow_html=True
         )
@@ -376,7 +378,7 @@ with st.sidebar:
                     f"<div style='background:#ffffff;border:1px solid #e5e5e5;border-radius:12px 12px 12px 3px;"
                     f"padding:10px 12px;font-size:13px;line-height:1.5;"
                     f"color:#111827;word-break:break-word;{anim}'>"
-                    f"<span style='font:600 10px Segoe UI;color:#9ca3af;display:block;margin-bottom:4px;letter-spacing:.5px;text-transform:uppercase'>{char_label}</span>"
+                    f"<span style='font:600 10px Inter;color:#9ca3af;display:block;margin-bottom:4px;letter-spacing:.5px;text-transform:uppercase'>{char_label}</span>"
                     f"<em>{txt}</em></div></div>"
                 )
             else:
@@ -385,7 +387,7 @@ with st.sidebar:
                     f"<div style='background:rgba(13,148,136,.1);border:1px solid rgba(13,148,136,.2);border-radius:12px 12px 3px 12px;"
                     f"padding:10px 12px;font-size:13px;line-height:1.5;"
                     f"color:#0f3d39;word-break:break-word;{anim}'>"
-                    f"<span style='font:600 10px Segoe UI;color:#0d9488;display:block;margin-bottom:4px;letter-spacing:.5px;text-transform:uppercase'>You ✓</span>"
+                    f"<span style='font:600 10px Inter;color:#0d9488;display:block;margin-bottom:4px;letter-spacing:.5px;text-transform:uppercase'>You ✓</span>"
                     f"{txt}</div></div>"
                 )
         st.markdown("".join(parts), unsafe_allow_html=True)

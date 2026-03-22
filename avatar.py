@@ -104,7 +104,7 @@ html,body{{width:100%;height:100%;background:#1a1a2e;overflow:hidden}}
 .scene-img{{width:100%;height:100%;object-fit:contain;display:block;border-radius:0}}
 .caption{{position:absolute;bottom:0;left:0;right:0;
   background:linear-gradient(transparent,rgba(0,0,0,.45));
-  color:white;font:13px/1.4 'Segoe UI',sans-serif;padding:28px 16px 10px;
+  color:white;font:13px/1.4 'Inter',sans-serif;padding:28px 16px 10px;
   pointer-events:none}}
 .avatar-panel{{
   position:absolute;bottom:14px;right:14px;
@@ -120,7 +120,7 @@ html,body{{width:100%;height:100%;background:#1a1a2e;overflow:hidden}}
 .dots{{display:{dot_d};gap:4px;align-items:center}}
 .dots span{{width:5px;height:5px;border-radius:50%;background:#a78bfa;animation:dot 1.1s ease-in-out infinite}}
 .dots span:nth-child(2){{animation-delay:.18s}}.dots span:nth-child(3){{animation-delay:.36s}}
-.lbl{{font:11px/1 'Segoe UI',sans-serif;color:#94a3b8;letter-spacing:.3px;min-height:14px}}
+.lbl{{font:11px/1 'Inter',sans-serif;color:#94a3b8;letter-spacing:.3px;min-height:14px}}
 .lbl.s{{color:#818cf8}}
 </style></head><body>
 {audio_tags}
@@ -186,7 +186,7 @@ svg{{position:relative;z-index:1}}
 .dots{{display:{dot_d};gap:6px;align-items:center}}
 .dots span{{width:7px;height:7px;border-radius:50%;background:#a78bfa;animation:dot 1.1s ease-in-out infinite}}
 .dots span:nth-child(2){{animation-delay:.18s}}.dots span:nth-child(3){{animation-delay:.36s}}
-.lbl{{font:13px/1 'Segoe UI',sans-serif;color:#94a3b8;letter-spacing:.4px}}
+.lbl{{font:13px/1 'Inter',sans-serif;color:#94a3b8;letter-spacing:.4px}}
 .lbl.s{{color:#818cf8}}
 </style></head><body>
 {audio_tags}

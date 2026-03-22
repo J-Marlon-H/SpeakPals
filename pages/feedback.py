@@ -26,6 +26,8 @@ st.set_page_config(page_title="Feedback — SpeakPals", page_icon="📋",
                    layout="wide", initial_sidebar_state="collapsed")
 
 st.markdown("""<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+  html,body{font-family:'Inter',sans-serif!important}
   #MainMenu,footer,[data-testid="stToolbar"]{visibility:hidden}
   [data-testid="stHeader"],header,.stAppHeader{display:none!important}
   [data-testid="collapsedControl"],[data-testid="stSidebarCollapseButton"],
@@ -200,14 +202,14 @@ if (correct_log or coaching_log) and not st.session_state.get("current_session_i
         margin-bottom:28px;
       }
       .sp-label {
-        font:600 15px/1 Segoe UI,sans-serif;
+        font:600 15px/1 Inter,sans-serif;
         color:rgba(17,24,39,.65);
         letter-spacing:.4px;
         animation:_sp_pulse 1.8s ease-in-out infinite;
         margin-bottom:10px;
       }
       .sp-sub {
-        font:400 12px Segoe UI;
+        font:400 12px Inter;
         color:rgba(17,24,39,.35);
         letter-spacing:.2px;
       }
@@ -329,7 +331,7 @@ def _render_vocab(s):
         return
     sid = s["id"]
     st.markdown(
-        "<div style='font:700 10px Segoe UI;letter-spacing:2px;color:rgba(17,24,39,.4);"
+        "<div style='font:700 10px Inter;letter-spacing:2px;color:rgba(17,24,39,.4);"
         "text-transform:uppercase;margin-bottom:14px'>Words from this session</div>",
         unsafe_allow_html=True,
     )
@@ -353,10 +355,10 @@ def _render_vocab(s):
                 f"border:1px solid #e5e5e5;border-radius:12px;"
                 f"padding:14px 16px;margin-bottom:4px'>"
                 f"  <div style='display:flex;align-items:baseline;gap:8px;margin-bottom:7px'>"
-                f"    <span style='font:700 15px Segoe UI;color:#111827'>{word}</span>"
-                f"    <span style='font:400 11px Segoe UI;color:rgba(17,24,39,.5)'>{trans}</span>"
+                f"    <span style='font:700 15px Inter;color:#111827'>{word}</span>"
+                f"    <span style='font:400 11px Inter;color:rgba(17,24,39,.5)'>{trans}</span>"
                 f"  </div>"
-                f"  <div style='font:400 12px/1.5 Segoe UI;color:rgba(17,24,39,.6);"
+                f"  <div style='font:400 12px/1.5 Inter;color:rgba(17,24,39,.6);"
                 f"    font-style:italic'>{example}</div>"
                 f"</div>",
                 unsafe_allow_html=True,
@@ -398,31 +400,31 @@ def render_session(s):
 
     correct_chip = (
         f"<span style='background:rgba(5,150,105,.1);border:1px solid rgba(5,150,105,.25);"
-        f"border-radius:20px;padding:3px 12px;font:600 11px Segoe UI;color:#059669;"
+        f"border-radius:20px;padding:3px 12px;font:600 11px Inter;color:#059669;"
         f"letter-spacing:.3px'>{ok}/{total} answered correctly</span>"
     )
     mistake_chip = (
         "<span style='background:rgba(5,150,105,.08);border:1px solid rgba(5,150,105,.2);"
-        "border-radius:20px;padding:3px 12px;font:600 11px Segoe UI;color:#059669;"
+        "border-radius:20px;padding:3px 12px;font:600 11px Inter;color:#059669;"
         "letter-spacing:.3px'>No mistakes</span>"
         if n_err == 0 else
         f"<span style='background:rgba(13,148,136,.1);border:1px solid rgba(13,148,136,.22);"
-        f"border-radius:20px;padding:3px 12px;font:600 11px Segoe UI;color:#0d9488;"
+        f"border-radius:20px;padding:3px 12px;font:600 11px Inter;color:#0d9488;"
         f"letter-spacing:.3px'>{n_err} mistake{'s' if n_err != 1 else ''} to review</span>"
     )
 
     st.markdown(
         f"<div style='background:{v_bg};border:1px solid {v_border};border-radius:20px;"
         f"padding:24px 28px;margin-bottom:20px'>"
-        f"  <div style='font:600 10px Segoe UI;color:{v_color};letter-spacing:2px;"
+        f"  <div style='font:600 10px Inter;color:{v_color};letter-spacing:2px;"
         f"text-transform:uppercase;margin-bottom:10px'>Would a native speaker understand you?</div>"
-        f"  <div style='font:800 26px/1.1 Segoe UI,sans-serif;color:{v_color};"
+        f"  <div style='font:800 26px/1.1 Inter,sans-serif;color:{v_color};"
         f"letter-spacing:-.3px;margin-bottom:8px'>{verdict}</div>"
-        f"  <div style='font:400 13px/1.6 Segoe UI;color:rgba(17,24,39,.6);"
+        f"  <div style='font:400 13px/1.6 Inter;color:rgba(17,24,39,.6);"
         f"margin-bottom:16px'>{verdict_sub}</div>"
         f"  <div style='display:flex;flex-wrap:wrap;align-items:center;gap:8px'>"
         f"    {correct_chip}{mistake_chip}"
-        f"    <span style='font:400 12px Segoe UI;color:rgba(17,24,39,.35)'>"
+        f"    <span style='font:400 12px Inter;color:rgba(17,24,39,.35)'>"
         f"      &nbsp;·&nbsp; {scene_ttl} &nbsp;·&nbsp; Level {s.get('level','')} &nbsp;·&nbsp; {s.get('date','')}"
         f"    </span>"
         f"  </div>"
@@ -433,7 +435,7 @@ def render_session(s):
     # ── Mistakes section ───────────────────────────────────────────────────────
     if errors:
         st.markdown(
-            "<div style='font:700 10px Segoe UI;letter-spacing:2px;color:rgba(17,24,39,.4);"
+            "<div style='font:700 10px Inter;letter-spacing:2px;color:rgba(17,24,39,.4);"
             "text-transform:uppercase;margin-bottom:14px'>Mistakes to review</div>",
             unsafe_allow_html=True
         )
@@ -449,24 +451,24 @@ def render_session(s):
                 f"padding:18px 20px;margin-bottom:14px'>"
                 # Number + question
                 f"<div style='display:flex;align-items:baseline;gap:10px;margin-bottom:14px'>"
-                f"  <span style='font:700 11px Segoe UI;color:rgba(13,148,136,.5)'>{n:02d}</span>"
-                f"  <span style='font:500 14px/1.4 Segoe UI;color:#111827'>{q}</span>"
+                f"  <span style='font:700 11px Inter;color:rgba(13,148,136,.5)'>{n:02d}</span>"
+                f"  <span style='font:500 14px/1.4 Inter;color:#111827'>{q}</span>"
                 f"</div>"
                 # Two columns: You said / Correction
                 f"<div style='display:grid;grid-template-columns:1fr 1.5fr;gap:12px'>"
                 # You said
                 f"  <div>"
-                f"    <div style='font:600 9px Segoe UI;color:rgba(17,24,39,.4);letter-spacing:.8px;"
+                f"    <div style='font:600 9px Inter;color:rgba(17,24,39,.4);letter-spacing:.8px;"
                 f"text-transform:uppercase;margin-bottom:6px'>You said</div>"
-                f"    <div style='font:400 13px Segoe UI;color:rgba(17,24,39,.5);"
+                f"    <div style='font:400 13px Inter;color:rgba(17,24,39,.5);"
                 f"padding:8px 12px;background:rgba(0,0,0,.03);border-radius:8px;"
                 f"border:1px solid rgba(17,24,39,.08)'>{att}</div>"
                 f"  </div>"
                 # Correction
                 f"  <div>"
-                f"    <div style='font:600 9px Segoe UI;color:rgba(17,24,39,.4);letter-spacing:.8px;"
+                f"    <div style='font:600 9px Inter;color:rgba(17,24,39,.4);letter-spacing:.8px;"
                 f"text-transform:uppercase;margin-bottom:6px'>Correction</div>"
-                f"    <div style='font:400 13px/1.5 Segoe UI;color:#0f3d39;"
+                f"    <div style='font:400 13px/1.5 Inter;color:#0f3d39;"
                 f"padding:8px 12px;background:rgba(13,148,136,.08);border-radius:8px;"
                 f"border:1px solid rgba(13,148,136,.18)'>{cor}</div>"
                 f"  </div>"
@@ -481,8 +483,8 @@ def render_session(s):
             "border-radius:14px;padding:20px 24px;margin-bottom:20px'>"
             "<div style='font-size:32px;line-height:1'>🎉</div>"
             "<div>"
-            "  <div style='font:600 15px Segoe UI;color:#059669;margin-bottom:3px'>Clean session</div>"
-            "  <div style='font:400 12px Segoe UI;color:rgba(5,150,105,.55)'>No mistakes this time — great work!</div>"
+            "  <div style='font:600 15px Inter;color:#059669;margin-bottom:3px'>Clean session</div>"
+            "  <div style='font:400 12px Inter;color:rgba(5,150,105,.55)'>No mistakes this time — great work!</div>"
             "</div></div>",
             unsafe_allow_html=True
         )
@@ -498,10 +500,10 @@ def render_session(s):
             f"border-radius:14px;padding:16px 20px;margin-bottom:20px'>"
             f"<div style='display:flex;align-items:center;gap:8px;margin-bottom:8px'>"
             f"  <span style='font-size:18px'>{flag}</span>"
-            f"  <span style='font:600 10px Segoe UI;color:rgba(17,24,39,.45);letter-spacing:1.5px;"
+            f"  <span style='font:600 10px Inter;color:rgba(17,24,39,.45);letter-spacing:1.5px;"
             f"text-transform:uppercase'>Tip for {s_bg} speakers</span>"
             f"</div>"
-            f"<div style='font:400 12px/1.7 Segoe UI;color:rgba(17,24,39,.6)'>{tip_text}</div>"
+            f"<div style='font:400 12px/1.7 Inter;color:rgba(17,24,39,.6)'>{tip_text}</div>"
             f"</div>",
             unsafe_allow_html=True
         )
@@ -519,17 +521,17 @@ def render_session(s):
                     parts.append(
                         f"<div style='background:rgba(0,0,0,.04);border-radius:4px 14px 14px 14px;"
                         f"padding:10px 14px;margin:6px 0;max-width:78%'>"
-                        f"<span style='font:600 9px Segoe UI;color:rgba(17,24,39,.4);text-transform:uppercase;"
+                        f"<span style='font:600 9px Inter;color:rgba(17,24,39,.4);text-transform:uppercase;"
                         f"letter-spacing:.5px;display:block;margin-bottom:4px'>{char_lbl}</span>"
-                        f"<span style='font:400 13px/1.4 Segoe UI;color:#111827'><em>{txt}</em></span></div>"
+                        f"<span style='font:400 13px/1.4 Inter;color:#111827'><em>{txt}</em></span></div>"
                     )
                 else:
                     parts.append(
                         f"<div style='background:rgba(13,148,136,.12);border-radius:14px 4px 14px 14px;"
                         f"padding:10px 14px;margin:6px 0 6px auto;max-width:78%;text-align:right'>"
-                        f"<span style='font:600 9px Segoe UI;color:rgba(17,24,39,.4);text-transform:uppercase;"
+                        f"<span style='font:600 9px Inter;color:rgba(17,24,39,.4);text-transform:uppercase;"
                         f"letter-spacing:.5px;display:block;margin-bottom:4px'>You</span>"
-                        f"<span style='font:400 13px/1.4 Segoe UI;color:#0f3d39'>{txt}</span></div>"
+                        f"<span style='font:400 13px/1.4 Inter;color:#0f3d39'>{txt}</span></div>"
                     )
             st.markdown(
                 f"<div style='display:flex;flex-direction:column'>{''.join(parts)}</div>",
@@ -542,9 +544,9 @@ st.markdown("""
 <div style='margin-bottom:32px;padding:28px 32px;
   background:rgba(13,148,136,.08);
   border:1px solid rgba(13,148,136,.2);border-radius:24px'>
-  <div style='font:800 28px/1 Segoe UI,sans-serif;color:#111827;letter-spacing:-.5px;
+  <div style='font:800 28px/1 Inter,sans-serif;color:#111827;letter-spacing:-.5px;
               margin-bottom:8px'>📋 Your Progress</div>
-  <div style='font:400 13px Segoe UI;color:rgba(17,24,39,.55)'>
+  <div style='font:400 13px Inter;color:rgba(17,24,39,.55)'>
     Review mistakes, track corrections, and see how far you've come
   </div>
 </div>""", unsafe_allow_html=True)
@@ -567,9 +569,9 @@ with tab_latest:
             "<div style='background:rgba(13,148,136,.07);"
             "border:1px solid rgba(13,148,136,.2);border-radius:20px;"
             "padding:24px 28px;margin-top:8px;margin-bottom:20px'>"
-            "<div style='font:700 16px Segoe UI,sans-serif;color:#111827;margin-bottom:6px'>"
+            "<div style='font:700 16px Inter,sans-serif;color:#111827;margin-bottom:6px'>"
             "Keep the momentum going</div>"
-            f"<div style='font:400 13px Segoe UI;color:rgba(17,24,39,.55)'>"
+            f"<div style='font:400 13px Inter;color:rgba(17,24,39,.55)'>"
             f"{'Try again for a clean run — you can do it.' if _n_err0 > 0 else 'Perfect run! Ready for the next challenge?'}"
             "</div>"
             "</div>",
