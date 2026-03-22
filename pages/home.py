@@ -61,6 +61,11 @@ st.markdown(f"""<style>
   .section-head.current{{color:#0d9488;
     border-bottom-color:rgba(13,148,136,.3)}}
 
+  /* Header nav buttons — two-line layout, equal size */
+  .st-key-nav_feedback button,.st-key-nav_settings button{{
+    white-space:pre-wrap!important;text-align:center!important;
+    height:70px!important;flex-direction:column!important}}
+
   /* Header buttons */
   label,.stButton button{{color:#111827!important}}
   .stButton button{{
@@ -165,12 +170,12 @@ with col_hdr:
 </div>""", unsafe_allow_html=True)
 with col_fb:
     st.markdown("<div style='padding-top:18px'>", unsafe_allow_html=True)
-    if st.button("📋 Feedback", use_container_width=True):
+    if st.button("📋\nFeedback", key="nav_feedback", use_container_width=True):
         st.switch_page("pages/feedback.py")
     st.markdown("</div>", unsafe_allow_html=True)
 with col_acct:
     st.markdown("<div style='padding-top:18px'>", unsafe_allow_html=True)
-    if st.button("⚙ Settings", use_container_width=True):
+    if st.button("⚙️\nSettings", key="nav_settings", use_container_width=True):
         st.switch_page("pages/account.py")
     st.markdown("</div>", unsafe_allow_html=True)
 
