@@ -416,7 +416,7 @@ def render_session(s):
     st.markdown(
         f"<div style='background:{v_bg};border:1px solid {v_border};border-radius:20px;"
         f"padding:24px 28px;margin-bottom:20px'>"
-        f"  <div style='font:600 10px Inter;color:{v_color};letter-spacing:2px;"
+        f"  <div style='font:500 12px Inter;color:{v_color};letter-spacing:.5px;"
         f"text-transform:uppercase;margin-bottom:10px'>Would a native speaker understand you?</div>"
         f"  <div style='font:800 26px/1.1 Inter,sans-serif;color:{v_color};"
         f"letter-spacing:-.3px;margin-bottom:8px'>{verdict}</div>"
