@@ -399,17 +399,17 @@ def render_session(s):
     verdict, verdict_sub, v_color, v_bg, v_border = _intelligibility(ok, total)
 
     correct_chip = (
-        f"<span style='background:rgba(5,150,105,.1);border:1px solid rgba(5,150,105,.25);"
-        f"border-radius:20px;padding:3px 12px;font:600 11px Inter;color:#059669;"
+        f"<span style='background:{v_bg};border:1px solid {v_border};"
+        f"border-radius:20px;padding:3px 12px;font:600 11px Inter;color:{v_color};"
         f"letter-spacing:.3px'>{ok}/{total} answered correctly</span>"
     )
     mistake_chip = (
-        "<span style='background:rgba(5,150,105,.08);border:1px solid rgba(5,150,105,.2);"
-        "border-radius:20px;padding:3px 12px;font:600 11px Inter;color:#059669;"
-        "letter-spacing:.3px'>No mistakes</span>"
+        f"<span style='background:{v_bg};border:1px solid {v_border};"
+        f"border-radius:20px;padding:3px 12px;font:600 11px Inter;color:{v_color};"
+        f"letter-spacing:.3px'>No mistakes</span>"
         if n_err == 0 else
-        f"<span style='background:rgba(13,148,136,.1);border:1px solid rgba(13,148,136,.22);"
-        f"border-radius:20px;padding:3px 12px;font:600 11px Inter;color:#0d9488;"
+        f"<span style='background:{v_bg};border:1px solid {v_border};"
+        f"border-radius:20px;padding:3px 12px;font:600 11px Inter;color:{v_color};"
         f"letter-spacing:.3px'>{n_err} mistake{'s' if n_err != 1 else ''} to review</span>"
     )
 
