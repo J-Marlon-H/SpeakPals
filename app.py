@@ -208,7 +208,8 @@ today = "Daily life, shopping"
 # ── Read settings from session state (written by pages/account.py) ─────────────
 
 name         = st.session_state.get("s_name",        "Marlon")
-level        = st.session_state.get("s_level",       "A1")
+_sel_scene   = st.session_state.get("selected_scene")
+level        = _SCENE_BY_KEY[_sel_scene]["level"] if _sel_scene in _SCENE_BY_KEY else "A1"
 bg_lang      = st.session_state.get("s_bg_lang",     "German")
 target_lang  = st.session_state.get("s_language",    "Danish")
 tts_lang_code = TTS_LANG_CODE.get(target_lang, "da")
