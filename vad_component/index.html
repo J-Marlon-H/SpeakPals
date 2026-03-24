@@ -431,25 +431,56 @@ window.addEventListener("message", function(e) {
 });
 
 // ── Audio exclusivity — only one voice plays at a time ───────────────────────
-var activeAudios = [];
+var activeAudios   = [];   // legacy Audio elements (kept for stopAllAudio compat)
+var activeSources  = [];   // Web Audio BufferSourceNodes
+var _playCtx       = null;
+
+function getPlayCtx() {
+  if (!_playCtx || _playCtx.state === 'closed') _playCtx = new AudioContext();
+  if (_playCtx.state === 'suspended') _playCtx.resume();
+  return _playCtx;
+}
+
 function stopAllAudio() {
   activeAudios.forEach(function(a) { try { a.pause(); a.currentTime = 0; } catch(e) {} });
   activeAudios = [];
+  activeSources.forEach(function(s) { try { s.stop(); } catch(e) {} });
+  activeSources = [];
+}
+
+// Shared helper — plays an array of b64 MP3 chunks sequentially through a GainNode.
+// gainVal > 1.0 amplifies (use for quiet voices); onDone called after last chunk.
+function playChunksWithGain(chunks, gainVal, delayMs, onDone) {
+  var ctx = getPlayCtx();
+  var i = 0;
+  function playNext() {
+    if (i >= chunks.length) { if (onDone) onDone(); return; }
+    var b64 = chunks[i++];
+    var bytes = atob(b64);
+    var buf   = new Uint8Array(bytes.length);
+    for (var j = 0; j < bytes.length; j++) buf[j] = bytes.charCodeAt(j);
+    ctx.decodeAudioData(buf.buffer, function(audioBuf) {
+      var src  = ctx.createBufferSource();
+      src.buffer = audioBuf;
+      var gain = ctx.createGain();
+      gain.gain.value = gainVal;
+      src.connect(gain);
+      gain.connect(ctx.destination);
+      activeSources.push(src);
+      src.onended = function() {
+        activeSources = activeSources.filter(function(s) { return s !== src; });
+        playNext();
+      };
+      src.start();
+    }, function() { playNext(); }); // skip undecipherable chunk
+  }
+  setTimeout(playNext, delayMs || 0);
 }
 
 // ── Character audio ───────────────────────────────────────────────────────────
 function playCharChunks(chunks) {
   stopAllAudio();
-  var audios = chunks.map(function(b64) {
-    return new Audio("data:audio/mpeg;base64," + b64);
-  });
-  activeAudios = audios;
-  function next(i) {
-    if (i >= audios.length) return;
-    audios[i].play().catch(function() { next(i+1); });
-    audios[i].onended = function() { next(i+1); };
-  }
-  setTimeout(function() { next(0); }, 80);
+  playChunksWithGain(chunks, 1.0, 80, null);
 }
 
 // ── Tutor audio + avatar ──────────────────────────────────────────────────────
@@ -491,24 +522,14 @@ function stopTutor() {
   avMouth.classList.remove('on');
   avLbl.textContent = "";
 }
+var TUTOR_GAIN = 1.8;  // boost tutor to match scene character loudness — tune if needed
 function playTutorChunks(chunks) {
   lastTutorChunks = chunks;
   replayTutorBtn.style.display = 'block';
   stopTutorBtn.style.display   = 'block';
   stopAllAudio();
-  var audios = chunks.map(function(b64) {
-    var a = new Audio("data:audio/mpeg;base64," + b64);
-    a.preload = "auto";
-    return a;
-  });
-  activeAudios = audios;
-  function next(i) {
-    if (i >= audios.length) { avIdleState(); return; }
-    avSpeakState();
-    audios[i].play().catch(function() { next(i+1); });
-    audios[i].onended = function() { next(i+1); };
-  }
-  setTimeout(function() { next(0); }, 100);
+  avSpeakState();
+  playChunksWithGain(chunks, TUTOR_GAIN, 100, avIdleState);
 }
 
 // ── Progress dots ─────────────────────────────────────────────────────────────
