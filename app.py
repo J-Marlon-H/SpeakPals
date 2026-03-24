@@ -275,9 +275,9 @@ if _scene_src_raw and not _scene_src_raw.startswith(("http", "data:")):
 else:
     scene_src = _scene_src_raw
 
-voice_id = lang_voices[voice_label]
+voice_id = lang_voices[voice_label] if voice_label in lang_voices else next(iter(lang_voices.values()))
 
-_char_prefs = SCENE_CHAR_VOICE.get(st.session_state.get("selected_scene"), [])
+_char_prefs = SCENE_CHAR_VOICE.get(st.session_state.get("selected_scene") or "", [])
 char_voice_id = next(
     (v for v in _char_prefs if v != voice_id),
     next(v for v in lang_voices.values() if v != voice_id),

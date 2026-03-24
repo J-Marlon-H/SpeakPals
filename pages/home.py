@@ -61,10 +61,15 @@ st.markdown(f"""<style>
   .section-head.current{{color:#0d9488;
     border-bottom-color:rgba(13,148,136,.3)}}
 
-  /* Header nav buttons — two-line layout, equal size */
+  /* Header nav buttons — two-line layout, equal size, neutral white style */
   .st-key-nav_feedback button,.st-key-nav_settings button{{
     white-space:pre-wrap!important;text-align:center!important;
-    height:70px!important;flex-direction:column!important}}
+    height:70px!important;flex-direction:column!important;
+    background:#ffffff!important;border:1px solid #e5e5e5!important;
+    color:#374151!important;box-shadow:0 1px 3px rgba(0,0,0,.06)!important}}
+  .st-key-nav_feedback button:hover,.st-key-nav_settings button:hover{{
+    border-color:rgba(13,148,136,.4)!important;color:#0d9488!important;
+    background:#ffffff!important;box-shadow:0 2px 8px rgba(13,148,136,.1)!important}}
 
   /* Header buttons */
   label,.stButton button{{color:#111827!important}}
