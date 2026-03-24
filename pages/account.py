@@ -1,28 +1,23 @@
 import streamlit as st
 import json, pathlib
-from pipeline import VOICES, VOICES_BY_LANG, MODELS, LESSON_STATE_KEYS, SCENE_CATALOG
+from pipeline import VOICES, VOICES_BY_LANG, MODELS, LESSON_STATE_KEYS, SCENE_CATALOG, SETTINGS_DEFAULTS
 
 # ── Persistent settings helpers ────────────────────────────────────────────────
 _SETTINGS_FILE = pathlib.Path(__file__).parent.parent / "user_settings.json"
-_SETTINGS_KEYS = ["s_name", "s_bg_lang", "s_language", "s_voice_label", "s_model_label"]
-_SETTINGS_DEFAULTS = {
-    "s_name": "Marlon", "s_bg_lang": "German", "s_language": "Danish",
-    "s_voice_label": "Mathias — male baritone", "s_model_label": "Haiku 4.5 — fastest",
-}
 
-def _load_settings() -> dict:
+def load_settings() -> dict:
     try:
-        return {**_SETTINGS_DEFAULTS, **json.loads(_SETTINGS_FILE.read_text(encoding="utf-8"))}
+        return {**SETTINGS_DEFAULTS, **json.loads(_SETTINGS_FILE.read_text(encoding="utf-8"))}
     except Exception:
-        return dict(_SETTINGS_DEFAULTS)
+        return dict(SETTINGS_DEFAULTS)
 
-def _save_settings(data: dict) -> None:
-    current = _load_settings()
-    current.update({k: data[k] for k in _SETTINGS_KEYS if k in data})
+def save_settings(data: dict) -> None:
+    current = load_settings()
+    current.update({k: data[k] for k in SETTINGS_DEFAULTS if k in data})
     _SETTINGS_FILE.write_text(json.dumps(current, indent=2), encoding="utf-8")
 
-# Seed session_state from saved file on page load
-for _k, _v in _load_settings().items():
+# Seed session_state from saved file
+for _k, _v in load_settings().items():
     if _k not in st.session_state:
         st.session_state[_k] = _v
 
@@ -30,62 +25,64 @@ st.set_page_config(page_title="Account — SpeakPals", page_icon="⚙", layout="
                    initial_sidebar_state="collapsed")
 
 st.markdown("""<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+  html,body{font-family:'Inter',sans-serif!important}
   #MainMenu,footer,[data-testid="stToolbar"]{visibility:hidden}
   [data-testid="stHeader"],header,.stAppHeader{display:none!important}
   [data-testid="collapsedControl"],[data-testid="stSidebarCollapseButton"],
   [data-testid="stSidebarNav"]{display:none!important}
-  [data-testid="stAppViewContainer"],[data-testid="stMain"]{background:#0b0b1a!important}
+  [data-testid="stAppViewContainer"],[data-testid="stMain"]{background:#ffffff!important}
   .block-container{padding:3rem 2rem!important;max-width:520px!important;margin:auto}
 
   /* Labels */
   label,.stSelectbox label,.stTextInput label{
-    color:rgba(165,180,252,.7)!important;font-size:12px!important;
+    color:rgba(17,24,39,.65)!important;font-size:12px!important;
     font-weight:600!important;letter-spacing:.5px!important}
 
   /* Text inputs */
   .stTextInput input{
-    background:#1a1a3a!important;color:#e2e8f0!important;
-    -webkit-text-fill-color:#e2e8f0!important;
-    border:1px solid rgba(129,140,248,.25)!important;border-radius:10px!important;
+    background:#ffffff!important;color:#111827!important;
+    -webkit-text-fill-color:#111827!important;
+    border:1px solid #e5e5e5!important;border-radius:10px!important;
     font-size:15px!important}
   .stTextInput input:focus{
-    border-color:rgba(129,140,248,.6)!important;
-    box-shadow:0 0 0 3px rgba(129,140,248,.12)!important}
+    border-color:#0d9488!important;
+    box-shadow:0 0 0 3px rgba(13,148,136,.12)!important}
   .stTextInput input:-webkit-autofill,
   .stTextInput input:-webkit-autofill:focus{
-    -webkit-box-shadow:0 0 0 100px #1a1a3a inset!important;
-    -webkit-text-fill-color:#e2e8f0!important}
+    -webkit-box-shadow:0 0 0 100px #ffffff inset!important;
+    -webkit-text-fill-color:#111827!important}
 
   /* Selectboxes */
   .stSelectbox > div > div{
-    background:rgba(255,255,255,.05)!important;color:#e2e8f0!important;
-    border:1px solid rgba(129,140,248,.25)!important;border-radius:10px!important}
+    background:#ffffff!important;color:#111827!important;
+    border:1px solid #e5e5e5!important;border-radius:10px!important}
 
   /* Buttons */
   .stButton button{
     border-radius:10px!important;font-weight:600!important;font-size:13px!important;
-    background:rgba(129,140,248,.12)!important;
-    border:1px solid rgba(129,140,248,.28)!important;
-    color:#c7d2fe!important;
+    background:rgba(13,148,136,.1)!important;
+    border:1px solid rgba(13,148,136,.28)!important;
+    color:#0d9488!important;
     transition:background .2s,border-color .2s}
   .stButton button:hover{
-    background:rgba(129,140,248,.22)!important;
-    border-color:rgba(129,140,248,.5)!important}
+    background:rgba(13,148,136,.2)!important;
+    border-color:rgba(13,148,136,.5)!important}
 
   div[data-testid="stVerticalBlock"]{gap:0.5rem!important}
 
   /* Section divider */
-  .sec-div{height:1px;background:rgba(129,140,248,.12);margin:22px 0 18px}
-  .sec-label{font:700 10px 'Segoe UI',sans-serif;letter-spacing:2px;
-    color:rgba(165,180,252,.45);text-transform:uppercase;margin:0 0 10px}
+  .sec-div{height:1px;background:rgba(17,24,39,.1);margin:22px 0 18px}
+  .sec-label{font:700 10px 'Inter',sans-serif;letter-spacing:2px;
+    color:rgba(17,24,39,.4);text-transform:uppercase;margin:0 0 10px}
 </style>""", unsafe_allow_html=True)
 
 # ── Page header ────────────────────────────────────────────────────────────────
 st.markdown("""
 <div style='padding:4px 0 28px'>
-  <div style='font:800 26px/1 Segoe UI,sans-serif;color:#e0e7ff;letter-spacing:-.5px;
+  <div style='font:800 26px/1 Inter,sans-serif;color:#111827;letter-spacing:-.5px;
               margin-bottom:6px'>⚙ Settings</div>
-  <div style='font:400 13px Segoe UI;color:rgba(129,140,248,.6)'>
+  <div style='font:400 13px Inter;color:rgba(17,24,39,.55)'>
     Personalise your SpeakPals experience
   </div>
 </div>""", unsafe_allow_html=True)
@@ -151,10 +148,10 @@ affected = [
 ]
 if affected:
     st.markdown(
-        f"<div style='background:rgba(129,140,248,.07);border:1px solid rgba(129,140,248,.18);"
-        f"border-radius:10px;padding:10px 14px;margin-top:4px;font:400 12px Segoe UI;"
-        f"color:rgba(165,180,252,.65)'>"
-        f"Auto-swap: <span style='color:#a5b4fc'>{', '.join(affected)}</span> "
+        f"<div style='background:rgba(13,148,136,.07);border:1px solid rgba(13,148,136,.2);"
+        f"border-radius:10px;padding:10px 14px;margin-top:4px;font:400 12px Inter;"
+        f"color:rgba(17,24,39,.65)'>"
+        f"Auto-swap: <span style='color:#0d9488'>{', '.join(affected)}</span> "
         f"will use a different character voice to avoid your tutor voice."
         f"</div>",
         unsafe_allow_html=True
@@ -176,7 +173,7 @@ def _save():
         "s_name": name, "s_bg_lang": bg_lang, "s_language": language,
         "s_voice_label": voice_label, "s_model_label": model_label,
     }
-    _save_settings(data)
+    save_settings(data)
     st.session_state.update(data)
 
 col_save, col_home, col_back = st.columns(3)

@@ -44,31 +44,43 @@ def _bg_css() -> str:
     return " ".join(parts)
 
 st.markdown(f"""<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+  html,body{{font-family:'Inter',sans-serif!important}}
   #MainMenu,footer,[data-testid="stToolbar"]{{visibility:hidden}}
   [data-testid="stHeader"],header,.stAppHeader{{display:none!important}}
   [data-testid="collapsedControl"],[data-testid="stSidebarCollapseButton"],
   [data-testid="stSidebarNav"]{{display:none!important}}
-  [data-testid="stAppViewContainer"],[data-testid="stMain"]{{background:#0b0b1a!important}}
+  [data-testid="stAppViewContainer"],[data-testid="stMain"]{{background:#ffffff!important}}
   .block-container{{padding:2.5rem 3rem!important;max-width:960px!important;margin:auto}}
 
   .section-head{{
-    font:700 11px/1 'Segoe UI',sans-serif;letter-spacing:2px;
-    text-transform:uppercase;color:rgba(255,255,255,.35);
+    font:700 11px/1 'Inter',sans-serif;letter-spacing:2px;
+    text-transform:uppercase;color:rgba(17,24,39,.4);
     margin:32px 0 14px;padding-bottom:8px;
-    border-bottom:1px solid rgba(255,255,255,.07)}}
-  .section-head.current{{color:rgba(129,140,248,.75);
-    border-bottom-color:rgba(129,140,248,.25)}}
+    border-bottom:1px solid rgba(17,24,39,.1)}}
+  .section-head.current{{color:#0d9488;
+    border-bottom-color:rgba(13,148,136,.3)}}
+
+  /* Header nav buttons — two-line layout, equal size, neutral white style */
+  .st-key-nav_feedback button,.st-key-nav_settings button{{
+    white-space:pre-wrap!important;text-align:center!important;
+    height:70px!important;flex-direction:column!important;
+    background:#ffffff!important;border:1px solid #e5e5e5!important;
+    color:#374151!important;box-shadow:0 1px 3px rgba(0,0,0,.06)!important}}
+  .st-key-nav_feedback button:hover,.st-key-nav_settings button:hover{{
+    border-color:rgba(13,148,136,.4)!important;color:#0d9488!important;
+    background:#ffffff!important;box-shadow:0 2px 8px rgba(13,148,136,.1)!important}}
 
   /* Header buttons */
-  label,.stButton button{{color:#e2e8f0!important}}
+  label,.stButton button{{color:#111827!important}}
   .stButton button{{
     border-radius:12px!important;font-weight:600!important;font-size:13px!important;
-    background:rgba(129,140,248,.15)!important;
-    border:1px solid rgba(129,140,248,.3)!important;color:#c7d2fe!important;
+    background:rgba(13,148,136,.12)!important;
+    border:1px solid rgba(13,148,136,.3)!important;color:#0d9488!important;
     transition:background .2s,border-color .2s}}
   .stButton button:hover{{
-    background:rgba(129,140,248,.28)!important;
-    border-color:rgba(129,140,248,.5)!important}}
+    background:rgba(13,148,136,.22)!important;
+    border-color:rgba(13,148,136,.5)!important}}
 
   /* ── Scene card buttons ─────────────────────────────────────────────────── */
   {_sel} {{
@@ -77,30 +89,30 @@ st.markdown(f"""<style>
     padding:0!important;margin:0!important;
     border-radius:18px!important;overflow:hidden!important;border:none!important;
     background-size:cover!important;background-position:top center!important;
-    box-shadow:0 6px 32px rgba(0,0,0,.55)!important;
+    box-shadow:0 4px 20px rgba(17,24,39,.18)!important;
     cursor:pointer!important;position:relative!important;
     transition:transform .22s cubic-bezier(.34,1.56,.64,1),
                box-shadow .22s ease,filter .22s ease!important}}
   {_selH} {{
     transform:scale(1.035) translateY(-4px)!important;
-    box-shadow:0 16px 48px rgba(129,140,248,.35),0 4px 20px rgba(0,0,0,.6)!important;
-    filter:brightness(1.08)!important}}
+    box-shadow:0 16px 40px rgba(13,148,136,.3),0 4px 16px rgba(17,24,39,.15)!important;
+    filter:brightness(1.05)!important}}
 
   /* Title text pinned to bottom */
   {_selP} {{
     position:absolute!important;
     bottom:0!important;left:0!important;right:0!important;top:auto!important;
     padding:28px 16px 14px!important;
-    background:linear-gradient(to top,rgba(10,10,26,.92) 0%,
-               rgba(10,10,26,.4) 55%,transparent 100%)!important;
+    background:linear-gradient(to top,rgba(10,10,20,.88) 0%,
+               rgba(10,10,20,.35) 55%,transparent 100%)!important;
     border-radius:0 0 18px 18px!important;
     text-align:left!important;pointer-events:none!important;margin:0!important}}
   {_selP2} {{
-    font:800 17px/1.2 'Segoe UI',sans-serif!important;
+    font:800 17px/1.2 'Inter',sans-serif!important;
     color:#fff!important;text-align:left!important;margin:0!important}}
 
   .scene-desc{{
-    font:400 12px 'Segoe UI',sans-serif;color:rgba(255,255,255,.4);
+    font:400 12px 'Inter',sans-serif;color:rgba(17,24,39,.5);
     margin-top:7px;padding:0 2px;line-height:1.5}}
 
   /* Per-scene background images (or gradient fallback if not yet cached) */
@@ -144,7 +156,7 @@ def _flag_img(lang: str, height: int = 32) -> str:
     b64 = base64.b64encode(svg.encode()).decode()
     return (f"<img src='data:image/svg+xml;base64,{b64}' "
             f"height='{height}' style='vertical-align:middle;border-radius:4px;"
-            f"box-shadow:0 2px 8px rgba(0,0,0,.45);margin-left:10px'>")
+            f"box-shadow:0 2px 8px rgba(0,0,0,.2);margin-left:10px'>")
 
 flag_img = _flag_img(language, height=30)
 
@@ -153,22 +165,22 @@ col_hdr, col_fb, col_acct = st.columns([5, 1, 1])
 with col_hdr:
     st.markdown(f"""
 <div style='padding:8px 0 4px'>
-  <div style='font:800 30px/1.1 Segoe UI,sans-serif;color:#e0e7ff;letter-spacing:-.5px;display:flex;align-items:center;gap:0'>
+  <div style='font:800 30px/1.1 Inter,sans-serif;color:#111827;letter-spacing:-.5px;display:flex;align-items:center;gap:0'>
     Hej, {name}! 👋{flag_img}
   </div>
-  <div style='font:400 14px Segoe UI;color:rgba(129,140,248,.75);margin-top:6px'>
-    Your level: <span style='color:#a5b4fc;font-weight:600'>{level} — {LEVEL_LABELS.get(level,"")}</span>
+  <div style='font:400 14px Inter;color:rgba(17,24,39,.6);margin-top:6px'>
+    Your level: <span style='color:#0d9488;font-weight:600'>{level} — {LEVEL_LABELS.get(level,"")}</span>
     &nbsp;·&nbsp; Choose a scene to practise {language}
   </div>
 </div>""", unsafe_allow_html=True)
 with col_fb:
     st.markdown("<div style='padding-top:18px'>", unsafe_allow_html=True)
-    if st.button("📋 Feedback", use_container_width=True):
+    if st.button("📋\nFeedback", key="nav_feedback", use_container_width=True):
         st.switch_page("pages/feedback.py")
     st.markdown("</div>", unsafe_allow_html=True)
 with col_acct:
     st.markdown("<div style='padding-top:18px'>", unsafe_allow_html=True)
-    if st.button("⚙ Settings", use_container_width=True):
+    if st.button("⚙️\nSettings", key="nav_settings", use_container_width=True):
         st.switch_page("pages/account.py")
     st.markdown("</div>", unsafe_allow_html=True)
 

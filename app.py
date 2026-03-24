@@ -7,8 +7,9 @@ from dotenv import load_dotenv
 import os
 
 import json as _json
-from pipeline import (run_pipeline_stream, MODELS, VOICES, VOICES_BY_LANG, TTS_LANG_CODE, STT_LANG_CODE,
-                      SCENE_CATALOG, parse_claude_response, generate_scene_image, character_tts_b64)
+from pipeline import (run_pipeline_stream, MODELS, VOICES, VOICES_BY_LANG, SCENE_CATALOG,
+                      SETTINGS_DEFAULTS, TTS_LANG_CODE, STT_LANG_CODE,
+                      parse_claude_response, generate_scene_image, character_tts_b64)
 from prompts import build_system_prompt
 from ws_proxy import start_in_thread, PROXY_PORT
 from scene_images import preload_all_images
@@ -159,22 +160,24 @@ Object.keys(localStorage).forEach(function(k){
 </script>""", height=0)
 
 st.markdown("""<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+  html,body{font-family:'Inter',sans-serif!important}
   #MainMenu,footer,[data-testid="stToolbar"]{visibility:hidden}
   [data-testid="collapsedControl"]{display:none!important}
   [data-testid="stSidebarCollapseButton"]{display:none!important}
   [data-testid="stSidebarNav"]{display:none!important}
   [data-testid="stHeader"],header[data-testid="stHeader"],.stAppHeader{
     display:none!important;height:0!important;min-height:0!important}
-  [data-testid="stAppViewContainer"]{background:#1a1a2e}
-  /* Sidebar — dark conversation panel, 320px wide */
-  [data-testid="stSidebar"]{background:#0b0b1a!important;border-right:1px solid rgba(129,140,248,.15)!important;width:320px!important;min-width:320px!important;color:#e2e8f0!important}
-  [data-testid="stSidebar"] *{color:#e2e8f0!important}
+  [data-testid="stAppViewContainer"]{background:#ffffff}
+  /* Sidebar — warm conversation panel, 320px wide */
+  [data-testid="stSidebar"]{background:#f5f5f5!important;border-right:1px solid #e5e5e5!important;width:320px!important;min-width:320px!important;color:#111827!important}
+  [data-testid="stSidebar"] *{color:#111827!important}
   [data-testid="stSidebar"] section{padding:0!important}
   [data-testid="stSidebar"] .stButton button{
-    background:rgba(129,140,248,.12)!important;color:#a5b4fc!important;
-    border:1px solid rgba(129,140,248,.25)!important;border-radius:8px!important;
+    background:rgba(13,148,136,.1)!important;color:#0d9488!important;
+    border:1px solid rgba(13,148,136,.25)!important;border-radius:8px!important;
     font-size:13px!important}
-  [data-testid="stSidebar"] .stButton button:hover{background:rgba(129,140,248,.22)!important}
+  [data-testid="stSidebar"] .stButton button:hover{background:rgba(13,148,136,.2)!important}
   /* Remove ALL Streamlit main padding */
   .stMainBlockContainer,.block-container{padding:0!important;margin:0!important;max-width:100%!important}
   [data-testid="stVerticalBlock"]{gap:0!important;padding:0!important}
@@ -186,19 +189,21 @@ st.markdown("""<style>
     position:fixed!important;top:0!important;left:320px!important;
     height:100vh!important;width:calc(100vw - 320px)!important;
     border:none!important;display:block!important;margin:0!important}
+  /* Prevent Streamlit from fading/dimming content during reruns */
+  [data-stale="true"],[data-stale="true"] *{opacity:1!important;transition:none!important}
   /* Chat message slide-in animation */
   @keyframes msgSlideIn{from{opacity:0;transform:translateX(-14px)}to{opacity:1;transform:translateX(0)}}
   /* Sidebar scroll area — leaves room for the pinned Home button */
   [data-testid="stSidebar"] > div:first-child{
     padding-bottom:80px!important;overflow-y:auto!important}
-  /* Each sidebar element — no gap collapse, no overflow issues */
+  /* Each sidebar element — small gap so bubbles don't collapse */
   [data-testid="stSidebar"] [data-testid="stVerticalBlock"]{
-    gap:0!important;overflow:visible!important}
+    gap:2px!important;overflow:visible!important}
   /* Pin Back-to-Home button to bottom — keyed so it ONLY matches that button */
   [data-testid="stSidebar"] .st-key-btn_home{
     position:fixed!important;bottom:0!important;left:0!important;
     width:320px!important;padding:10px 16px 14px!important;
-    background:#0b0b1a!important;border-top:1px solid rgba(129,140,248,.15)!important;
+    background:#f5f5f5!important;border-top:1px solid #e5e5e5!important;
     z-index:100!important}
 </style>""", unsafe_allow_html=True)
 
@@ -207,11 +212,7 @@ st.markdown("""<style>
 today = "Daily life, shopping"
 
 # ── Read settings — seed session_state from file if not already set ────────────
-_SETTINGS_DEFAULTS = {
-    "s_name": "Marlon", "s_bg_lang": "German", "s_language": "Danish",
-    "s_voice_label": "Mathias — male baritone", "s_model_label": "Haiku 4.5 — fastest",
-}
-_saved = dict(_SETTINGS_DEFAULTS)
+_saved = SETTINGS_DEFAULTS.copy()
 try:
     _saved.update(_json.loads(pathlib.Path("user_settings.json").read_text(encoding="utf-8")))
 except Exception:
@@ -220,19 +221,17 @@ for _k, _v in _saved.items():
     if _k not in st.session_state:
         st.session_state[_k] = _v
 
-name         = st.session_state.get("s_name",        "Marlon")
-_sel_scene   = st.session_state.get("selected_scene")
-level        = _SCENE_BY_KEY[_sel_scene]["level"] if _sel_scene in _SCENE_BY_KEY else "A1"
-bg_lang      = st.session_state.get("s_bg_lang",     "German")
-target_lang  = st.session_state.get("s_language",    "Danish")
-tts_lang_code = TTS_LANG_CODE.get(target_lang, "da")
-stt_lang_code = STT_LANG_CODE.get(target_lang, "da")   # ISO 639-3 for Scribe
-model_label  = st.session_state.get("s_model_label", "Haiku 4.5 — fastest")
-model_id     = MODELS[model_label]
-
-lang_voices  = VOICES_BY_LANG.get(target_lang, VOICES)
-saved_voice  = st.session_state.get("s_voice_label", "")
-voice_label  = saved_voice if saved_voice in lang_voices else list(lang_voices.keys())[0]
+name        = st.session_state.get("s_name",        SETTINGS_DEFAULTS["s_name"])
+_sel_scene  = st.session_state.get("selected_scene")
+level       = _SCENE_BY_KEY[_sel_scene]["level"] if _sel_scene in _SCENE_BY_KEY else "A1"
+bg_lang     = st.session_state.get("s_bg_lang",     SETTINGS_DEFAULTS["s_bg_lang"])
+voice_label = st.session_state.get("s_voice_label", SETTINGS_DEFAULTS["s_voice_label"])
+model_label = st.session_state.get("s_model_label", SETTINGS_DEFAULTS["s_model_label"])
+model_id    = MODELS[model_label]
+target_lang    = st.session_state.get("s_language", SETTINGS_DEFAULTS["s_language"])
+lang_voices    = VOICES_BY_LANG.get(target_lang, VOICES)
+tts_lang_code  = TTS_LANG_CODE.get(target_lang, "da")
+stt_lang_code  = STT_LANG_CODE.get(target_lang, "da")
 
 # ── Session state ──────────────────────────────────────────────────────────────
 
@@ -277,9 +276,9 @@ if _scene_src_raw and not _scene_src_raw.startswith(("http", "data:")):
 else:
     scene_src = _scene_src_raw
 
-voice_id = lang_voices[voice_label]
+voice_id = lang_voices[voice_label] if voice_label in lang_voices else next(iter(lang_voices.values()))
 
-_char_prefs = SCENE_CHAR_VOICE.get(st.session_state.get("selected_scene"), [])
+_char_prefs = SCENE_CHAR_VOICE.get(st.session_state.get("selected_scene") or "", [])
 char_voice_id = next(
     (v for v in _char_prefs if v != voice_id),
     next(v for v in lang_voices.values() if v != voice_id),
@@ -335,8 +334,8 @@ with st.sidebar:
     with col_title:
         st.markdown(
             "<div style='padding:20px 0 0 16px'>"
-            "<div style='font:800 18px/1.2 Segoe UI,sans-serif;color:#e0e7ff;letter-spacing:-.3px'>Lesson Chat</div>"
-            f"<div style='font:500 12px Segoe UI;color:rgba(129,140,248,.7);margin-top:4px'>Scene {scene_idx_1based} · {level} · {name}</div>"
+            "<div style='font:800 18px/1.2 Inter,sans-serif;color:#111827;letter-spacing:-.3px'>Lesson Chat</div>"
+            f"<div style='font:500 12px Inter;color:rgba(17,24,39,.55);margin-top:4px'>Scene {scene_idx_1based} · {level} · {name}</div>"
             "</div>",
             unsafe_allow_html=True
         )
@@ -346,7 +345,7 @@ with st.sidebar:
             st.switch_page("pages/account.py")
         st.markdown("</div>", unsafe_allow_html=True)
     st.markdown(
-        "<div style='height:1px;background:linear-gradient(90deg,rgba(129,140,248,.3),transparent);margin:4px 16px 0'></div>",
+        "<div style='height:1px;background:linear-gradient(90deg,rgba(13,148,136,.3),transparent);margin:4px 16px 0'></div>",
         unsafe_allow_html=True
     )
 
@@ -354,66 +353,62 @@ with st.sidebar:
     log = st.session_state.correct_log
     if not st.session_state.lesson_started:
         st.markdown(
-            "<div style='padding:16px;font-size:12px;color:rgba(255,255,255,.55);font-style:italic'>"
+            "<div style='padding:16px;font-size:12px;color:rgba(17,24,39,.45);font-style:italic'>"
             "Press Start Lesson to begin."
             "</div>",
             unsafe_allow_html=True
         )
     elif not log:
         st.markdown(
-            "<div style='padding:16px;font-size:12px;color:rgba(255,255,255,.55);font-style:italic'>"
+            "<div style='padding:16px;font-size:12px;color:rgba(17,24,39,.45);font-style:italic'>"
             "Start speaking — your accepted answers will appear here."
             "</div>",
             unsafe_allow_html=True
         )
     else:
         last_i = len(log) - 1
-        # Find index of the last character entry (for replay button placement)
         last_char_i = next((i for i in range(len(log)-1, -1, -1) if log[i]["who"] == "character"), None)
+        # Build entire chat as one HTML block to avoid Streamlit element spacing issues
+        parts = []
         for i, entry in enumerate(log):
             txt  = entry["text"].replace("<", "&lt;").replace(">", "&gt;")
             anim = "animation:msgSlideIn .4s cubic-bezier(.34,1.56,.64,1) both;" if i == last_i else ""
             if entry["who"] == "character":
-                show_replay = (i == last_char_i and bool(st.session_state.char_audio))
-                if show_replay:
-                    cb, rb = st.columns([5, 1])
-                else:
-                    cb = st.container()
-                with cb:
-                    st.markdown(
-                        f"<div style='background:rgba(255,255,255,.07);border-radius:12px 12px 12px 3px;"
-                        f"padding:10px 12px;margin:12px 12px 4px;font-size:13px;line-height:1.5;"
-                        f"color:#e2e8f0;word-break:break-word;{anim}'>"
-                        f"<span style='font:600 10px Segoe UI;color:#94a3b8;display:block;margin-bottom:4px;letter-spacing:.5px;text-transform:uppercase'>{char_label}</span>"
-                        f"<em>{txt}</em></div>",
-                        unsafe_allow_html=True
-                    )
-                if show_replay:
-                    with rb:
-                        st.markdown("<div style='padding:20px 0 0 0'>", unsafe_allow_html=True)
-                        if st.button("↺", key=f"rch_{i}",
-                                     help=f"Replay {char_label.lower()}",
-                                     use_container_width=True):
-                            st.session_state.replay_char_seq += 1
-                            st.rerun()
-                        st.markdown("</div>", unsafe_allow_html=True)
-            else:
-                st.markdown(
-                    f"<div style='background:rgba(129,140,248,.18);border-radius:12px 12px 3px 12px;"
-                    f"padding:10px 12px;margin:4px 12px 12px;font-size:13px;line-height:1.5;"
-                    f"color:#c7d2fe;word-break:break-word;{anim}'>"
-                    f"<span style='font:600 10px Segoe UI;color:#818cf8;display:block;margin-bottom:4px;letter-spacing:.5px;text-transform:uppercase'>You ✓</span>"
-                    f"{txt}</div>",
-                    unsafe_allow_html=True
+                parts.append(
+                    f"<div style='padding:8px 12px 4px'>"
+                    f"<div style='background:#ffffff;border:1px solid #e5e5e5;border-radius:12px 12px 12px 3px;"
+                    f"padding:10px 12px;font-size:13px;line-height:1.5;"
+                    f"color:#111827;word-break:break-word;{anim}'>"
+                    f"<span style='font:600 10px Inter;color:#9ca3af;display:block;margin-bottom:4px;letter-spacing:.5px;text-transform:uppercase'>{char_label}</span>"
+                    f"<em>{txt}</em></div></div>"
                 )
+            else:
+                parts.append(
+                    f"<div style='padding:4px 12px 8px'>"
+                    f"<div style='background:rgba(13,148,136,.1);border:1px solid rgba(13,148,136,.2);border-radius:12px 12px 3px 12px;"
+                    f"padding:10px 12px;font-size:13px;line-height:1.5;"
+                    f"color:#0f3d39;word-break:break-word;{anim}'>"
+                    f"<span style='font:600 10px Inter;color:#0d9488;display:block;margin-bottom:4px;letter-spacing:.5px;text-transform:uppercase'>You ✓</span>"
+                    f"{txt}</div></div>"
+                )
+        st.markdown("".join(parts), unsafe_allow_html=True)
+        # Replay button rendered separately after the chat block
+        if last_char_i is not None and st.session_state.char_audio:
+            _, rb = st.columns([5, 1])
+            with rb:
+                if st.button("↺", key=f"rch_{last_char_i}",
+                             help=f"Replay {char_label.lower()}",
+                             use_container_width=True):
+                    st.session_state.replay_char_seq += 1
+                    st.rerun()
 
     # Error debug
     if st.session_state.get("pipeline_error"):
-        st.markdown(f"<div style='margin:8px 12px;padding:8px 10px;background:rgba(248,113,113,.12);border-radius:8px;color:#fca5a5;font-size:11px;word-break:break-word'>⚠ {st.session_state.pipeline_error}</div>", unsafe_allow_html=True)
+        st.markdown(f"<div style='margin:8px 12px;padding:8px 10px;background:rgba(220,38,38,.08);border-radius:8px;color:#dc2626;font-size:11px;word-break:break-word'>⚠ {st.session_state.pipeline_error}</div>", unsafe_allow_html=True)
 
     # Finish button
     if st.session_state.get("scene_idx", 0) >= 1:
-        st.markdown("<div style='height:1px;background:rgba(255,255,255,.07);margin:8px 12px'></div>", unsafe_allow_html=True)
+        st.markdown("<div style='height:1px;background:rgba(17,24,39,.1);margin:8px 12px'></div>", unsafe_allow_html=True)
         if st.button("Finish Lecture", type="primary", use_container_width=True):
             st.switch_page("pages/feedback.py")
 

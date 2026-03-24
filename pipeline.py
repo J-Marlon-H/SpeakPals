@@ -1,4 +1,3 @@
-from __future__ import annotations
 import requests, urllib3, base64, json, re, time, threading
 import streamlit as st
 
@@ -39,6 +38,81 @@ def tts_chunk(text, voice_id, eleven_key, lang_code="da"):
     r.raise_for_status()
 
 
+def generate_language_tip(conversation_lines: list, bg_lang: str, claude_key: str,
+                          model: str = "claude-haiku-4-5-20251001") -> str:
+    """Generate a conversation-specific language tip for a given background language.
+    Returns plain text (2-3 sentences). Raises on API error."""
+    conv_text = "\n".join(
+        f"{'Character' if e['who'] == 'character' else 'Student'}: {e['text']}"
+        for e in conversation_lines
+    )
+    prompt = (
+        f"A student whose native language is {bg_lang} just completed this short Danish conversation:\n\n"
+        f"{conv_text}\n\n"
+        f"Write a short tip (2–3 sentences max) specifically for {bg_lang} speakers, based only on "
+        f"the words that appear in this conversation. Focus on: cognates (Danish words that look or "
+        f"sound similar to {bg_lang}), false friends, or notable pronunciation differences. "
+        f"Reference specific words from the conversation. Plain text only — no markdown, no bullet points."
+    )
+    r = get_session().post(
+        "https://api.anthropic.com/v1/messages",
+        headers={"x-api-key": claude_key, "anthropic-version": "2023-06-01",
+                 "Content-Type": "application/json"},
+        json={"model": model, "max_tokens": 150, "temperature": 0.5,
+              "messages": [{"role": "user", "content": prompt}]},
+        timeout=20,
+    )
+    r.raise_for_status()
+    return r.json()["content"][0]["text"].strip()
+
+
+def extract_vocabulary(conversation_lines: list, bg_lang: str, level: str,
+                       claude_key: str, model: str = "claude-haiku-4-5-20251001") -> list:
+    """Extract key vocab from conversation.
+    Returns list of {word, translation, example} dicts (4–6 items)."""
+    conv_text = "\n".join(
+        f"{'Character' if e['who'] == 'character' else 'Student'}: {e['text']}"
+        for e in conversation_lines
+    )
+    prompt = (
+        f"From this Danish conversation (student level: {level}, native language: {bg_lang}):\n\n"
+        f"{conv_text}\n\n"
+        f"Extract 4–6 useful Danish words or short phrases a beginner should practice. "
+        f"Prefer content words (nouns, verbs, useful phrases). Skip bare filler like 'ja' or 'hej' "
+        f"unless there is a genuine nuance worth noting for {bg_lang} speakers. "
+        f"For each word provide:\n"
+        f"  - 'word': the Danish word/phrase as it appeared\n"
+        f"  - 'translation': concise English translation\n"
+        f"  - 'example': a short new Danish sentence (5–8 words) using this word — "
+        f"different from the conversation, appropriate for {level} level\n\n"
+        f"Reply with a JSON array only, no other text:\n"
+        f'[{{"word":"...","translation":"...","example":"..."}}]'
+    )
+    r = get_session().post(
+        "https://api.anthropic.com/v1/messages",
+        headers={"x-api-key": claude_key, "anthropic-version": "2023-06-01",
+                 "Content-Type": "application/json"},
+        json={"model": model, "max_tokens": 500, "temperature": 0.4,
+              "messages": [{"role": "user", "content": prompt}]},
+        timeout=20,
+    )
+    r.raise_for_status()
+    raw = r.json()["content"][0]["text"].strip()
+    # Strip markdown code fences Claude sometimes adds (```json ... ```)
+    raw = re.sub(r'^```[a-z]*\s*', '', raw)
+    raw = re.sub(r'\s*```$', '', raw)
+    return json.loads(raw)
+
+
+SETTINGS_DEFAULTS = {
+    "s_name":        "Marlon",
+    "s_level":       "A1",
+    "s_bg_lang":     "German",
+    "s_language":    "Danish",
+    "s_voice_label": "Mathias — male baritone",
+    "s_model_label": "Haiku 4.5 — fastest",
+}
+
 MODELS = {
     "Sonnet 4.6 — best quality": "claude-sonnet-4-6",
     "Haiku 4.5 — fastest":       "claude-haiku-4-5-20251001",
@@ -50,13 +124,13 @@ VOICES = {
     "Casper — male, calm":     "ADRrvIX3j1uTFlD5q6DE",
 }
 
-# Per-language voice menus — Brazilian voices use native Brazilian-accented voice IDs
+# Per-language voice menus
 VOICES_BY_LANG = {
     "Danish": VOICES,
     "Portuguese (Brazilian)": {
-        "Matheus — male baritone": "36rVQA1AOIPwpA3Hg1tC",  # Native Brazilian male
-        "Camila — female":         "4RklGmuxoAskAbGXplXN",  # Multilingual female (shared)
-        "Flavio — male, calm":     "x6uRgOliu4lpcrqMH3s1",  # Native Brazilian male, narrative
+        "Matheus — male baritone": "36rVQA1AOIPwpA3Hg1tC",
+        "Camila — female":         "4RklGmuxoAskAbGXplXN",
+        "Flavio — male, calm":     "x6uRgOliu4lpcrqMH3s1",
     },
 }
 
@@ -65,13 +139,11 @@ TTS_LANG_CODE = {
     "Portuguese (Brazilian)": "pt",
 }
 
-# STT (Scribe v2 realtime) uses ISO 639-3 codes — different from TTS ISO 639-1 codes
 STT_LANG_CODE = {
     "Danish":                 "da",
-    "Portuguese (Brazilian)": "por",   # "por" is the confirmed Scribe ISO 639-3 code
+    "Portuguese (Brazilian)": "por",
 }
 
-# TTS model per language — turbo_v2_5 gives the best pronunciation quality for both
 TTS_MODEL = {
     "da": "eleven_turbo_v2_5",
     "pt": "eleven_turbo_v2_5",
@@ -83,11 +155,11 @@ SCENE_CATALOG = [
         "key":         "meet_a_friend",
         "level":       "A1",
         "title":       "Meet a Friend",
-        "desc":        "Introduce yourself and get to know someone",
+        "desc":        "Introduce yourself and get to know someone in Danish",
         "file":        "friend.jpg",
         "gradient":    "linear-gradient(135deg,#064e3b,#065f46)",
         "char_name":   "Friend",
-        "scene_description": "A friendly young person smiling at you in a sunny park, ready to chat and get to know you",
+        "scene_description": "A friendly young Dane smiling at you in a sunny park, ready to chat and get to know you",
     },
     {
         "key":         "cafe",
@@ -97,7 +169,7 @@ SCENE_CATALOG = [
         "file":        "cafe.jpg",
         "gradient":    "linear-gradient(135deg,#451a03,#78350f)",
         "char_name":   "Barista",
-        "scene_description": "A cosy café — the barista is at the counter with coffee cups and pastries, ready to take your order",
+        "scene_description": "A cosy Danish café — the barista is at the counter with coffee cups and pastries, ready to take your order",
     },
     {
         "key":         "supermarket",
@@ -107,37 +179,37 @@ SCENE_CATALOG = [
         "file":        "supermarket_cashier.jpg",
         "gradient":    "linear-gradient(135deg,#1e3a8a,#312e81)",
         "char_name":   "Cashier",
-        "scene_description": "Supermarket checkout — the cashier is facing you, ready to scan your items",
+        "scene_description": "Danish supermarket checkout — the cashier is facing you, ready to scan your items",
     },
     {
         "key":         "flower_store",
         "level":       "A2",
         "title":       "At the Flower Shop",
-        "desc":        "Buy flowers and chat with the florist",
+        "desc":        "Buy flowers and chat with the florist in Danish",
         "file":        "flower_store.jpg",
         "gradient":    "linear-gradient(135deg,#4a1942,#831843)",
         "char_name":   "Florist",
-        "scene_description": "A flower shop — the florist is behind the counter, surrounded by colourful flowers, ready to help you",
+        "scene_description": "Danish flower shop — the florist is behind the counter, surrounded by colourful flowers, ready to help you",
     },
     {
         "key":         "bakery",
         "level":       "A2",
         "title":       "At the Bakery",
-        "desc":        "Order pastries and bread from the baker",
+        "desc":        "Order pastries and bread from the baker in Danish",
         "file":        "bakery.jpg",
         "gradient":    "linear-gradient(135deg,#78350f,#92400e)",
         "char_name":   "Baker",
-        "scene_description": "A bakery — the baker is at the counter with fresh pastries and bread on display",
+        "scene_description": "Danish bakery — the baker is at the counter with fresh pastries and bread on display",
     },
     {
         "key":         "restaurant",
         "level":       "B1",
         "title":       "At the Restaurant",
-        "desc":        "Order a meal and interact with the waiter",
+        "desc":        "Order a meal and interact with the waiter in Danish",
         "file":        "restaurant.jpg",
         "gradient":    "linear-gradient(135deg,#7c2d12,#9a3412)",
         "char_name":   "Waiter",
-        "scene_description": "A restaurant — a waiter is at your table, ready to take your order",
+        "scene_description": "Danish restaurant — a waiter is at your table, ready to take your order",
     },
 ]
 
@@ -229,7 +301,7 @@ def run_pipeline_stream(system, user_input, history, voice_id, claude_key, eleve
         tts_text = clean_for_tts(raw_claude)
 
     if tts_text:
-        audio = tts_chunk(tts_text, voice_id, eleven_key, lang_code)
+        audio = tts_chunk(tts_text, voice_id, eleven_key, lang_code=lang_code)
         yield raw_claude, base64.b64encode(audio).decode()
     else:
         yield raw_claude, ""
@@ -307,7 +379,7 @@ def parse_claude_response(raw: str) -> tuple[str, bool, bool]:
 def character_tts_b64(text: str, voice_id: str, eleven_key: str, lang_code: str = "da") -> str | None:
     """Synthesize a short line with the given voice; returns base64 string or None."""
     try:
-        audio = tts_chunk(text, voice_id, eleven_key, lang_code)
+        audio = tts_chunk(text, voice_id, eleven_key, lang_code=lang_code)
         return base64.b64encode(audio).decode()
     except Exception:
         return None
