@@ -6,6 +6,7 @@ import hashlib, pathlib, base64
 from dotenv import load_dotenv
 import os
 
+import json as _json
 from pipeline import (run_pipeline_stream, MODELS, VOICES, VOICES_BY_LANG, TTS_LANG_CODE, STT_LANG_CODE,
                       SCENE_CATALOG, parse_claude_response, generate_scene_image, character_tts_b64)
 from prompts import build_system_prompt
@@ -205,7 +206,19 @@ st.markdown("""<style>
 
 today = "Daily life, shopping"
 
-# ── Read settings from session state (written by pages/account.py) ─────────────
+# ── Read settings — seed session_state from file if not already set ────────────
+_SETTINGS_DEFAULTS = {
+    "s_name": "Marlon", "s_bg_lang": "German", "s_language": "Danish",
+    "s_voice_label": "Mathias — male baritone", "s_model_label": "Haiku 4.5 — fastest",
+}
+_saved = dict(_SETTINGS_DEFAULTS)
+try:
+    _saved.update(_json.loads(pathlib.Path("user_settings.json").read_text(encoding="utf-8")))
+except Exception:
+    pass
+for _k, _v in _saved.items():
+    if _k not in st.session_state:
+        st.session_state[_k] = _v
 
 name         = st.session_state.get("s_name",        "Marlon")
 _sel_scene   = st.session_state.get("selected_scene")
