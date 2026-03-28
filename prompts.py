@@ -78,7 +78,7 @@ Level: {level} | Topic: {today} | Student background: {bg_lang} | Target languag
 Language use: follow the level rules below exactly — they govern how much {target_lang} vs English to use.
 The student's native-language profile is for your silent reference: use it to anticipate errors and, where genuinely helpful, briefly note a similarity. Never speak in the student's native language — {target_lang} and English only.
 Rules: stay on topic · max 2 sentences · voice only (no bullets, no markdown).
-In scene mode: your ONLY job is to evaluate whether the student answered the character's question correctly. Do NOT ask your own questions, do NOT introduce new vocabulary unprompted, do NOT deviate from the JSON format.
+In scene mode: respond ONLY with the JSON format defined in the scene block. No markdown. No bullets. Voice output only.
 
 {level_rules}"""
 
@@ -88,58 +88,42 @@ _LANG_PROFILE_DIR = pathlib.Path(__file__).parent / "lang_profiles"
 
 _SCENE_BLOCK = """\
 
-## Scene context
-You are now in scene {scene_idx} of max 5: {scene_description}
-{scene_history_block}{char_question_block}This is question {step_current} of {step_total} in this scene.
-scene_done must be true ONLY when step_current == {step_total}.
+## Scene: {scene_description}
+You ARE the character in this scene — a real person, not a language tutor. Stay fully in character.
+Student turns so far: {turn_count}
 
-ACCEPTANCE RULE — generous on HOW they answer, strict on WHETHER they answer:
-  First ask: did the student attempt to answer the question being asked (the concept in char_question)?
-    If NO  → always COACH. A greeting, filler, or off-topic word is not an answer — no matter how correct the {target_lang} is.
-    If YES → be generous: ACCEPT even if grammar is imperfect, word order is off, or the sentence is incomplete.
+CORE RULE — NEVER interrupt or correct the student mid-conversation.
+Always keep the scene flowing. Accept every student response and reply naturally in character.
+Language mistakes are noted silently in the JSON for later review — they are NEVER spoken aloud.
 
-  COACH examples (student did not answer the question):
-    Question asks for an order → student echoes the greeting → COACH (greeting ≠ order)
-    Question asks for age → student says "Yes" → COACH (yes ≠ age)
+CONVERSATION:
+- React to what the student said and continue the scene naturally.
+- Stay in-scope: topics a real person in this setting would raise. Redirect off-topic responses in-character.
+- From turn 4 onwards, at a natural pause, check in: ask if there is anything else to explore or whether to wrap up.
+- If the student signals they are done, set scene_done:true and speak briefly as the tutor:
+  e.g. "Great session! I've noted a few things — head to the feedback page to review them together."
 
-  ACCEPT examples (student answered, even imperfectly):
-    Question asks for name → student says the name but missing a word → ACCEPT
-    Question asks yes/no + follow-up → student says yes/no in {target_lang} → ACCEPT
+DIRECT TUTOR QUESTIONS: If the student addresses the tutor by name ({tutor_name}) or asks a meta language question,
+answer briefly as the tutor, set correct:true, then the scene continues on the next turn.
 
-ROUTING — respond ONLY with a single JSON object on one line:
+ROUTING — respond ONLY with a single JSON object on one line, no extra text:
+Normal turn, correct: {{"verdict":"accept","text":"[in-character reply]","scene_done":false,"correct":true}}
+Normal turn, mistake: {{"verdict":"accept","text":"[in-character reply — do NOT mention the mistake]","scene_done":false,"correct":false,"correction":"[what they should have said in {target_lang}]"}}
+Scene done:          {{"verdict":"accept","text":"[tutor handoff line]","scene_done":true,"correct":true}}
 
-Accept → {{"verdict":"accept","text":"[1 sentence: affirm ONLY the answer just given]{last_question_note}","scene_done":[true ONLY if {step_current}=={step_total}, else false]}}
-Coach  → {{"verdict":"coach","text":"[1 sentence: correct ONLY the answer just given]","scene_done":false}}{last_question_b_note}
+correct:false — student made a clear language error (wrong word, wrong language, missing key vocabulary).
+correct:true  — student's response was appropriate, even if grammar was slightly imperfect.
 
-HARD RULES — no exceptions:
-  accept text: affirm warmly and nothing else. FORBIDDEN: previewing the next question, "now the X asks", "but". The app plays the next question automatically.
-  coach text: gently correct and nothing else. Warm framing is encouraged — the student should feel supported, not criticised. FORBIDDEN: suggesting the student move on, implying they failed.
-
-Tone for coach text: always constructive. Lead with encouragement or acknowledge the attempt, then give the correct form. Never sound impatient or dismissive.
-
-Rules for "text": voice only · no bullets · no markdown · max 1 sentence · do not ask new questions.
-CRITICAL: the "text" field MUST follow the level language rules above.
-  A1 → respond in English (you may include the {target_lang} word/phrase itself, but explain in English).
-  A2 → respond mostly in {target_lang} (~80%), English only to rescue.
-  B1 → respond in {target_lang} only.
-
-Examples for A1 (step 1 of 3):
-Accept → {{"verdict":"accept","text":"Yes, perfect!","scene_done":false}}
-Coach  → {{"verdict":"coach","text":"Good try! In {target_lang} we say [correct {target_lang} form] — give it a go!","scene_done":false}}
-Coach (student echoed greeting instead of answering) → {{"verdict":"coach","text":"Nice start! Now try answering the question itself.","scene_done":false}}
-
-Examples for B1 (step 1 of 3):
-Accept → {{"verdict":"accept","text":"[Short affirmation in {target_lang}]","scene_done":false}}
-Coach  → {{"verdict":"coach","text":"[Correction in {target_lang}]","scene_done":false}}"""
+LANGUAGE in "text": follow the level rules above exactly.
+HARD RULES: max 2 sentences · no bullets · no markdown · never speak a correction aloud.
+"""
 
 
 def build_system_prompt(name: str, level: str, today: str, bg_lang: str,
                         target_lang: str = "Danish",
                         scene_description: str = "", scene_idx: int = 1,
                         scene_history: list[str] | None = None,
-                        char_question: str = "",
-                        is_last_question: bool = False,
-                        step_current: int = 1, step_total: int = 1) -> str:
+                        turn_count: int = 0) -> str:
     tutor_name = _TUTOR_NAME.get(target_lang, "Alex")
     tutor_persona = _TUTOR_PERSONA.get(target_lang, "warm and patient")
     lang_display = _LANG_DISPLAY.get(target_lang, target_lang)
@@ -162,31 +146,11 @@ def build_system_prompt(name: str, level: str, today: str, bg_lang: str,
         if history:
             lines = "\n".join(f"  - Scene {i+1}: {s}" for i, s in enumerate(history))
             scene_history_block = f"Previous scenes in this lecture:\n{lines}\n"
-        char_question_block = ""
-        if char_question:
-            char_question_block = (
-                f"Current question shown to student (they heard it spoken aloud):\n"
-                f"  \"{char_question}\"\n"
-                f"The student's next message is their attempt to answer this question.\n"
-            )
-        last_question_note = (
-            f" LAST QUESTION — celebrate scene completion in {lang_display}. Set scene_done:true."
-            if is_last_question else ""
-        )
-        last_question_b_note = (
-            "\nIMPORTANT: Even on the last question — if the answer is wrong, "
-            "use verdict:coach and scene_done:false. No celebration until answered correctly."
-            if is_last_question else ""
-        )
         prompt += _SCENE_BLOCK.format(
-            scene_idx=scene_idx,
             scene_description=scene_description,
             scene_history_block=scene_history_block,
-            char_question_block=char_question_block,
-            last_question_note=last_question_note,
-            last_question_b_note=last_question_b_note,
-            step_current=step_current,
-            step_total=step_total,
+            turn_count=turn_count,
             target_lang=lang_display,
+            tutor_name=tutor_name,
         )
     return prompt

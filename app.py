@@ -29,76 +29,23 @@ CLAUDE_KEY = _secret("CLAUDE_API_KEY")
 ELEVEN_KEY = _secret("ELEVENLABS_API_KEY")
 FAL_KEY    = _secret("FAL_KEY")
 
-# ── Scene scripts — per language ───────────────────────────────────────────────
-
-SCENE_SCRIPTS_BY_LANG = {
+# Opening line per scene — spoken by the character at lesson start (TTS pre-loaded)
+SCENE_OPENERS_BY_LANG = {
     "Danish": {
-        "meet_a_friend": [
-            "Hej! Hvad hedder du?",
-            "Hvor gammel er du?",
-            "Hvor bor du?",
-        ],
-        "cafe": [
-            "Hej! Hvad må det være?",
-            "Vil du have mælk i din kaffe?",
-            "Det er 35 kroner. Betaler du med kort?",
-        ],
-        "supermarket": [
-            "Vil du betale med kort eller kontanter?",
-            "Vil du have en kvittering?",
-            "Hav en god dag!",
-        ],
-        "flower_store": [
-            "Hej! Hvad kan jeg hjælpe dig med i dag?",
-            "Hvilken farve vil du have?",
-            "Det bliver 50 kroner. Betaler du med kort eller kontant?",
-        ],
-        "bakery": [
-            "Godmorgen! Hvad må det være?",
-            "Vil du have en pose med?",
-            "Det er 35 kroner. Værsgo og god dag!",
-        ],
-        "restaurant": [
-            "Goddag og velkommen! Har du reserveret bord?",
-            "Hvad kan jeg bringe dig i dag?",
-            "Vil du have noget at drikke til maden?",
-            "Er alt til din tilfredshed?",
-            "Ønsker du dessert eller kaffe?",
-        ],
+        "meet_a_friend": "Hej! Hvad hedder du?",
+        "cafe":          "Hej! Hvad må det være?",
+        "supermarket":   "Vil du betale med kort eller kontanter?",
+        "flower_store":  "Hej! Hvad kan jeg hjælpe dig med i dag?",
+        "bakery":        "Godmorgen! Hvad må det være?",
+        "restaurant":    "Goddag og velkommen! Har du reserveret bord?",
     },
     "Portuguese (Brazilian)": {
-        "meet_a_friend": [
-            "Oi! Qual é o seu nome?",
-            "Quantos anos você tem?",
-            "Onde você mora?",
-        ],
-        "cafe": [
-            "Olá! O que vai ser?",
-            "Quer leite no seu café?",
-            "São quinze reais. Vai pagar no cartão?",
-        ],
-        "supermarket": [
-            "Vai pagar no débito ou no crédito?",
-            "Quer o recibo?",
-            "Tenha um bom dia!",
-        ],
-        "flower_store": [
-            "Oi! Em que posso ajudar você hoje?",
-            "Qual cor você prefere?",
-            "São cinquenta reais. Vai pagar no cartão ou em dinheiro?",
-        ],
-        "bakery": [
-            "Bom dia! O que vai ser?",
-            "Quer uma sacola?",
-            "São quinze reais. Obrigado e bom dia!",
-        ],
-        "restaurant": [
-            "Boa tarde e bem-vindo! Tem reserva?",
-            "O que posso trazer para você hoje?",
-            "Gostaria de algo para beber com a refeição?",
-            "Está tudo ao seu gosto?",
-            "Deseja sobremesa ou café?",
-        ],
+        "meet_a_friend": "Oi! Qual é o seu nome?",
+        "cafe":          "Olá! O que vai ser?",
+        "supermarket":   "Vai pagar no débito ou no crédito?",
+        "flower_store":  "Oi! Em que posso ajudar você hoje?",
+        "bakery":        "Bom dia! O que vai ser?",
+        "restaurant":    "Boa tarde e bem-vindo! Tem reserva?",
     },
 }
 
@@ -238,8 +185,7 @@ stt_lang_code  = STT_LANG_CODE.get(target_lang, "da")
 for k, v in [
     ("chat", []), ("last_chunks", None), ("last_response", None), ("last_id", None),
     ("scene_images", []), ("scene_idx", 0), ("scene_loading", False),
-    ("interaction_idx", 0), ("char_audio", []),
-    ("scene_celebration", False), ("char_loaded_for", None),
+    ("turn_count", 0), ("opener_loaded", False), ("scene_complete", False), ("char_audio", []),
     ("pipeline_error", None), ("pending_student", None), ("avatar_thinking", False),
     ("correct_log", []), ("coaching_log", []), ("lesson_started", False),
     ("tutor_play_seq", 0), ("char_play_seq", 0), ("replay_char_seq", 0),
@@ -284,13 +230,11 @@ char_voice_id = next(
     next(v for v in lang_voices.values() if v != voice_id),
 )
 
-sk              = _scene_key(_scene_src_raw)
-_lang_scripts   = SCENE_SCRIPTS_BY_LANG.get(target_lang, SCENE_SCRIPTS_BY_LANG["Danish"])
-script          = _lang_scripts.get(sk, []) if sk else []
-char_label      = _SCENE_BY_KEY[sk]["char_name"] if sk and sk in _SCENE_BY_KEY else "Character"
-interaction_idx = st.session_state.interaction_idx
-char_question   = script[interaction_idx] if script and interaction_idx < len(script) else ""
-is_last_question = bool(script) and interaction_idx == len(script) - 1
+sk         = _scene_key(_scene_src_raw)
+char_label = _SCENE_BY_KEY[sk]["char_name"] if sk and sk in _SCENE_BY_KEY else "Character"
+turn_count = st.session_state.turn_count
+_lang_openers = SCENE_OPENERS_BY_LANG.get(target_lang, SCENE_OPENERS_BY_LANG["Danish"])
+opener_line   = _lang_openers.get(sk, "") if sk else ""
 
 system = build_system_prompt(
     name, level, today, bg_lang,
@@ -298,33 +242,23 @@ system = build_system_prompt(
     scene_description=scene_description,
     scene_idx=scene_idx_1based,
     scene_history=scene_history,
-    char_question=char_question,
-    is_last_question=is_last_question,
-    step_current=interaction_idx + 1,
-    step_total=max(len(script), 1),
+    turn_count=turn_count,
 )
 
-# ── Character TTS — fetch when question changes, log it ONLY after student accepts ─
-# (char question is added to correct_log in the pipeline section when has_ok)
-
-char_loaded_key = (st.session_state.scene_idx, interaction_idx)
-
-if (script
-        and interaction_idx < len(script)
-        and st.session_state.char_loaded_for != char_loaded_key
+# Load opener TTS once at lesson start
+if (opener_line
+        and not st.session_state.opener_loaded
         and ELEVEN_KEY):
-    line = script[interaction_idx]
-    b64  = character_tts_b64(line, char_voice_id, ELEVEN_KEY, lang_code=tts_lang_code)
+    b64 = character_tts_b64(opener_line, char_voice_id, ELEVEN_KEY, lang_code=tts_lang_code)
     if b64:
         st.session_state.char_audio = [b64]
-        st.session_state.char_play_seq += 1  # new seq → component always detects new audio
+        st.session_state.char_play_seq += 1
     else:
         st.session_state.char_audio = []
-    # Log to sidebar chat immediately when cashier "speaks" (not waiting for has_ok)
     _log = st.session_state.correct_log
-    if not any(e["who"] == "character" and e["text"] == line for e in _log):
-        _log.append({"who": "character", "text": line})
-    st.session_state.char_loaded_for = char_loaded_key
+    if not any(e["who"] == "character" and e["text"] == opener_line for e in _log):
+        _log.append({"who": "character", "text": opener_line})
+    st.session_state.opener_loaded = True
 
 # ── Sidebar: conversation log ──────────────────────────────────────────────────
 
@@ -406,10 +340,20 @@ with st.sidebar:
     if st.session_state.get("pipeline_error"):
         st.markdown(f"<div style='margin:8px 12px;padding:8px 10px;background:rgba(220,38,38,.08);border-radius:8px;color:#dc2626;font-size:11px;word-break:break-word'>⚠ {st.session_state.pipeline_error}</div>", unsafe_allow_html=True)
 
-    # Finish button
-    if st.session_state.get("scene_idx", 0) >= 1:
+    # Feedback CTA — prominent when scene is complete, plain when just available
+    if st.session_state.get("scene_complete"):
+        st.markdown(
+            "<div style='margin:10px 12px;padding:14px 16px;"
+            "background:rgba(13,148,136,.1);border:1px solid rgba(13,148,136,.3);"
+            "border-radius:12px;font:500 12px Inter;color:#0d9488;line-height:1.5'>"
+            "Great session! Head to the feedback page to review what I noted.</div>",
+            unsafe_allow_html=True
+        )
+        if st.button("View Feedback →", type="primary", use_container_width=True):
+            st.switch_page("pages/feedback.py")
+    elif st.session_state.get("turn_count", 0) >= 1:
         st.markdown("<div style='height:1px;background:rgba(17,24,39,.1);margin:8px 12px'></div>", unsafe_allow_html=True)
-        if st.button("Finish Lecture", type="primary", use_container_width=True):
+        if st.button("Finish Lesson", type="primary", use_container_width=True):
             st.switch_page("pages/feedback.py")
 
     # Back to Home — always last → pinned to bottom by CSS (.st-key-btn_home)
@@ -418,15 +362,13 @@ with st.sidebar:
 
 # ── VAD / scene component ──────────────────────────────────────────────────────
 
-def _make_image_ready_cb(next_prompt, reset_interaction=False):
+def _make_image_ready_cb(next_prompt):
     def _cb(url):
         if url:
             st.session_state.scene_images.append({"description": next_prompt, "src": url})
-            st.session_state.scene_idx += 1
-            if reset_interaction:
-                st.session_state.interaction_idx   = 0
-                st.session_state.scene_celebration = False
-                st.session_state.char_loaded_for   = None
+            st.session_state.scene_idx  += 1
+            st.session_state.turn_count  = 0
+            st.session_state.opener_loaded = False
         st.session_state.scene_loading = False
     return _cb
 
@@ -467,9 +409,8 @@ mic_props = dict(
     stop_audio_seq    = st.session_state.stop_audio_seq,
     tutor_text        = (st.session_state.last_response[1]
                          if st.session_state.last_response else ""),
-    progress_current  = min(interaction_idx, len(script)),
-    progress_total    = len(script),
-    scene_celebration = st.session_state.scene_celebration,
+    progress_current  = 0,
+    progress_total    = 0,
     default           = None,
     height            = 900,
 )
@@ -511,14 +452,11 @@ if student_text:
         for raw_tutor_text, chunk_b64 in run_pipeline_stream(
                 system, student_text, st.session_state.chat, voice_id,
                 CLAUDE_KEY, ELEVEN_KEY, model=model_id,
-                use_structured=bool(script), lang_code=tts_lang_code):
+                use_structured=True, lang_code=tts_lang_code):
             if chunk_b64:
                 all_chunks.append(chunk_b64)
 
-        tutor_text, has_ok, scene_done = parse_claude_response(raw_tutor_text)
-        # Safety: Claude cannot declare scene done before all questions are answered
-        if scene_done and script and interaction_idx + 1 < len(script):
-            scene_done = False
+        tutor_text, has_ok, scene_done, is_correct, correction_note = parse_claude_response(raw_tutor_text)
 
         st.session_state.chat.extend([
             {"role": "user",      "content": student_text},
@@ -528,38 +466,32 @@ if student_text:
         st.session_state.last_chunks     = all_chunks
         st.session_state.last_response   = (student_text, tutor_text)
         if all_chunks:
-            st.session_state.tutor_play_seq += 1  # new seq → component always detects new audio
+            st.session_state.tutor_play_seq += 1
 
-        # ── Log: accepted student answer (char question already logged when TTS loaded) ─
-        if has_ok and char_question:
-            st.session_state.correct_log.append({"who": "student", "text": student_text})
+        # ── Determine last character line (for coaching log context) ──────────
+        _last_char = next(
+            (e["text"] for e in reversed(st.session_state.correct_log) if e["who"] == "character"),
+            ""
+        )
 
-        # ── Log: coaching event (wrong answer) ────────────────────────────────
-        if not has_ok and char_question and script:
+        # ── Always log student turn — conversation is never blocked ───────────
+        st.session_state.correct_log.append({"who": "student", "text": student_text})
+        st.session_state.turn_count += 1
+        if tutor_text and not scene_done:
+            st.session_state.correct_log.append({"who": "character", "text": tutor_text})
+
+        # ── Log mistakes silently for the feedback page ────────────────────────
+        if not is_correct and correction_note:
             st.session_state.coaching_log.append({
-                "question":   char_question,
+                "question":   _last_char,
                 "attempt":    student_text,
-                "correction": tutor_text,
+                "correction": correction_note,
                 "bg_lang":    bg_lang,
             })
 
-        # ── Advance interaction ────────────────────────────────────────────────
-        if script and has_ok and interaction_idx < len(script):
-            new_idx = interaction_idx + 1
-            if new_idx >= len(script):
-                st.session_state.scene_celebration = True
-                st.session_state.interaction_idx   = new_idx
-
-                if st.session_state.scene_idx < 4 and FAL_KEY:
-                    next_prompt = SCENE_NEXT_PROMPT.get(sk, "")
-                    if next_prompt:
-                        st.session_state.scene_loading = True
-                        generate_scene_image(next_prompt, FAL_KEY,
-                                             _make_image_ready_cb(next_prompt, reset_interaction=True))
-            else:
-                st.session_state.interaction_idx = new_idx
-
-        elif not script and scene_done:
+        # ── Handle scene done ─────────────────────────────────────────────────
+        if scene_done:
+            st.session_state.scene_complete = True
             if st.session_state.scene_idx < 4 and FAL_KEY:
                 next_prompt = SCENE_NEXT_PROMPT.get(sk, "")
                 if next_prompt:
@@ -572,5 +504,4 @@ if student_text:
         st.session_state.pipeline_error  = str(e)
         st.session_state.last_chunks     = None
 
-    # CRITICAL: rerun so component receives new chunks / clears thinking state
     st.rerun()

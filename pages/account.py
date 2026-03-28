@@ -91,6 +91,9 @@ st.markdown("""
 st.markdown("<div class='sec-label'>Student Profile</div>", unsafe_allow_html=True)
 
 name     = st.text_input("Name", value=st.session_state.get("s_name", "Marlon"))
+level    = st.selectbox("Level", ["A1", "A2", "B1", "B2"],
+                        index=["A1", "A2", "B1", "B2"].index(
+                            st.session_state.get("s_level", "A1")))
 bg_langs = ["English", "German", "Spanish", "French", "Dutch", "Swedish"]
 bg_lang  = st.selectbox("Your language background", bg_langs,
                         index=bg_langs.index(
@@ -170,7 +173,7 @@ st.markdown("<div class='sec-div'></div>", unsafe_allow_html=True)
 # ── Save & navigate ────────────────────────────────────────────────────────────
 def _save():
     data = {
-        "s_name": name, "s_bg_lang": bg_lang, "s_language": language,
+        "s_name": name, "s_level": level, "s_bg_lang": bg_lang, "s_language": language,
         "s_voice_label": voice_label, "s_model_label": model_label,
     }
     save_settings(data)

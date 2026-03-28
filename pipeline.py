@@ -217,8 +217,7 @@ SCENE_CATALOG = [
 LESSON_STATE_KEYS = [
     "chat", "last_chunks", "last_response", "last_id",
     "scene_images", "scene_idx", "scene_loading",
-    "interaction_idx", "char_audio",
-    "scene_celebration", "char_loaded_for",
+    "turn_count", "opener_loaded", "scene_complete", "char_audio",
     "pipeline_error", "pending_student", "avatar_thinking",
     "correct_log", "coaching_log", "lesson_started",
     "tutor_play_seq", "char_play_seq", "replay_char_seq",
@@ -230,11 +229,13 @@ LESSON_STATE_KEYS = [
 VERDICT_SCHEMA = {
     "type": "object",
     "properties": {
-        "verdict":    {"type": "string", "enum": ["accept", "coach"]},
+        "verdict":    {"type": "string", "enum": ["accept"]},
         "text":       {"type": "string"},
         "scene_done": {"type": "boolean"},
+        "correct":    {"type": "boolean"},
+        "correction": {"type": "string"},
     },
-    "required": ["verdict", "text", "scene_done"],
+    "required": ["verdict", "text", "scene_done", "correct"],
     "additionalProperties": False,
 }
 
@@ -341,39 +342,46 @@ _TEXT_RE    = re.compile(r'"text"\s*:\s*"((?:[^"\\]|\\.)*)"')
 _DONE_RE    = re.compile(r'"scene_done"\s*:\s*(true|false)', re.IGNORECASE)
 
 
-def parse_claude_response(raw: str) -> tuple[str, bool, bool]:
-    """Parse Claude's response. Returns (spoken_text, has_ok, scene_done).
-    1. Try full JSON parse (structured output, guaranteed valid)
-    2. Try regex extraction (malformed JSON but right fields)
-    3. Fall back to <ok/> token + <scene> tag (legacy plain text)
+_CORRECT_RE    = re.compile(r'"correct"\s*:\s*(true|false)', re.IGNORECASE)
+_CORRECTION_RE = re.compile(r'"correction"\s*:\s*"((?:[^"\\]|\\.)*)"')
+
+
+def parse_claude_response(raw: str) -> tuple[str, bool, bool, bool, str]:
+    """Parse Claude's response.
+    Returns (spoken_text, has_ok, scene_done, is_correct, correction_note).
+    has_ok is always True — the tutor never blocks the conversation flow.
+    is_correct/correction_note are for silent feedback logging only.
     """
     stripped = raw.strip()
 
     # ── Attempt 1: full JSON parse ──────────────────────────────────────────
     try:
         obj        = json.loads(stripped)
-        verdict    = str(obj.get("verdict", "")).lower()
         text       = str(obj.get("text", "")).strip()
         scene_done = bool(obj.get("scene_done", False))
-        if verdict in ("accept", "coach") and text:
-            return text, verdict == "accept", scene_done
+        is_correct = bool(obj.get("correct", True))
+        correction = str(obj.get("correction", "")).strip()
+        if text:
+            return text, True, scene_done, is_correct, correction
     except Exception:
         pass
 
-    # ── Attempt 2: regex field extraction (handles extra prose around JSON) ─
-    v_match = _VERDICT_RE.search(stripped)
+    # ── Attempt 2: regex field extraction ───────────────────────────────────
     t_match = _TEXT_RE.search(stripped)
-    if v_match and t_match:
-        verdict    = v_match.group(1).lower()
+    if t_match:
         text       = t_match.group(1).replace('\\"', '"').replace("\\n", " ").strip()
         d_match    = _DONE_RE.search(stripped)
-        scene_done = d_match and d_match.group(1).lower() == "true" if d_match else False
-        return text, verdict == "accept", bool(scene_done)
+        scene_done = bool(d_match and d_match.group(1).lower() == "true") if d_match else False
+        c_match    = _CORRECT_RE.search(stripped)
+        is_correct = not (c_match and c_match.group(1).lower() == "false")
+        r_match    = _CORRECTION_RE.search(stripped)
+        correction = r_match.group(1).replace('\\"', '"').strip() if r_match else ""
+        return text, True, bool(scene_done), is_correct, correction
 
-    # ── Attempt 3: legacy plain-text with <ok/> / <scene> tags ─────────────
+    # ── Attempt 3: legacy plain-text fallback ────────────────────────────────
     raw_no_scene, scene_directive = strip_scene_tag(stripped)
-    text, has_ok = strip_ok_tag(raw_no_scene)
-    return text, has_ok, bool(scene_directive)
+    text, _ = strip_ok_tag(raw_no_scene)
+    return text, True, bool(scene_directive), True, ""
 
 
 def character_tts_b64(text: str, voice_id: str, eleven_key: str, lang_code: str = "da") -> str | None:
