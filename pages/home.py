@@ -1,6 +1,15 @@
 import streamlit as st
-from pipeline import SCENE_CATALOG, LESSON_STATE_KEYS
+from pipeline import SCENE_CATALOG, LESSON_STATE_KEYS, SETTINGS_DEFAULTS
 from scene_images import img_b64 as _img_b64
+from db import require_auth, load_profile
+
+require_auth()
+
+# ── Load profile from Supabase into session_state ──────────────────────────────
+# Always overwrite so switching users gets the correct settings.
+_profile = load_profile(st.session_state.sb_user_id, st.session_state.sb_access_token)
+for _k, _v in {**SETTINGS_DEFAULTS, **_profile}.items():
+    st.session_state[_k] = _v
 
 st.set_page_config(page_title="SpeakPals", page_icon="🇩🇰",
                    layout="wide", initial_sidebar_state="collapsed")

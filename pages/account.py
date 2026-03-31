@@ -1,25 +1,13 @@
 import streamlit as st
-import json, pathlib
 from pipeline import VOICES, VOICES_BY_LANG, MODELS, LESSON_STATE_KEYS, SCENE_CATALOG, SETTINGS_DEFAULTS
+from db import require_auth, upsert_profile, load_profile
 
-# ── Persistent settings helpers ────────────────────────────────────────────────
-_SETTINGS_FILE = pathlib.Path(__file__).parent.parent / "user_settings.json"
+require_auth()
 
-def load_settings() -> dict:
-    try:
-        return {**SETTINGS_DEFAULTS, **json.loads(_SETTINGS_FILE.read_text(encoding="utf-8"))}
-    except Exception:
-        return dict(SETTINGS_DEFAULTS)
-
-def save_settings(data: dict) -> None:
-    current = load_settings()
-    current.update({k: data[k] for k in SETTINGS_DEFAULTS if k in data})
-    _SETTINGS_FILE.write_text(json.dumps(current, indent=2), encoding="utf-8")
-
-# Seed session_state from saved file
-for _k, _v in load_settings().items():
-    if _k not in st.session_state:
-        st.session_state[_k] = _v
+# Always load the user's saved profile from DB so the form shows their actual settings.
+_profile = load_profile(st.session_state.sb_user_id, st.session_state.sb_access_token)
+for _k, _v in {**SETTINGS_DEFAULTS, **_profile}.items():
+    st.session_state[_k] = _v
 
 st.set_page_config(page_title="Account — SpeakPals", page_icon="⚙", layout="centered",
                    initial_sidebar_state="collapsed")
@@ -176,8 +164,12 @@ def _save():
         "s_name": name, "s_level": level, "s_bg_lang": bg_lang, "s_language": language,
         "s_voice_label": voice_label, "s_model_label": model_label,
     }
-    save_settings(data)
     st.session_state.update(data)
+    upsert_profile(
+        st.session_state.sb_user_id,
+        st.session_state.sb_access_token,
+        data,
+    )
 
 col_save, col_home, col_back = st.columns(3)
 with col_save:
@@ -202,3 +194,18 @@ if st.button("🔄 Clear lesson & restart", use_container_width=True):
     for k in LESSON_STATE_KEYS:
         st.session_state.pop(k, None)
     st.switch_page("app.py")
+
+st.markdown("<div class='sec-div'></div>", unsafe_allow_html=True)
+st.markdown("<div class='sec-label'>Account</div>", unsafe_allow_html=True)
+
+st.markdown(
+    f"<div style='font:400 12px Inter;color:rgba(17,24,39,.5);margin-bottom:10px'>"
+    f"Signed in as <strong>{st.session_state.get('sb_email','')}</strong></div>",
+    unsafe_allow_html=True
+)
+if st.button("Sign out", use_container_width=True):
+    from db import sign_out
+    sign_out(st.session_state.get("sb_access_token", ""))
+    for k in list(st.session_state.keys()):
+        del st.session_state[k]
+    st.switch_page("pages/login.py")

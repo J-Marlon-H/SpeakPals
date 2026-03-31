@@ -13,6 +13,7 @@ from pipeline import (run_pipeline_stream, MODELS, VOICES, VOICES_BY_LANG, SCENE
 from prompts import build_system_prompt
 from ws_proxy import start_in_thread, PROXY_PORT
 from scene_images import preload_all_images
+from db import require_auth
 
 # Warm the image cache on first server start so home page loads instantly
 preload_all_images()
@@ -99,6 +100,7 @@ def _scene_to_data_url(src: str) -> str:
 
 st.set_page_config(page_title="Lesson — SpeakPals", page_icon="DK", layout="wide",
                    initial_sidebar_state="expanded")
+require_auth()
 
 components.html("""<script>
 Object.keys(localStorage).forEach(function(k){
