@@ -2,7 +2,12 @@
 from __future__ import annotations
 import os
 from dotenv import load_dotenv
-from supabase import create_client, Client
+
+try:
+    from supabase import create_client
+    _SUPABASE_AVAILABLE = True
+except ImportError:
+    _SUPABASE_AVAILABLE = False
 
 load_dotenv("keys.env")
 
@@ -19,9 +24,11 @@ SUPABASE_URL = _secret("SUPABASE_URL")
 SUPABASE_KEY = _secret("SUPABASE_ANON_KEY") or _secret("SUPABASE_PUBLISHABLE_KEY")
 
 
-def _client(access_token: str | None = None) -> Client:
+def _client(access_token: str | None = None):
     """Return a Supabase client, optionally authenticated with a user JWT."""
-    c = create_client(SUPABASE_URL, SUPABASE_KEY)
+    if not _SUPABASE_AVAILABLE:
+        raise RuntimeError("supabase package not installed")
+    c = create_client(SUPABASE_URL, SUPABASE_KEY)  # type: ignore[name-defined]
     if access_token:
         c.auth.set_session(access_token, "")
     return c
