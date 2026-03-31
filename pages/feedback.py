@@ -171,8 +171,9 @@ for _k, _v in SETTINGS_DEFAULTS.items():
 
 # Load session history from DB (once per page load, unless already cached)
 if "session_history" not in st.session_state:
-    _db_sessions = load_sessions(
-        st.session_state.sb_user_id, st.session_state.sb_access_token
+    _db_sessions = (
+        load_sessions(st.session_state.sb_user_id, st.session_state.sb_access_token)
+        if "sb_user_id" in st.session_state else []
     )
     # Normalise DB rows: parse JSONB fields if stored as strings
     for _row in _db_sessions:
@@ -305,11 +306,12 @@ if (correct_log or coaching_log) and not st.session_state.get("current_session_i
         {ik: iv for ik, iv in item.items() if ik != "audio_b64"}
         for item in vocab
     ]
-    save_session(
-        st.session_state.sb_user_id,
-        st.session_state.sb_access_token,
-        _db_row,
-    )
+    if "sb_user_id" in st.session_state:
+        save_session(
+            st.session_state.sb_user_id,
+            st.session_state.sb_access_token,
+            _db_row,
+        )
 
 history = st.session_state["session_history"]
 

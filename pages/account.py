@@ -5,9 +5,14 @@ from db import require_auth, upsert_profile, load_profile
 require_auth()
 
 # Always load the user's saved profile from DB so the form shows their actual settings.
-_profile = load_profile(st.session_state.sb_user_id, st.session_state.sb_access_token)
+# Skipped if not authenticated (Supabase not configured).
+if "sb_user_id" in st.session_state:
+    _profile = load_profile(st.session_state.sb_user_id, st.session_state.sb_access_token)
+else:
+    _profile = {}
 for _k, _v in {**SETTINGS_DEFAULTS, **_profile}.items():
-    st.session_state[_k] = _v
+    if _k not in st.session_state:
+        st.session_state[_k] = _v
 
 st.set_page_config(page_title="Account — SpeakPals", page_icon="⚙", layout="centered",
                    initial_sidebar_state="collapsed")
@@ -165,11 +170,12 @@ def _save():
         "s_voice_label": voice_label, "s_model_label": model_label,
     }
     st.session_state.update(data)
-    upsert_profile(
-        st.session_state.sb_user_id,
-        st.session_state.sb_access_token,
-        data,
-    )
+    if "sb_user_id" in st.session_state:
+        upsert_profile(
+            st.session_state.sb_user_id,
+            st.session_state.sb_access_token,
+            data,
+        )
 
 col_save, col_home, col_back = st.columns(3)
 with col_save:

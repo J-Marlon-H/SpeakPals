@@ -155,7 +155,10 @@ def load_sessions(user_id: str, access_token: str) -> list[dict]:
 def require_auth() -> None:
     """Call at the top of every protected page.
     Redirects to the login page if no session is active.
+    Skipped entirely if Supabase is not configured (e.g. hosted without secrets).
     """
+    if not SUPABASE_URL or not SUPABASE_KEY:
+        return
     import streamlit as st
     if "sb_user_id" not in st.session_state:
         st.switch_page("pages/login.py")
