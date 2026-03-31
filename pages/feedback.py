@@ -3,12 +3,14 @@ import streamlit.components.v1 as components
 import datetime
 import base64
 import os
-import pathlib
 from dotenv import load_dotenv
 from pipeline import (SCENE_CATALOG, LESSON_STATE_KEYS, VOICES, SETTINGS_DEFAULTS,
                       generate_language_tip, extract_vocabulary, tts_chunk)
 import json as _json
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor
+from db import require_auth, save_session, load_sessions
+
+require_auth()
 
 load_dotenv("keys.env")
 
@@ -163,16 +165,33 @@ SAMPLE_SESSIONS = [
 ]
 
 # ── Session state init ─────────────────────────────────────────────────────────
-_saved = SETTINGS_DEFAULTS.copy()
-try:
-    _saved.update(_json.loads((pathlib.Path(__file__).parent.parent / "user_settings.json").read_text(encoding="utf-8")))
-except Exception:
-    pass
-for _k, _v in _saved.items():
+for _k, _v in SETTINGS_DEFAULTS.items():
     if _k not in st.session_state:
         st.session_state[_k] = _v
+
+# Load session history from DB (once per page load, unless already cached)
 if "session_history" not in st.session_state:
-    st.session_state["session_history"] = list(SAMPLE_SESSIONS)
+    _db_sessions = (
+        load_sessions(st.session_state.sb_user_id, st.session_state.sb_access_token)
+        if "sb_user_id" in st.session_state else []
+    )
+    # Normalise DB rows: parse JSONB fields if stored as strings
+    for _row in _db_sessions:
+        for _jk in ("coaching_log", "correct_log", "vocab"):
+            if isinstance(_row.get(_jk), str):
+                try:
+                    _row[_jk] = _json.loads(_row[_jk])
+                except Exception:
+                    _row[_jk] = []
+        # Format date from ISO timestamp if present
+        if "created_at" in _row and not _row.get("date"):
+            try:
+                _row["date"] = datetime.datetime.fromisoformat(
+                    _row["created_at"].replace("Z", "+00:00")
+                ).strftime("%b %d, %Y")
+            except Exception:
+                _row["date"] = ""
+    st.session_state["session_history"] = _db_sessions if _db_sessions else list(SAMPLE_SESSIONS)
 
 _sk          = st.session_state.get("selected_scene", "")
 _level       = st.session_state.get("s_level",    SETTINGS_DEFAULTS["s_level"])
@@ -264,8 +283,7 @@ if (correct_log or coaching_log) and not st.session_state.get("current_session_i
         vocab = items
 
     _loading_slot.empty()
-    st.session_state["current_session_id"] = _ts
-    st.session_state["session_history"].insert(0, {
+    _new_session = {
         "id":           _ts,
         "date":         datetime.datetime.now().strftime("%b %d, %Y"),
         "scene_key":    _sk,
@@ -279,7 +297,21 @@ if (correct_log or coaching_log) and not st.session_state.get("current_session_i
         "correct_log":  correct_log,
         "lang_tip":     lang_tip,
         "vocab":        vocab,
-    })
+    }
+    st.session_state["current_session_id"] = _ts
+    st.session_state["session_history"].insert(0, _new_session)
+    # Persist to Supabase (vocab audio blobs are stripped — too large for DB)
+    _db_row = {k: v for k, v in _new_session.items() if k != "id"}
+    _db_row["vocab"] = [
+        {ik: iv for ik, iv in item.items() if ik != "audio_b64"}
+        for item in vocab
+    ]
+    if "sb_user_id" in st.session_state:
+        save_session(
+            st.session_state.sb_user_id,
+            st.session_state.sb_access_token,
+            _db_row,
+        )
 
 history = st.session_state["session_history"]
 
