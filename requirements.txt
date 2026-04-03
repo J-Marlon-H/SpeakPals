@@ -47,4 +47,13 @@ urllib3==2.6.3
 watchdog==6.0.0
 websockets>=11,<15
 fal-client==0.13.1
-supabase=2.15.6
+supabase==2.15.1
+gotrue==2.12.4
+postgrest==1.0.2
+storage3==0.11.3
+supafunc==0.9.4
+realtime==2.4.3
+PyJWT==2.12.1
+deprecation==2.1.0
+StrEnum==0.4.15
+aiohttp==3.13.4
