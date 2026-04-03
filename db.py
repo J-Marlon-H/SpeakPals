@@ -3,11 +3,7 @@ from __future__ import annotations
 import os
 from dotenv import load_dotenv
 
-try:
-    from supabase import create_client
-    _SUPABASE_AVAILABLE = True
-except ImportError:
-    _SUPABASE_AVAILABLE = False
+from supabase import create_client
 
 load_dotenv("keys.env")
 
@@ -26,9 +22,7 @@ SUPABASE_KEY = _secret("SUPABASE_ANON_KEY") or _secret("SUPABASE_PUBLISHABLE_KEY
 
 def _client(access_token: str | None = None):
     """Return a Supabase client, optionally authenticated with a user JWT."""
-    if not _SUPABASE_AVAILABLE:
-        raise RuntimeError("supabase package not installed")
-    c = create_client(SUPABASE_URL, SUPABASE_KEY)  # type: ignore[name-defined]
+    c = create_client(SUPABASE_URL, SUPABASE_KEY)
     if access_token:
         c.auth.set_session(access_token, "")
     return c
@@ -162,10 +156,7 @@ def load_sessions(user_id: str, access_token: str) -> list[dict]:
 def require_auth() -> None:
     """Call at the top of every protected page.
     Redirects to the login page if no session is active.
-    Skipped entirely if Supabase is not configured (e.g. hosted without secrets).
     """
-    if not SUPABASE_URL or not SUPABASE_KEY:
-        return
     import streamlit as st
     if "sb_user_id" not in st.session_state:
         st.switch_page("pages/login.py")
