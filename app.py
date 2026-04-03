@@ -10,7 +10,7 @@ import json as _json
 from pipeline import (run_pipeline_stream, MODELS, VOICES, VOICES_BY_LANG, SCENE_CATALOG,
                       SETTINGS_DEFAULTS, TTS_LANG_CODE, STT_LANG_CODE,
                       parse_claude_response, generate_scene_image, character_tts_b64)
-from prompts import build_system_prompt
+from prompts import build_system_prompt, get_tutor_name
 from ws_proxy import start_in_thread, PROXY_PORT
 from scene_images import preload_all_images
 from db import require_auth
@@ -232,8 +232,9 @@ char_voice_id = next(
     next(v for v in lang_voices.values() if v != voice_id),
 )
 
-sk         = _scene_key(_scene_src_raw)
-char_label = _SCENE_BY_KEY[sk]["char_name"] if sk and sk in _SCENE_BY_KEY else "Character"
+sk          = _scene_key(_scene_src_raw)
+char_label  = _SCENE_BY_KEY[sk]["char_name"] if sk and sk in _SCENE_BY_KEY else "Character"
+tutor_name  = get_tutor_name(target_lang)
 turn_count = st.session_state.turn_count
 _lang_openers = SCENE_OPENERS_BY_LANG.get(target_lang, SCENE_OPENERS_BY_LANG["Danish"])
 opener_line   = _lang_openers.get(sk, "") if sk else ""
@@ -303,7 +304,7 @@ with st.sidebar:
         )
     else:
         last_i = len(log) - 1
-        last_char_i = next((i for i in range(len(log)-1, -1, -1) if log[i]["who"] == "character"), None)
+        last_char_i = next((i for i in range(len(log)-1, -1, -1) if log[i]["who"] in ("character", "tutor")), None)
         # Build entire chat as one HTML block to avoid Streamlit element spacing issues
         parts = []
         for i, entry in enumerate(log):
@@ -317,6 +318,15 @@ with st.sidebar:
                     f"color:#111827;word-break:break-word;{anim}'>"
                     f"<span style='font:600 10px Inter;color:#9ca3af;display:block;margin-bottom:4px;letter-spacing:.5px;text-transform:uppercase'>{char_label}</span>"
                     f"<em>{txt}</em></div></div>"
+                )
+            elif entry["who"] == "tutor":
+                parts.append(
+                    f"<div style='padding:8px 12px 4px'>"
+                    f"<div style='background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.25);border-radius:12px 12px 12px 3px;"
+                    f"padding:10px 12px;font-size:13px;line-height:1.5;"
+                    f"color:#78350f;word-break:break-word;{anim}'>"
+                    f"<span style='font:600 10px Inter;color:#d97706;display:block;margin-bottom:4px;letter-spacing:.5px;text-transform:uppercase'>💡 {tutor_name}</span>"
+                    f"{txt}</div></div>"
                 )
             else:
                 parts.append(
@@ -450,25 +460,34 @@ if student_text:
     try:
         all_chunks     = []
         raw_tutor_text = ""
+        last_speaker   = "character"
 
-        for raw_tutor_text, chunk_b64 in run_pipeline_stream(
+        for raw_tutor_text, chunk_b64, last_speaker in run_pipeline_stream(
                 system, student_text, st.session_state.chat, voice_id,
                 CLAUDE_KEY, ELEVEN_KEY, model=model_id,
-                use_structured=True, lang_code=tts_lang_code):
+                use_structured=True, lang_code=tts_lang_code,
+                char_voice_id=char_voice_id):
             if chunk_b64:
                 all_chunks.append(chunk_b64)
 
-        tutor_text, has_ok, scene_done, is_correct, correction_note = parse_claude_response(raw_tutor_text)
+        tutor_text, has_ok, scene_done, is_correct, correction_note, speaker = parse_claude_response(raw_tutor_text)
 
         st.session_state.chat.extend([
             {"role": "user",      "content": student_text},
             {"role": "assistant", "content": tutor_text},
         ])
         st.session_state.avatar_thinking = False
-        st.session_state.last_chunks     = all_chunks
         st.session_state.last_response   = (student_text, tutor_text)
+
+        # ── Route audio to character or tutor based on speaker ────────────────
         if all_chunks:
-            st.session_state.tutor_play_seq += 1
+            if last_speaker == "character":
+                st.session_state.char_audio    = all_chunks
+                st.session_state.char_play_seq += 1
+                st.session_state.last_chunks   = None
+            else:
+                st.session_state.last_chunks    = all_chunks
+                st.session_state.tutor_play_seq += 1
 
         # ── Determine last character line (for coaching log context) ──────────
         _last_char = next(
@@ -480,7 +499,7 @@ if student_text:
         st.session_state.correct_log.append({"who": "student", "text": student_text})
         st.session_state.turn_count += 1
         if tutor_text and not scene_done:
-            st.session_state.correct_log.append({"who": "character", "text": tutor_text})
+            st.session_state.correct_log.append({"who": speaker, "text": tutor_text})
 
         # ── Log mistakes silently for the feedback page ────────────────────────
         if not is_correct and correction_note:

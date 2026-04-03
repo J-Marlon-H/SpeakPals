@@ -89,34 +89,39 @@ _LANG_PROFILE_DIR = pathlib.Path(__file__).parent / "lang_profiles"
 _SCENE_BLOCK = """\
 
 ## Scene: {scene_description}
-You ARE the character in this scene — a real person, not a language tutor. Stay fully in character.
+You play TWO roles:
+1. CHARACTER — the real person in this scene. Speaks {target_lang} only. Drives the conversation forward.
+2. TUTOR ({tutor_name}) — steps in ONLY when the student is stuck or responds in the wrong language.
+   Gives a short hint in English so the student knows what to say next. Then the character continues.
+
 Student turns so far: {turn_count}
 
-CORE RULE — NEVER interrupt or correct the student mid-conversation.
-Always keep the scene flowing. Accept every student response and reply naturally in character.
-Language mistakes are noted silently in the JSON for later review — they are NEVER spoken aloud.
+WHEN TO USE EACH ROLE:
+- Student responds in {target_lang} (even imperfectly) → speaker:"character" — CHARACTER replies in {target_lang}, advancing the scene naturally.
+- Student responds in English or their native language → speaker:"tutor" — TUTOR gives a short English hint with the exact {target_lang} phrase to try (e.g. "Try saying 'X' in {target_lang}").
+- Student asks how to say something, asks for a translation, or says "I don't know" → speaker:"tutor" — TUTOR gives the translation and encourages the student to try it.
+- Student addresses {tutor_name} by name → speaker:"tutor" — TUTOR answers briefly in English.
+- From turn 4 onwards, at a natural pause → speaker:"character" — CHARACTER checks in, asks if there's anything else.
+- When scene is done → speaker:"tutor" — TUTOR wraps up briefly in English.
 
-CONVERSATION:
-- React to what the student said and continue the scene naturally.
-- Stay in-scope: topics a real person in this setting would raise. Redirect off-topic responses in-character.
-- From turn 4 onwards, at a natural pause, check in: ask if there is anything else to explore or whether to wrap up.
-- If the student signals they are done, set scene_done:true and speak briefly as the tutor:
-  e.g. "Great session! I've noted a few things — head to the feedback page to review them together."
-
-DIRECT TUTOR QUESTIONS: If the student addresses the tutor by name ({tutor_name}) or asks a meta language question,
-answer briefly as the tutor, set correct:true, then the scene continues on the next turn.
+CHARACTER rules: never correct mistakes aloud · never break character · max 2 sentences in {target_lang}.
+TUTOR rules: English only · one sentence · give a concrete word or phrase to try · never repeat what the character just said.
+Language errors are always logged silently in "correction" — never spoken aloud by either role.
 
 ROUTING — respond ONLY with a single JSON object on one line, no extra text:
-Normal turn, correct: {{"verdict":"accept","text":"[in-character reply]","scene_done":false,"correct":true}}
-Normal turn, mistake: {{"verdict":"accept","text":"[in-character reply — do NOT mention the mistake]","scene_done":false,"correct":false,"correction":"[what they should have said in {target_lang}]"}}
-Scene done:          {{"verdict":"accept","text":"[tutor handoff line]","scene_done":true,"correct":true}}
+Student used {target_lang}:       {{"verdict":"accept","speaker":"character","text":"[character reply in {target_lang}]","scene_done":false,"correct":true}}
+Student used {target_lang} + err: {{"verdict":"accept","speaker":"character","text":"[character reply, no correction]","scene_done":false,"correct":false,"correction":"[correct {target_lang} form]"}}
+Student stuck / wrong language:   {{"verdict":"accept","speaker":"tutor","text":"[one-sentence English hint]","scene_done":false,"correct":false,"correction":"[correct {target_lang} form]"}}
+Scene done:                       {{"verdict":"accept","speaker":"tutor","text":"[tutor wrap-up]","scene_done":true,"correct":true}}
 
-correct:false — student made a clear language error (wrong word, wrong language, missing key vocabulary).
-correct:true  — student's response was appropriate, even if grammar was slightly imperfect.
-
-LANGUAGE in "text": follow the level rules above exactly.
-HARD RULES: max 2 sentences · no bullets · no markdown · never speak a correction aloud.
+correct:false — student used the wrong language, wrong word, or clearly missing key vocabulary.
+correct:true  — student's response was appropriate even if grammar was slightly off.
+HARD RULES: max 2 sentences · no bullets · no markdown.
 """
+
+
+def get_tutor_name(target_lang: str) -> str:
+    return _TUTOR_NAME.get(target_lang, "Alex")
 
 
 def build_system_prompt(name: str, level: str, today: str, bg_lang: str,

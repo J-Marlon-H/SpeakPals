@@ -230,22 +230,25 @@ VERDICT_SCHEMA = {
     "type": "object",
     "properties": {
         "verdict":    {"type": "string", "enum": ["accept"]},
+        "speaker":    {"type": "string", "enum": ["character", "tutor"]},
         "text":       {"type": "string"},
         "scene_done": {"type": "boolean"},
         "correct":    {"type": "boolean"},
         "correction": {"type": "string"},
     },
-    "required": ["verdict", "text", "scene_done", "correct"],
+    "required": ["verdict", "speaker", "text", "scene_done", "correct"],
     "additionalProperties": False,
 }
 
 
 def run_pipeline_stream(system, user_input, history, voice_id, claude_key, eleven_key,
-                        model="claude-sonnet-4-6", use_structured=False, lang_code="da"):
-    """Generator: yields (raw_claude_text, chunk_b64).
+                        model="claude-sonnet-4-6", use_structured=False, lang_code="da",
+                        char_voice_id=None):
+    """Generator: yields (raw_claude_text, chunk_b64, speaker).
     Streams Claude fully, then makes a single TTS call for the complete response.
-    When use_structured=True, enforces VERDICT_SCHEMA via the structured outputs API
-    and extracts the "text" field for TTS (not the raw JSON).
+    When use_structured=True, enforces VERDICT_SCHEMA via the structured outputs API,
+    extracts the "text" field for TTS, and picks the voice based on "speaker":
+    "character" → char_voice_id (falls back to voice_id); "tutor" → voice_id.
     """
     sess = get_session()
     messages = [{"role": m["role"], "content": m["content"]}
@@ -287,25 +290,31 @@ def run_pipeline_stream(system, user_input, history, voice_id, claude_key, eleve
         if ev.get("type") == "content_block_delta":
             raw_claude += ev.get("delta", {}).get("text", "")
 
-    # Extract spoken text for TTS — use JSON "text" field if structured, else full text
+    # Extract spoken text and speaker — use JSON fields if structured, else full text
     tts_text = None
+    speaker = "character"
     if use_structured:
         try:
             obj = json.loads(raw_claude.strip())
             spoken = str(obj.get("text", "")).strip()
             if spoken:
                 tts_text = clean_for_tts(spoken)
+            speaker = obj.get("speaker", "character")
         except Exception:
             pass
 
     if tts_text is None:
         tts_text = clean_for_tts(raw_claude)
 
+    # Pick voice and lang: character uses char_voice_id + target lang; tutor uses voice_id + English
+    tts_voice    = (char_voice_id or voice_id) if speaker == "character" else voice_id
+    tts_lang     = lang_code if speaker == "character" else "en"
+
     if tts_text:
-        audio = tts_chunk(tts_text, voice_id, eleven_key, lang_code=lang_code)
-        yield raw_claude, base64.b64encode(audio).decode()
+        audio = tts_chunk(tts_text, tts_voice, eleven_key, lang_code=tts_lang)
+        yield raw_claude, base64.b64encode(audio).decode(), speaker
     else:
-        yield raw_claude, ""
+        yield raw_claude, "", speaker
 
 
 # ── Response parsing ────────────────────────────────────────────────────────────
@@ -344,13 +353,14 @@ _DONE_RE    = re.compile(r'"scene_done"\s*:\s*(true|false)', re.IGNORECASE)
 
 _CORRECT_RE    = re.compile(r'"correct"\s*:\s*(true|false)', re.IGNORECASE)
 _CORRECTION_RE = re.compile(r'"correction"\s*:\s*"((?:[^"\\]|\\.)*)"')
+_SPEAKER_RE    = re.compile(r'"speaker"\s*:\s*"(character|tutor)"', re.IGNORECASE)
 
 
-def parse_claude_response(raw: str) -> tuple[str, bool, bool, bool, str]:
+def parse_claude_response(raw: str) -> tuple[str, bool, bool, bool, str, str]:
     """Parse Claude's response.
-    Returns (spoken_text, has_ok, scene_done, is_correct, correction_note).
+    Returns (spoken_text, has_ok, scene_done, is_correct, correction_note, speaker).
     has_ok is always True — the tutor never blocks the conversation flow.
-    is_correct/correction_note are for silent feedback logging only.
+    speaker is "character" or "tutor".
     """
     stripped = raw.strip()
 
@@ -361,8 +371,9 @@ def parse_claude_response(raw: str) -> tuple[str, bool, bool, bool, str]:
         scene_done = bool(obj.get("scene_done", False))
         is_correct = bool(obj.get("correct", True))
         correction = str(obj.get("correction", "")).strip()
+        speaker    = obj.get("speaker", "character")
         if text:
-            return text, True, scene_done, is_correct, correction
+            return text, True, scene_done, is_correct, correction, speaker
     except Exception:
         pass
 
@@ -376,12 +387,14 @@ def parse_claude_response(raw: str) -> tuple[str, bool, bool, bool, str]:
         is_correct = not (c_match and c_match.group(1).lower() == "false")
         r_match    = _CORRECTION_RE.search(stripped)
         correction = r_match.group(1).replace('\\"', '"').strip() if r_match else ""
-        return text, True, bool(scene_done), is_correct, correction
+        s_match    = _SPEAKER_RE.search(stripped)
+        speaker    = s_match.group(1).lower() if s_match else "character"
+        return text, True, bool(scene_done), is_correct, correction, speaker
 
     # ── Attempt 3: legacy plain-text fallback ────────────────────────────────
     raw_no_scene, scene_directive = strip_scene_tag(stripped)
     text, _ = strip_ok_tag(raw_no_scene)
-    return text, True, bool(scene_directive), True, ""
+    return text, True, bool(scene_directive), True, "", "character"
 
 
 def character_tts_b64(text: str, voice_id: str, eleven_key: str, lang_code: str = "da") -> str | None:
