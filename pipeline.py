@@ -121,7 +121,7 @@ MODELS = {
 VOICES = {
     "Mathias — male baritone": "ygiXC2Oa1BiHksD3WkJZ",
     "Camilla — female":        "4RklGmuxoAskAbGXplXN",
-    "Casper — male, calm":     "ADRrvIX3j1uTFlD5q6DE",
+    "Søren — male, calm":      "xj6X4BCUsv9oxohm1E8o",
 }
 
 # Per-language voice menus

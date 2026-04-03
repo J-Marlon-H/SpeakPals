@@ -121,10 +121,10 @@ voice_label = st.selectbox(
 # Scene primary voices mapped per language label
 SCENE_PRIMARY_VOICE = {
     "Danish": {
-        "meet_a_friend": "Casper — male, calm",
+        "meet_a_friend": "Søren — male, calm",
         "cafe":          "Camilla — female",
         "supermarket":   "Camilla — female",
-        "flower_store":  "Casper — male, calm",
+        "flower_store":  "Søren — male, calm",
         "bakery":        "Camilla — female",
         "restaurant":    "Mathias — male baritone",
     },
