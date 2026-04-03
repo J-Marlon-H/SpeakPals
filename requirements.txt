@@ -47,4 +47,3 @@ urllib3==2.6.3
 watchdog==6.0.0
 websockets>=11,<15
 fal-client==0.13.1
-supabase==2.15.1
