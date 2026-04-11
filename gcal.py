@@ -43,16 +43,34 @@ CALENDAR_API    = "https://www.googleapis.com/calendar/v3"
 # ── Credential file helpers ───────────────────────────────────────────────────
 
 def _load_client() -> tuple[str, str]:
-    """Return (client_id, client_secret) from the Google OAuth credentials file."""
-    path = _find_creds_file()
-    if not path:
-        raise FileNotFoundError(
-            "Google credentials file not found. "
-            "Download client_secret_*.json from Google Cloud Console "
-            "(APIs & Services → Credentials → OAuth 2.0 Client IDs) "
-            "and place it in the project root."
-        )
-    data = json.loads(path.read_text())
+    """Return (client_id, client_secret).
+
+    Sources tried in order:
+    1. GOOGLE_CLIENT_SECRET_JSON env var / Streamlit secret (JSON string)
+    2. client_secret_*.json or google_credentials.json file in project root
+    """
+    raw = None
+
+    # 1. Try Streamlit secrets (Streamlit Cloud deployment)
+    try:
+        import streamlit as st
+        raw = st.secrets["GOOGLE_CLIENT_SECRET_JSON"]
+    except Exception:
+        pass
+
+    if raw:
+        data = json.loads(raw)
+    else:
+        # 2. Fall back to file on disk (local dev)
+        path = _find_creds_file()
+        if not path:
+            raise FileNotFoundError(
+                "Google credentials not found. Either:\n"
+                "  • Set GOOGLE_CLIENT_SECRET_JSON in Streamlit secrets\n"
+                "  • Place client_secret_*.json in the project root (local)"
+            )
+        data = json.loads(path.read_text())
+
     info = data.get("installed") or data.get("web") or data
     return info["client_id"], info["client_secret"]
 

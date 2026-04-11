@@ -145,13 +145,18 @@ def _mp3_to_ogg_opus(mp3_bytes: bytes) -> bytes:
 
 def _stt_sync(audio_bytes: bytes, lang_code: str = "da") -> str:
     """Transcribe audio via ElevenLabs Scribe REST API (blocking)."""
+    data = {"model_id": "scribe_v1"}
+    if lang_code:
+        data["language_code"] = lang_code
     r = requests.post(
         "https://api.elevenlabs.io/v1/speech-to-text",
         headers={"xi-api-key": ELEVEN_KEY},
-        data={"model_id": "scribe_v1", "language_code": lang_code},
+        data=data,
         files={"file": ("audio.ogg", audio_bytes, "audio/ogg")},
         timeout=30,
     )
+    if not r.ok:
+        log.error("ElevenLabs STT error %s: %s", r.status_code, r.text)
     r.raise_for_status()
     return r.json().get("text", "").strip()
 
