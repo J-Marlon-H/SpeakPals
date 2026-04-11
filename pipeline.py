@@ -244,7 +244,7 @@ LESSON_STATE_KEYS = [
     "pipeline_error", "pending_student", "avatar_thinking",
     "correct_log", "coaching_log", "lesson_started",
     "tutor_play_seq", "char_play_seq", "replay_char_seq",
-    "current_session_id",
+    "current_session_id", "knowledge_profile",
 ]
 
 # ── Structured output schema ────────────────────────────────────────────────────

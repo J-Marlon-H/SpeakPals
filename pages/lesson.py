@@ -12,7 +12,7 @@ from pipeline import (run_pipeline_stream, MODELS, VOICES, VOICES_BY_LANG, VOICE
                       parse_claude_response, generate_scene_image, character_tts_b64)
 from prompts import build_system_prompt, get_tutor_name
 from ws_proxy import start_in_thread, PROXY_PORT
-from db import require_auth
+from db import require_auth, load_knowledge_profile
 
 load_dotenv("keys.env")
 
@@ -162,6 +162,16 @@ for _k, _v in _saved.items():
     if _k not in st.session_state:
         st.session_state[_k] = _v
 
+# Load knowledge profile once per lesson session
+if "knowledge_profile" not in st.session_state:
+    if "sb_user_id" in st.session_state:
+        st.session_state["knowledge_profile"] = load_knowledge_profile(
+            st.session_state.sb_user_id,
+            st.session_state.sb_access_token,
+        )
+    else:
+        st.session_state["knowledge_profile"] = {}
+
 name        = st.session_state.get("s_name",        SETTINGS_DEFAULTS["s_name"])
 _sel_scene  = st.session_state.get("selected_scene")
 level       = _SCENE_BY_KEY[_sel_scene]["level"] if _sel_scene in _SCENE_BY_KEY else "A1"
@@ -238,6 +248,7 @@ system = build_system_prompt(
     target_lang=target_lang,
     scene_description=scene_description,
     turn_count=turn_count,
+    knowledge_profile=st.session_state.get("knowledge_profile"),
 )
 
 # Load opener TTS once at lesson start

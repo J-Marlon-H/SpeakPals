@@ -1,6 +1,7 @@
 """db.py — Supabase client, auth, and per-user data access."""
 from __future__ import annotations
 import os
+import json as _json
 from dotenv import load_dotenv
 
 try:
@@ -125,6 +126,43 @@ def upsert_profile(user_id: str, access_token: str, data: dict) -> None:
         (_client(access_token)
          .table("users")
          .upsert({"id": user_id, **_to_db(data)})
+         .execute())
+    except Exception:
+        pass
+
+
+# ── User knowledge profile ────────────────────────────────────────────────────
+
+def load_knowledge_profile(user_id: str, access_token: str) -> dict:
+    """Return the user's knowledge profile JSON, or {} if none exists yet."""
+    try:
+        res = (_client(access_token)
+               .table("user_knowledge_profiles")
+               .select("profile")
+               .eq("user_id", user_id)
+               .maybe_single()
+               .execute())
+        if res is not None and res.data:
+            p = res.data.get("profile")
+            if not p:
+                return {}
+            return p if isinstance(p, dict) else _json.loads(p)
+        return {}
+    except Exception:
+        return {}
+
+
+def save_knowledge_profile(user_id: str, access_token: str, profile: dict) -> None:
+    """Upsert the user's knowledge profile JSON."""
+    import datetime as _dt
+    try:
+        (_client(access_token)
+         .table("user_knowledge_profiles")
+         .upsert({
+             "user_id":    user_id,
+             "profile":    _json.dumps(profile, ensure_ascii=False),
+             "updated_at": _dt.datetime.utcnow().isoformat() + "Z",
+         })
          .execute())
     except Exception:
         pass

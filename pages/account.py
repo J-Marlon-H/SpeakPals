@@ -1,6 +1,6 @@
 import streamlit as st
 from pipeline import VOICES, VOICES_BY_LANG, MODELS, LESSON_STATE_KEYS, SCENE_CATALOG, SETTINGS_DEFAULTS
-from db import require_auth, upsert_profile, load_profile
+from db import require_auth, upsert_profile, load_profile, load_knowledge_profile
 
 require_auth()
 
@@ -215,3 +215,41 @@ if st.button("Sign out", use_container_width=True):
     for k in list(st.session_state.keys()):
         del st.session_state[k]
     st.switch_page("pages/login.py")
+
+st.markdown("<div class='sec-div'></div>", unsafe_allow_html=True)
+st.markdown("<div class='sec-label'>Your Learning Profile</div>", unsafe_allow_html=True)
+st.markdown(
+    "<div style='font:400 12px Inter;color:rgba(17,24,39,.5);margin-bottom:14px'>"
+    "What SpeakPals has learned about you across sessions.</div>",
+    unsafe_allow_html=True,
+)
+
+if "sb_user_id" in st.session_state:
+    _kp = load_knowledge_profile(st.session_state.sb_user_id, st.session_state.sb_access_token)
+else:
+    _kp = {}
+
+if not _kp:
+    st.markdown(
+        "<div style='font:400 13px Inter;color:rgba(17,24,39,.4);padding:10px 0'>"
+        "No profile yet — complete a lesson to start building your profile.</div>",
+        unsafe_allow_html=True,
+    )
+else:
+    _LABEL = {
+        "language_level":        "Language Level",
+        "learning_motivation":   "Learning Motivation",
+        "personal_use_context":  "Where You'll Use It",
+        "common_errors":         "Common Errors & Patterns",
+        "relationships_context": "Relationships & Context",
+    }
+    for _key, _val in _kp.items():
+        _label   = _LABEL.get(_key, _key.replace("_", " ").title())
+        _content = _val.get("content", "") if isinstance(_val, dict) else str(_val)
+        _ts      = _val.get("updated_at", "") if isinstance(_val, dict) else ""
+        _header  = f"**{_label}**" + (f"  ·  *{_ts[:10]}*" if _ts else "")
+        with st.expander(_header, expanded=False):
+            st.markdown(
+                f"<div style='font:400 13px/1.6 Inter;color:#111827'>{_content or '—'}</div>",
+                unsafe_allow_html=True,
+            )

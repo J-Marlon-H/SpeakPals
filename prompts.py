@@ -122,7 +122,8 @@ def get_tutor_name(target_lang: str) -> str:
 def build_system_prompt(name: str, level: str, bg_lang: str,
                         target_lang: str = "Danish",
                         scene_description: str = "",
-                        turn_count: int = 0) -> str:
+                        turn_count: int = 0,
+                        knowledge_profile: dict | None = None) -> str:
     tutor_name = _TUTOR_NAME.get(target_lang, "Alex")
     tutor_persona = _TUTOR_PERSONA.get(target_lang, "warm and patient")
     lang_display = _LANG_DISPLAY.get(target_lang, target_lang)
@@ -138,6 +139,18 @@ def build_system_prompt(name: str, level: str, bg_lang: str,
         prompt = base + f"\n\n## Student's native language background: {bg_lang}\n{profile}"
     except FileNotFoundError:
         prompt = base
+
+    if knowledge_profile:
+        _nonempty = {
+            k: v for k, v in knowledge_profile.items()
+            if isinstance(v, dict) and v.get("content", "").strip()
+        }
+        if _nonempty:
+            lines = ["\n\n## What you know about this student"]
+            for key, val in _nonempty.items():
+                heading = key.replace("_", " ").title()
+                lines.append(f"**{heading}**: {val['content']}")
+            prompt += "\n".join(lines)
 
     if scene_description:
         prompt += _SCENE_BLOCK.format(
