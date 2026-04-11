@@ -84,7 +84,8 @@ USERS_DIR.mkdir(exist_ok=True)
 
 _executor = ThreadPoolExecutor(max_workers=4)
 
-FFMPEG = "/opt/homebrew/bin/ffmpeg"
+import shutil
+FFMPEG = shutil.which("ffmpeg") or "/opt/homebrew/bin/ffmpeg"
 
 # ── User state ────────────────────────────────────────────────────────────────
 
