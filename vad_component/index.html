@@ -656,11 +656,14 @@ async function startListening() {
 
   if (!proxyPort && !wsToken) { lbl.textContent = 'not ready'; return; }
 
+  // Append language_code only when lang is set (non-empty string).
+  // Empty = Scribe auto-detects (Danish mode); non-empty = locked (Portuguese mode).
+  var langParam = lang ? ('&language_code=' + lang) : '';
   var wsUrl = proxyPort
     ? 'ws://localhost:' + proxyPort + '?lang=' + lang
     : 'wss://api.elevenlabs.io/v1/speech-to-text/realtime'
         + '?token=' + wsToken + '&model_id=scribe_v2_realtime'
-        + '&language_code=' + lang + '&audio_format=pcm_16000';
+        + langParam + '&audio_format=pcm_16000';
 
   // Use pre-warmed open WS (proxy only) — skips handshake wait
   if (_pwWs && _pwWs.readyState === WebSocket.OPEN) {

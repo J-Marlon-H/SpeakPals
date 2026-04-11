@@ -122,7 +122,7 @@ for col, scene in zip(cols, scenes):
             st.session_state["selected_scene"] = scene["key"]
             for k in LESSON_STATE_KEYS:
                 st.session_state.pop(k, None)
-            st.switch_page("app.py")
+            st.switch_page("pages/lesson.py")
 
 # ── Bottom links ───────────────────────────────────────────────────────────────
 
@@ -130,7 +130,7 @@ st.markdown("<div style='height:24px'></div>", unsafe_allow_html=True)
 c1, c2 = st.columns(2)
 with c1:
     if st.button("← Back to lesson", use_container_width=True):
-        st.switch_page("app.py")
+        st.switch_page("pages/lesson.py")
 with c2:
     if st.button("🏠 All scenes", use_container_width=True):
         st.switch_page("pages/home.py")

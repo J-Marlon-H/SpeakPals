@@ -189,7 +189,7 @@ with col_home:
 with col_back:
     if st.button("← Lesson", use_container_width=True):
         _save()
-        st.switch_page("app.py")
+        st.switch_page("pages/lesson.py")
 
 st.markdown("<div class='sec-div'></div>", unsafe_allow_html=True)
 
@@ -199,7 +199,7 @@ st.markdown("<div class='sec-label'>Session</div>", unsafe_allow_html=True)
 if st.button("🔄 Clear lesson & restart", use_container_width=True):
     for k in LESSON_STATE_KEYS:
         st.session_state.pop(k, None)
-    st.switch_page("app.py")
+    st.switch_page("pages/lesson.py")
 
 st.markdown("<div class='sec-div'></div>", unsafe_allow_html=True)
 st.markdown("<div class='sec-label'>Account</div>", unsafe_allow_html=True)

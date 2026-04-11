@@ -19,7 +19,7 @@ from dotenv import load_dotenv
 load_dotenv("keys.env")
 ELEVEN_KEY  = os.getenv("ELEVENLABS_API_KEY", "")
 EL_WS_BASE  = "wss://api.elevenlabs.io/v1/speech-to-text/realtime"
-PROXY_PORT  = 8502
+PROXY_PORT  = 8765
 
 
 async def proxy(browser_ws):
@@ -51,10 +51,15 @@ async def proxy(browser_ws):
     print(f"[proxy] connecting to ElevenLabs with language_code={lang}", flush=True)
 
     # ── Phase 2: connect to ElevenLabs with the final language ────────────────
+    # Append language_code only when set (non-empty).
+    # Empty lang = Scribe v2 auto-detects (used for Danish so English questions
+    # to the tutor are also recognised). Non-empty = locked to target language
+    # (used for Portuguese to enforce immersion and avoid cross-language bleed).
+    lang_param = f"&language_code={lang}" if lang else ""
     el_url = (
         f"{EL_WS_BASE}"
         f"?model_id=scribe_v2_realtime"
-        f"&language_code={lang}"
+        f"{lang_param}"
         f"&encoding=pcm_s16le"
         f"&sample_rate=16000"
     )
