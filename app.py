@@ -10,7 +10,16 @@ preload_all_images()
 # ── Telegram bot (embedded background thread) ─────────────────────────────────
 @st.cache_resource
 def _start_telegram_bot():
-    """Start the Telegram bot once per server process."""
+    """Start the Telegram bot once per server process.
+    Only starts if TELEGRAM_BOT_ENABLED is set to 'true' in secrets or env."""
+    import os
+    enabled = False
+    try:
+        enabled = st.secrets.get("TELEGRAM_BOT_ENABLED", "false").lower() == "true"
+    except Exception:
+        enabled = os.getenv("TELEGRAM_BOT_ENABLED", "false").lower() == "true"
+    if not enabled:
+        return
     try:
         from telegram_bot import start_bot_thread
         start_bot_thread()
