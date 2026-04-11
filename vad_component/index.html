@@ -324,6 +324,33 @@ window.addEventListener("message", function(e) {
   wsToken   = a.ws_token   || null;
   rendered  = true;
 
+  // ── Onboarding mode — light background, centred large avatar ─────────────
+  var obMode = !!a.ob_mode;
+  if (obMode) {
+    document.body.style.background = '#f5f0eb';
+    wrapEl.style.backgroundColor   = '#f5f0eb';
+    noScene.style.display = 'none'; // never show "Loading scene…" text
+    var ap = document.querySelector('.avatar-panel');
+    if (ap && !ap.dataset.obStyled) {
+      ap.dataset.obStyled = '1';
+      ap.style.position       = 'absolute';
+      ap.style.bottom         = 'auto';
+      ap.style.right          = 'auto';
+      ap.style.top            = '46%';
+      ap.style.left           = '50%';
+      ap.style.transform      = 'translate(-50%, -50%) scale(2.6)';
+      ap.style.transformOrigin= 'center center';
+      ap.style.background     = 'transparent';
+      ap.style.border         = 'none';
+      ap.style.boxShadow      = 'none';
+    }
+    var micW = document.querySelector('.mic-wrap');
+    if (micW && !micW.dataset.obStyled) {
+      micW.dataset.obStyled = '1';
+      micW.style.background = 'rgba(0,0,0,.12)';
+    }
+  }
+
   // ── Scene image (CSS background — fills container with no cropping at top)
   var src = a.scene_src || "";
   var currentBg = wrapEl.dataset.sceneSrc || "";
@@ -332,12 +359,14 @@ window.addEventListener("message", function(e) {
     var tmp = new Image();
     tmp.onload = function() {
       wrapEl.style.backgroundImage = "url('" + src.replace(/'/g, "\\'") + "')";
-      noScene.style.display = 'none';
+      if (!obMode) noScene.style.display = 'none';
     };
     tmp.src = src;
-  } else if (!src) {
+  } else if (!src && !obMode) {
     wrapEl.style.backgroundImage = "none";
     noScene.style.display = "flex";
+  } else if (!src) {
+    wrapEl.style.backgroundImage = "none";
   }
 
   // ── Avatar (tutor) — seq-number based detection, checked FIRST ──────────

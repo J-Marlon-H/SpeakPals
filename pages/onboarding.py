@@ -44,28 +44,20 @@ _OB_MAX_TURNS = 18  # ~8-10 minutes of conversation
 # ── Opening greeting per language (spoken before user says anything) ───────────
 _OPENERS = {
     "English": (
-        "Hi {name}! I'm Alex, your personal language learning companion here at SpeakPals. "
-        "I'm really glad you're here! Before we jump into practising, I'd love to get to know "
-        "you a little better so I can be the best possible companion for you. "
-        "So — what brings you to SpeakPals? What language are you hoping to learn?"
+        "Hi {name}! I'm Alex, your SpeakPals companion. "
+        "What language are you hoping to learn?"
     ),
     "German": (
-        "Hallo {name}! Ich bin Alex, dein persönlicher Sprachlernbegleiter bei SpeakPals. "
-        "Schön, dass du hier bist! Bevor wir mit dem Üben beginnen, würde ich dich gerne etwas "
-        "besser kennenlernen, damit ich der bestmögliche Begleiter für dich sein kann. "
-        "Also — was hat dich zu SpeakPals geführt? Welche Sprache möchtest du lernen?"
+        "Hallo {name}! Ich bin Alex, dein SpeakPals-Begleiter. "
+        "Welche Sprache möchtest du lernen?"
     ),
     "Danish": (
-        "Hej {name}! Jeg er Alex, din personlige sprogindlæringsledsager her på SpeakPals. "
-        "Det er dejligt, at du er her! Inden vi begynder at øve, vil jeg gerne lære dig lidt "
-        "bedre at kende, så jeg kan være den bedst mulige ledsager for dig. "
-        "Så — hvad har bragt dig til SpeakPals? Hvilket sprog håber du at lære?"
+        "Hej {name}! Jeg er Alex, din SpeakPals-ledsager. "
+        "Hvilket sprog håber du at lære?"
     ),
     "Portuguese (Brazilian)": (
-        "Oi {name}! Sou Alex, seu companheiro pessoal de aprendizado de idiomas no SpeakPals. "
-        "Que ótimo ter você aqui! Antes de começarmos a praticar, adoraria te conhecer um "
-        "pouco melhor para ser o melhor companheiro possível para você. "
-        "Então — o que te trouxe ao SpeakPals? Qual idioma você quer aprender?"
+        "Oi {name}! Sou Alex, seu parceiro no SpeakPals. "
+        "Qual idioma você quer aprender?"
     ),
 }
 
@@ -287,42 +279,37 @@ if st.session_state.ob_started and not st.session_state.ob_opener_loaded:
 with st.sidebar:
     # Header
     st.markdown(
-        "<div style='padding:20px 0 0 16px'>"
+        "<div style='padding:16px 16px 0'>"
         "<div style='font:800 18px/1.2 Inter,sans-serif;color:#111827;letter-spacing:-.3px'>"
         "Welcome to SpeakPals 👋</div>"
-        f"<div style='font:500 12px Inter;color:rgba(17,24,39,.55);margin-top:4px'>"
-        f"Getting to know you, {name}</div>"
         "</div>",
         unsafe_allow_html=True,
     )
+
+    # Language selector — always visible at top (locked once conversation starts)
     st.markdown(
-        "<div style='height:1px;background:linear-gradient(90deg,rgba(13,148,136,.3),"
-        "transparent);margin:4px 16px 8px'></div>",
+        "<div style='padding:10px 12px 2px'>"
+        "<div style='font:600 10px Inter;letter-spacing:2px;color:rgba(17,24,39,.4);"
+        "text-transform:uppercase;margin-bottom:6px'>Interview language</div>"
+        "</div>",
         unsafe_allow_html=True,
     )
+    ob_lang_choice = st.selectbox(
+        "Interview language",
+        ONBOARDING_LANGUAGES,
+        index=ONBOARDING_LANGUAGES.index(st.session_state.ob_language),
+        label_visibility="collapsed",
+        disabled=st.session_state.ob_started,
+    )
+    if ob_lang_choice != st.session_state.ob_language and not st.session_state.ob_started:
+        st.session_state.ob_language = ob_lang_choice
+        st.rerun()
 
-    # Language selector — only before conversation starts
-    if not st.session_state.ob_started:
-        st.markdown(
-            "<div style='padding:0 12px 4px'>"
-            "<div style='font:600 10px Inter;letter-spacing:2px;color:rgba(17,24,39,.4);"
-            "text-transform:uppercase;margin-bottom:6px'>Conversation language</div>"
-            "</div>",
-            unsafe_allow_html=True,
-        )
-        ob_lang_choice = st.selectbox(
-            "Conversation language",
-            ONBOARDING_LANGUAGES,
-            index=ONBOARDING_LANGUAGES.index(st.session_state.ob_language),
-            label_visibility="collapsed",
-        )
-        if ob_lang_choice != st.session_state.ob_language:
-            st.session_state.ob_language = ob_lang_choice
-            st.rerun()
-        st.markdown(
-            "<div style='height:1px;background:rgba(17,24,39,.1);margin:8px 12px 10px'></div>",
-            unsafe_allow_html=True,
-        )
+    st.markdown(
+        "<div style='height:1px;background:linear-gradient(90deg,rgba(13,148,136,.3),"
+        "transparent);margin:6px 12px 10px'></div>",
+        unsafe_allow_html=True,
+    )
 
     # Chat log
     log = st.session_state.ob_log
@@ -445,6 +432,7 @@ mic_props = dict(
     tutor_text      = "",
     progress_current= 0,
     progress_total  = 0,
+    ob_mode         = True,         # light background + centered large avatar
     default         = None,
     height          = 900,
 )

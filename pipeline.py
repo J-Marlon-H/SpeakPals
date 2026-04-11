@@ -29,7 +29,7 @@ def tts_chunk(text, voice_id, eleven_key, lang_code="da"):
     body = {
         "text": text.strip(),
         "model_id": "eleven_multilingual_v2",
-        "voice_settings": {"stability": 0.4, "similarity_boost": 0.75, "speed": 0.92},
+        "voice_settings": {"stability": 0.4, "similarity_boost": 0.75, "speed": 1.0},
     }
     if lang_code:
         body["language_code"] = lang_code
