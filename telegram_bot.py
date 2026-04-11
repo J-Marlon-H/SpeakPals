@@ -84,6 +84,14 @@ USERS_DIR.mkdir(exist_ok=True)
 
 _executor = ThreadPoolExecutor(max_workers=4)
 
+# Scribe v1 REST API needs an explicit language code to avoid misidentifying
+# similar languages (e.g. Danish → Swedish). Different from STT_LANG_CODE
+# which is used by the Streamlit app's Scribe v2 Realtime WebSocket stream.
+_BOT_STT_LANG = {
+    "Danish":                 "dan",
+    "Portuguese (Brazilian)": "por",
+}
+
 import shutil
 FFMPEG = shutil.which("ffmpeg") or "/opt/homebrew/bin/ffmpeg"
 
@@ -859,7 +867,7 @@ async def voice_handler(
     # Download the voice note Telegram sent as OGG
     voice_file  = await context.bot.get_file(update.message.voice.file_id)
     audio_bytes = bytes(await voice_file.download_as_bytearray())
-    lang_code   = STT_LANG_CODE.get(user["language"], "da")
+    lang_code   = _BOT_STT_LANG.get(user["language"], "dan")
 
     loop = asyncio.get_running_loop()
     try:
