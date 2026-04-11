@@ -1,6 +1,6 @@
 import streamlit as st
 from pipeline import VOICES, VOICES_BY_LANG, MODELS, LESSON_STATE_KEYS, SCENE_CATALOG, SETTINGS_DEFAULTS
-from db import require_auth, upsert_profile, load_profile, load_knowledge_profile
+from db import require_auth, upsert_profile, load_profile, load_knowledge_profile, get_user_email
 
 require_auth()
 
@@ -177,7 +177,7 @@ def _save():
             data,
         )
 
-col_save, col_home, col_back = st.columns(3)
+col_save, col_home, col_back, col_ob = st.columns(4)
 with col_save:
     if st.button("Save", use_container_width=True):
         _save()
@@ -190,6 +190,10 @@ with col_back:
     if st.button("← Lesson", use_container_width=True):
         _save()
         st.switch_page("pages/lesson.py")
+with col_ob:
+    if st.button("👋 Interview", use_container_width=True):
+        _save()
+        st.switch_page("pages/onboarding.py")
 
 st.markdown("<div class='sec-div'></div>", unsafe_allow_html=True)
 
@@ -204,9 +208,16 @@ if st.button("🔄 Clear lesson & restart", use_container_width=True):
 st.markdown("<div class='sec-div'></div>", unsafe_allow_html=True)
 st.markdown("<div class='sec-label'>Account</div>", unsafe_allow_html=True)
 
+# Resolve email — prefer session state, fall back to live API call if missing.
+_email = st.session_state.get("sb_email", "")
+if not _email and "sb_access_token" in st.session_state:
+    _email = get_user_email(st.session_state.sb_access_token)
+    if _email:
+        st.session_state["sb_email"] = _email
+
 st.markdown(
     f"<div style='font:400 12px Inter;color:rgba(17,24,39,.5);margin-bottom:10px'>"
-    f"Signed in as <strong>{st.session_state.get('sb_email','')}</strong></div>",
+    f"Signed in as <strong>{_email or '—'}</strong></div>",
     unsafe_allow_html=True
 )
 if st.button("Sign out", use_container_width=True):

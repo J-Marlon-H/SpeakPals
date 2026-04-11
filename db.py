@@ -78,6 +78,15 @@ def sign_out(access_token: str) -> None:
         pass
 
 
+def get_user_email(access_token: str) -> str:
+    """Return the email address for the authenticated user, or '' on failure."""
+    try:
+        res = _client(access_token).auth.get_user(access_token)
+        return res.user.email if res and res.user else ""
+    except Exception:
+        return ""
+
+
 # ── Profile key mapping ───────────────────────────────────────────────────────
 # App session_state uses "s_" prefixed keys; DB columns use plain names.
 
