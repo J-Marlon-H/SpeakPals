@@ -18,6 +18,19 @@ from db import require_auth
 # Warm the image cache on first server start so home page loads instantly
 preload_all_images()
 
+# ── Telegram bot (embedded background thread) ─────────────────────────────────
+@st.cache_resource
+def _start_telegram_bot():
+    """Start the Telegram bot once per server process."""
+    try:
+        from telegram_bot import start_bot_thread
+        start_bot_thread()
+    except Exception as e:
+        import logging
+        logging.getLogger("speakpals").warning("Telegram bot not started: %s", e)
+
+_start_telegram_bot()
+
 load_dotenv("keys.env")
 
 def _secret(key):

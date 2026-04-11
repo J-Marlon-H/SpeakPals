@@ -670,14 +670,13 @@ async def voice_handler(
 
 # ── Entry point ───────────────────────────────────────────────────────────────
 
-def main() -> None:
+def build_app() -> Application:
+    """Build and return the configured Application (without starting polling)."""
     if not BOT_TOKEN:
         raise RuntimeError(
             "TELEGRAM_BOT_TOKEN not set. Add it to keys.env and try again."
         )
-
     app = Application.builder().token(BOT_TOKEN).build()
-
     app.add_handler(CommandHandler("start", cmd_start))
     app.add_handler(CommandHandler("scene", cmd_scene))
     app.add_handler(CommandHandler("level", cmd_level))
@@ -687,9 +686,32 @@ def main() -> None:
     app.add_handler(CallbackQueryHandler(callback_handler))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, text_handler))
     app.add_handler(MessageHandler(filters.VOICE, voice_handler))
+    return app
 
-    log.info("SpeakPals bot starting (polling)…")
-    app.run_polling(drop_pending_updates=True)
+
+def start_bot_thread() -> None:
+    """Start the bot in a background thread with its own event loop.
+    Avoids run_polling() which registers OS signal handlers (main-thread only)."""
+    import threading
+
+    async def _run_async():
+        app = build_app()
+        log.info("SpeakPals bot starting (polling, embedded thread)…")
+        async with app:
+            await app.start()
+            await app.updater.start_polling(drop_pending_updates=True)
+            # Block forever — daemon thread dies when the main process exits
+            await asyncio.Event().wait()
+
+    def _run():
+        asyncio.run(_run_async())
+
+    t = threading.Thread(target=_run, daemon=True, name="speakpals-bot")
+    t.start()
+
+
+def main() -> None:
+    build_app().run_polling(drop_pending_updates=True)
 
 
 if __name__ == "__main__":
