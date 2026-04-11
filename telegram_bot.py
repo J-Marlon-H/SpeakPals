@@ -65,9 +65,19 @@ logging.basicConfig(
 )
 log = logging.getLogger("speakpals_bot")
 
-CLAUDE_KEY = os.getenv("CLAUDE_API_KEY")
-ELEVEN_KEY = os.getenv("ELEVENLABS_API_KEY")
-BOT_TOKEN  = os.getenv("TELEGRAM_BOT_TOKEN")
+
+def _secret(key: str) -> str | None:
+    """Read from Streamlit secrets first, fall back to environment variable."""
+    try:
+        import streamlit as st
+        return st.secrets[key]
+    except Exception:
+        return os.getenv(key)
+
+
+CLAUDE_KEY = _secret("CLAUDE_API_KEY")
+ELEVEN_KEY = _secret("ELEVENLABS_API_KEY")
+BOT_TOKEN  = _secret("TELEGRAM_BOT_TOKEN")
 
 USERS_DIR = pathlib.Path("telegram_users")
 USERS_DIR.mkdir(exist_ok=True)
