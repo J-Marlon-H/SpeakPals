@@ -499,7 +499,7 @@ def render_session(s):
                 # Correction
                 f"  <div>"
                 f"    <div style='font:600 9px Inter;color:rgba(17,24,39,.4);letter-spacing:.8px;"
-                f"text-transform:uppercase;margin-bottom:6px'>Correction</div>"
+                f"text-transform:uppercase;margin-bottom:6px'>How to answer next time</div>"
                 f"    <div style='font:400 13px/1.5 Inter;color:#0f3d39;"
                 f"padding:8px 12px;background:rgba(13,148,136,.08);border-radius:8px;"
                 f"border:1px solid rgba(13,148,136,.18)'>{cor}</div>"
@@ -547,6 +547,8 @@ def render_session(s):
     if conv:
         with st.expander("Full conversation"):
             parts = []
+            _tutor_names = {"Danish": "Lars", "Portuguese (Brazilian)": "João"}
+            tutor_disp = _tutor_names.get(s.get("target_lang", "Danish"), "Lars")
             for entry in conv:
                 txt = entry["text"].replace("<","&lt;").replace(">","&gt;")
                 if entry["who"] == "character":
@@ -556,6 +558,14 @@ def render_session(s):
                         f"<span style='font:600 9px Inter;color:rgba(17,24,39,.4);text-transform:uppercase;"
                         f"letter-spacing:.5px;display:block;margin-bottom:4px'>{char_lbl}</span>"
                         f"<span style='font:400 13px/1.4 Inter;color:#111827'><em>{txt}</em></span></div>"
+                    )
+                elif entry["who"] == "tutor":
+                    parts.append(
+                        f"<div style='background:rgba(245,158,11,.07);border-radius:4px 14px 14px 14px;"
+                        f"padding:10px 14px;margin:6px 0;max-width:78%'>"
+                        f"<span style='font:600 9px Inter;color:#d97706;text-transform:uppercase;"
+                        f"letter-spacing:.5px;display:block;margin-bottom:4px'>💡 {tutor_disp}</span>"
+                        f"<span style='font:400 13px/1.4 Inter;color:#78350f'>{txt}</span></div>"
                     )
                 else:
                     parts.append(

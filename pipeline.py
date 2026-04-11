@@ -21,13 +21,23 @@ def clean_for_tts(text):
 
 
 def tts_chunk(text, voice_id, eleven_key, lang_code="da"):
+    # Always use eleven_multilingual_v2 — handles target-language words correctly
+    # regardless of the surrounding language.
+    # Only send language_code when set: omitting it lets the model auto-detect per
+    # word, which is critical for tutor lines that mix English with target-language
+    # phrases (e.g. "Try saying 'Jeg hedder Marlon'").
+    body = {
+        "text": text.strip(),
+        "model_id": "eleven_multilingual_v2",
+        "voice_settings": {"stability": 0.4, "similarity_boost": 0.75, "speed": 0.92},
+    }
+    if lang_code:
+        body["language_code"] = lang_code
     for attempt in range(3):
         r = get_session().post(
             f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}/stream",
             headers={"xi-api-key": eleven_key, "Content-Type": "application/json"},
-            json={"text": text.strip(), "model_id": TTS_MODEL.get(lang_code, "eleven_turbo_v2_5"),
-                  "language_code": lang_code,
-                  "voice_settings": {"stability": 0.4, "similarity_boost": 0.75, "speed": 0.92}},
+            json=body,
             stream=True, timeout=30,
         )
         if r.status_code == 429:
@@ -134,19 +144,32 @@ VOICES_BY_LANG = {
     },
 }
 
+# Gender for each voice label (used to match character voice to scene image)
+VOICE_GENDER = {
+    "Mathias — male baritone":  "male",
+    "Camilla — female":         "female",
+    "Søren — male, calm":       "male",
+    "Matheus — male baritone":  "male",
+    "Camila — female":          "female",
+    "Flavio — male, calm":      "male",
+}
+
 TTS_LANG_CODE = {
     "Danish":                 "da",
     "Portuguese (Brazilian)": "pt",
 }
 
 STT_LANG_CODE = {
-    "Danish":                 "da",
-    "Portuguese (Brazilian)": "por",
+    # Empty string = Scribe v2 auto-detects the language per utterance.
+    # Both Danish and Portuguese learners may speak English to the tutor,
+    # so locking to a single language would mis-transcribe those English turns.
+    "Danish":                 "",
+    "Portuguese (Brazilian)": "",
 }
 
 TTS_MODEL = {
-    "da": "eleven_turbo_v2_5",
-    "pt": "eleven_turbo_v2_5",
+    "da": "eleven_multilingual_v2",   # better Danish pronunciation
+    "pt": "eleven_multilingual_v2",   # better Portuguese pronunciation
 }
 
 # ── Scene catalog — single source of truth for all scenes ──────────────────────
@@ -306,9 +329,12 @@ def run_pipeline_stream(system, user_input, history, voice_id, claude_key, eleve
     if tts_text is None:
         tts_text = clean_for_tts(raw_claude)
 
-    # Pick voice and lang: character uses char_voice_id + target lang; tutor uses voice_id + English
-    tts_voice    = (char_voice_id or voice_id) if speaker == "character" else voice_id
-    tts_lang     = lang_code if speaker == "character" else "en"
+    # Character: use target-language voice + lang_code so pronunciation is anchored.
+    # Tutor: no lang_code — the multilingual model auto-detects English and any
+    # embedded target-language words, keeping Danish/Portuguese phrases correct
+    # even inside an otherwise English sentence.
+    tts_voice = (char_voice_id or voice_id) if speaker == "character" else voice_id
+    tts_lang  = lang_code if speaker == "character" else ""
 
     if tts_text:
         audio = tts_chunk(tts_text, tts_voice, eleven_key, lang_code=tts_lang)

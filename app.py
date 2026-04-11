@@ -7,8 +7,8 @@ from dotenv import load_dotenv
 import os
 
 import json as _json
-from pipeline import (run_pipeline_stream, MODELS, VOICES, VOICES_BY_LANG, SCENE_CATALOG,
-                      SETTINGS_DEFAULTS, TTS_LANG_CODE, STT_LANG_CODE,
+from pipeline import (run_pipeline_stream, MODELS, VOICES, VOICES_BY_LANG, VOICE_GENDER,
+                      SCENE_CATALOG, SETTINGS_DEFAULTS, TTS_LANG_CODE, STT_LANG_CODE,
                       parse_claude_response, generate_scene_image, character_tts_b64)
 from prompts import build_system_prompt, get_tutor_name
 from ws_proxy import start_in_thread, PROXY_PORT
@@ -50,14 +50,14 @@ SCENE_OPENERS_BY_LANG = {
     },
 }
 
-# Preference order per scene: first voice that doesn't clash with the tutor's voice is used
-SCENE_CHAR_VOICE = {
-    "meet_a_friend": [VOICES["Søren — male, calm"],     VOICES["Camilla — female"]],
-    "cafe":          [VOICES["Camilla — female"],        VOICES["Mathias — male baritone"]],
-    "supermarket":  [VOICES["Camilla — female"],        VOICES["Mathias — male baritone"]],
-    "flower_store": [VOICES["Søren — male, calm"],     VOICES["Mathias — male baritone"]],
-    "bakery":       [VOICES["Camilla — female"],        VOICES["Søren — male, calm"]],
-    "restaurant":   [VOICES["Mathias — male baritone"], VOICES["Søren — male, calm"]],
+# Gender of the visible character in each scene image
+SCENE_CHAR_GENDER = {
+    "meet_a_friend": "male",
+    "cafe":          "female",
+    "supermarket":   "female",
+    "flower_store":  "male",
+    "bakery":        "female",
+    "restaurant":    "male",
 }
 
 SCENE_NEXT_PROMPT = {
@@ -156,10 +156,6 @@ st.markdown("""<style>
     z-index:100!important}
 </style>""", unsafe_allow_html=True)
 
-# ── Topic ──────────────────────────────────────────────────────────────────────
-
-today = "Daily life, shopping"
-
 # ── Read settings — seed session_state from file if not already set ────────────
 _saved = SETTINGS_DEFAULTS.copy()
 try:
@@ -213,10 +209,9 @@ if not st.session_state.scene_images:
 
 scene_list        = st.session_state.scene_images
 current_scene     = scene_list[st.session_state.scene_idx] if scene_list else None
-scene_description = current_scene["description"] if current_scene else today
+scene_description = current_scene["description"] if current_scene else ""
 _scene_src_raw    = current_scene["src"] if current_scene else ""
 scene_idx_1based  = st.session_state.scene_idx + 1
-scene_history     = [s["description"] for s in scene_list[:st.session_state.scene_idx]]
 
 # Convert local images to base64; FAL URLs pass through as-is
 if _scene_src_raw and not _scene_src_raw.startswith(("http", "data:")):
@@ -226,10 +221,13 @@ else:
 
 voice_id = lang_voices[voice_label] if voice_label in lang_voices else next(iter(lang_voices.values()))
 
-_char_prefs = SCENE_CHAR_VOICE.get(st.session_state.get("selected_scene") or "", [])
-char_voice_id = next(
-    (v for v in _char_prefs if v != voice_id),
-    next(v for v in lang_voices.values() if v != voice_id),
+_scene_gender = SCENE_CHAR_GENDER.get(st.session_state.get("selected_scene") or "", None)
+_same_gender  = [vid for lbl, vid in lang_voices.items()
+                 if VOICE_GENDER.get(lbl) == _scene_gender]
+char_voice_id = (
+    next((v for v in _same_gender if v != voice_id), None)
+    or (_same_gender[0] if _same_gender else None)
+    or next((v for v in lang_voices.values() if v != voice_id), next(iter(lang_voices.values())))
 )
 
 sk          = _scene_key(_scene_src_raw)
@@ -240,11 +238,9 @@ _lang_openers = SCENE_OPENERS_BY_LANG.get(target_lang, SCENE_OPENERS_BY_LANG["Da
 opener_line   = _lang_openers.get(sk, "") if sk else ""
 
 system = build_system_prompt(
-    name, level, today, bg_lang,
+    name, level, bg_lang,
     target_lang=target_lang,
     scene_description=scene_description,
-    scene_idx=scene_idx_1based,
-    scene_history=scene_history,
     turn_count=turn_count,
 )
 
@@ -384,8 +380,7 @@ def _make_image_ready_cb(next_prompt):
         st.session_state.scene_loading = False
     return _cb
 
-_vad_dir = pathlib.Path(__file__).parent / "vad_component"
-mic = components.declare_component("vad_mic", path=str(_vad_dir))
+from vad_helper import mic
 
 chunks  = st.session_state.last_chunks or []
 caption = ("Generating next scene…" if st.session_state.scene_loading
@@ -501,8 +496,11 @@ if student_text:
         if tutor_text and not scene_done:
             st.session_state.correct_log.append({"who": speaker, "text": tutor_text})
 
-        # ── Log mistakes silently for the feedback page ────────────────────────
-        if not is_correct and correction_note:
+        # ── Log mistakes silently for the feedback page ───────────────────────
+        # Only log when the CHARACTER responded — that means the student was
+        # speaking Danish. When the TUTOR responds, the student was speaking
+        # English intentionally, so there is nothing to log.
+        if not is_correct and correction_note and speaker == "character":
             st.session_state.coaching_log.append({
                 "question":   _last_char,
                 "attempt":    student_text,
