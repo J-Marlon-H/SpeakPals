@@ -19,7 +19,7 @@ from dotenv import load_dotenv
 load_dotenv("keys.env")
 ELEVEN_KEY  = os.getenv("ELEVENLABS_API_KEY", "")
 EL_WS_BASE  = "wss://api.elevenlabs.io/v1/speech-to-text/realtime"
-PROXY_PORT  = 8502
+PROXY_PORT  = 8765
 
 
 async def proxy(browser_ws):
