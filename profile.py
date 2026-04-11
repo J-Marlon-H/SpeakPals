@@ -12,7 +12,7 @@ REQUIRED_CATEGORIES = [
     "learning_motivation",
     "personal_use_context",
     "common_errors",
-    "relationships_context",
+    "conversation_history",
 ]
 
 # ── Claude prompt ──────────────────────────────────────────────────────────────
@@ -38,12 +38,19 @@ Student: {name}  |  Level: {level}  |  Target language: {target_lang}  |  Native
 Return an updated profile JSON object that incorporates everything you learned about this student from the session.
 
 Rules:
-1. Always include all 5 predefined keys: language_level, learning_motivation, personal_use_context, common_errors, relationships_context.
+1. Always include all 5 predefined keys: language_level, learning_motivation, personal_use_context, common_errors, conversation_history.
 2. You may add up to 2 additional snake_case keys if the session reveals something important that does not fit the predefined categories. Choose short, descriptive key names (e.g. "pronunciation_notes", "cultural_interests").
 3. The total number of keys must not exceed 7.
 4. Preserve any existing custom keys from the current profile unless you have a strong reason to merge or remove them.
 5. Each category value must be a JSON object with exactly two fields:
-   - "content": A comprehensive plain-text summary written in present tense and third person about the learner. Include all relevant observations — specific words, phrases, patterns, examples. Do not truncate; write as much as is genuinely useful. Accumulate and enrich across sessions rather than replacing prior content.
+   - "content": A comprehensive summary about the learner. Rules per category type:
+     • For conversation_history: write as Markdown bullet points (each starting with "- "), \
+one bullet per notable topic or fact that has come up across all sessions. \
+Accumulate bullets from prior sessions — never delete existing bullets, only add new ones. \
+Keep each bullet concise (one line). Example: "- Mentioned Danish partner named Sofie\n- Plans to move to Copenhagen in June 2026"
+     • For all other categories: write in present tense, third person, plain prose. Include all \
+relevant observations — specific words, phrases, patterns, examples. \
+Do not truncate; write as much as is genuinely useful. Accumulate and enrich across sessions.
    - "updated_at": The ISO 8601 UTC timestamp "{now_iso}" — use this exact value if content changed, keep the old timestamp if the category was not updated.
 6. If a session reveals nothing new for a category, keep the existing content and timestamp completely unchanged.
 7. If the current profile is empty ({{}}) this is the first session — populate all 5 predefined categories with whatever the session reveals. Set content to "" for categories with no evidence yet.

@@ -1,7 +1,7 @@
 import streamlit as st
 from pipeline import SCENE_CATALOG, LESSON_STATE_KEYS, SETTINGS_DEFAULTS
 from scene_images import img_b64 as _img_b64
-from db import require_auth, load_profile
+from db import require_auth, load_profile, load_knowledge_profile
 
 require_auth()
 
@@ -15,6 +15,18 @@ else:
 for _k, _v in {**SETTINGS_DEFAULTS, **_profile}.items():
     if _k not in st.session_state:
         st.session_state[_k] = _v
+
+# ── Auto-redirect new users to onboarding if they have no knowledge profile ────
+# Check DB once per session (onboarding_checked flag prevents repeat calls).
+if "sb_user_id" in st.session_state and not st.session_state.get("onboarding_checked"):
+    _kp = load_knowledge_profile(
+        st.session_state.sb_user_id,
+        st.session_state.sb_access_token,
+    )
+    st.session_state["knowledge_profile"]  = _kp
+    st.session_state["onboarding_checked"] = True
+    if not _kp:
+        st.switch_page("pages/onboarding.py")
 
 st.set_page_config(page_title="SpeakPals", page_icon="🇩🇰",
                    layout="wide", initial_sidebar_state="collapsed")

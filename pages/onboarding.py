@@ -90,7 +90,7 @@ a checklist:
    Specific situations: at work, with family, travelling, living abroad, hobbies?
 4. **Patterns and challenges** — Mistakes or difficulties they are already aware of? \
    Things they have tried before? What worked, what did not?
-5. **Relationships and personal context** — Connections to the language or culture? \
+5. **Personal and cultural connections** — Connections to the language or culture? \
    Partner, family, friends, travel plans, work context — anything that makes the \
    language personally meaningful?
 
@@ -401,7 +401,7 @@ with st.sidebar:
         for k in ["ob_chat", "ob_log", "ob_turn_count", "ob_complete", "ob_pending",
                    "ob_thinking", "ob_last_chunks", "ob_tutor_play_seq", "ob_last_id",
                    "ob_started", "ob_opener_loaded", "ob_opener_text", "ob_profile_saved",
-                   "ob_error", "knowledge_profile"]:
+                   "ob_error", "knowledge_profile", "onboarding_checked"]:
             st.session_state.pop(k, None)
         st.rerun()
 
