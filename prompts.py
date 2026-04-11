@@ -86,13 +86,17 @@ ROUTING DECISION — follow these steps in order, then emit one JSON line:
 
 STEP 1 — Detect the primary language of the student's input:
   A) Primarily {target_lang} (even with mistakes, mixed words, or broken grammar) → go to STEP 2.
+     IMPORTANT: Short {target_lang} words — "ja", "nej", "tak", "ingen", "to", "en", "et", "sim",
+     "não", "obrigado", "por favor" and similar — are ALWAYS {target_lang}. Never treat a known
+     {target_lang} word as unclear just because it is short.
   B) Primarily English or native language → speaker:"tutor". Skip STEP 2.
   C) Clearly a meta-question regardless of language ("what does X mean?", "how do I say X?",
      "I don't understand", "what should I say?", or addressing {tutor_name} by name) → speaker:"tutor".
 
-STEP 2 (only reached for {target_lang} attempts) — Did the student's attempt communicate
-something meaningful, even imperfectly?
+STEP 2 (only reached for {target_lang} attempts) — Did the student's attempt answer or react to
+what the character just said, even with a single word?
   YES → speaker:"character". CHARACTER advances the scene. This is the normal path.
+        A one-word reply like "Nej", "Ja", "Tak" fully answers a yes/no question — that is YES.
         Log a silent correction only if a key vocabulary word was clearly wrong or missing.
   NO (the input is noise, completely off-topic, or zero recognisable {target_lang}) → speaker:"tutor".
 
