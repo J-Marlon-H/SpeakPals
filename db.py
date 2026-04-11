@@ -168,6 +168,18 @@ def save_knowledge_profile(user_id: str, access_token: str, profile: dict) -> No
         pass
 
 
+def delete_knowledge_profile(user_id: str, access_token: str) -> None:
+    """Delete the user's knowledge profile row entirely."""
+    try:
+        (_client(access_token)
+         .table("user_knowledge_profiles")
+         .delete()
+         .eq("user_id", user_id)
+         .execute())
+    except Exception:
+        pass
+
+
 # ── Session history ───────────────────────────────────────────────────────────
 
 def save_session(user_id: str, access_token: str, session_data: dict) -> None:

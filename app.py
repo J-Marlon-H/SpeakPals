@@ -14,6 +14,7 @@ pages = [
     st.Page("pages/scene_select.py", title="Scene Select", visibility="hidden"),
     st.Page("pages/lesson.py",       title="Lesson",       visibility="hidden"),
     st.Page("pages/feedback.py",     title="Feedback",     visibility="hidden"),
+    st.Page("pages/onboarding.py",   title="Onboarding",   visibility="hidden"),
 ]
 pg = st.navigation(pages, position="hidden")
 pg.run()
