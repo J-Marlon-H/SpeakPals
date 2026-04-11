@@ -626,7 +626,7 @@ with tab_latest:
                 for k in LESSON_STATE_KEYS:
                     st.session_state.pop(k, None)
                 st.session_state["selected_scene"] = _sk0
-                st.switch_page("app.py")
+                st.switch_page("pages/lesson.py")
         with _col_b:
             _next_lbl = f"Next: {_next_sc['title']} →" if _next_sc else "Browse scenes →"
             if st.button(_next_lbl, use_container_width=True, key="momentum_next"):
@@ -634,7 +634,7 @@ with tab_latest:
                     st.session_state.pop(k, None)
                 if _next_sc:
                     st.session_state["selected_scene"] = _next_sc["key"]
-                    st.switch_page("app.py")
+                    st.switch_page("pages/lesson.py")
                 else:
                     st.switch_page("pages/scene_select.py")
     else:
@@ -667,7 +667,7 @@ st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
 _nav1, _nav2 = st.columns(2)
 with _nav1:
     if st.button("← Back to lesson", use_container_width=True):
-        st.switch_page("app.py")
+        st.switch_page("pages/lesson.py")
 with _nav2:
     if st.button("🏠 Home", use_container_width=True):
         st.switch_page("pages/home.py")

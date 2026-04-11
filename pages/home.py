@@ -219,7 +219,7 @@ for lvl in levels_with_scenes:
                 st.session_state["selected_scene"] = scene["key"]
                 for k in LESSON_STATE_KEYS:
                     st.session_state.pop(k, None)
-                st.switch_page("app.py")
+                st.switch_page("pages/lesson.py")
             st.markdown(
                 f"<div class='scene-desc'>{scene['desc']}</div>",
                 unsafe_allow_html=True,
