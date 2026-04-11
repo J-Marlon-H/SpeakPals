@@ -178,20 +178,13 @@ def _valid_token(chat_id: int) -> dict | None:
 
 # ── Calendar API ──────────────────────────────────────────────────────────────
 
-def get_upcoming_events(chat_id: int, days: int = 7) -> list[str]:
-    """
-    Fetch the next `days` days of events from the user's primary calendar.
-    Returns a list of human-readable strings like:
-      "Monday Apr 14 at 10:00 — Team standup"
-    Returns an empty list if not connected or on error.
-    """
+def _fetch_raw_items(chat_id: int, days: int = 7) -> list[dict]:
+    """Fetch raw event items from Google Calendar API. Returns [] on any error."""
     token = _valid_token(chat_id)
     if not token:
         return []
-
     now   = datetime.now(timezone.utc)
     until = now + timedelta(days=days)
-
     try:
         r = requests.get(
             f"{CALENDAR_API}/calendars/primary/events",
@@ -206,27 +199,39 @@ def get_upcoming_events(chat_id: int, days: int = 7) -> list[str]:
             timeout=15,
         )
         r.raise_for_status()
+        return r.json().get("items", [])
     except Exception as e:
         log.warning("Calendar fetch failed for %s: %s", chat_id, e)
         return []
 
-    events = []
-    for item in r.json().get("items", []):
-        title = item.get("summary", "Untitled event")
-        start = item.get("start", {})
-        dt_str = start.get("dateTime") or start.get("date", "")
-        try:
-            if "T" in dt_str:
-                dt = datetime.fromisoformat(dt_str)
-                label = dt.strftime("%A %b %-d at %H:%M")
-            else:
-                dt = datetime.fromisoformat(dt_str)
-                label = dt.strftime("%A %b %-d (all day)")
-        except Exception:
-            label = dt_str
-        events.append(f"{label} — {title}")
 
-    return events
+def _format_item(item: dict) -> tuple[str, str]:
+    """Return (date_label, title) for a raw calendar item."""
+    title  = item.get("summary", "Untitled event")
+    start  = item.get("start", {})
+    dt_str = start.get("dateTime") or start.get("date", "")
+    try:
+        dt = datetime.fromisoformat(dt_str)
+        label = dt.strftime("%A %b %-d at %H:%M") if "T" in dt_str \
+                else dt.strftime("%A %b %-d (all day)")
+    except Exception:
+        label = dt_str
+    return label, title
+
+
+def get_upcoming_events(chat_id: int, days: int = 7) -> list[str]:
+    """Return human-readable event strings: 'Monday Apr 14 at 10:00 — Team standup'"""
+    return [f"{label} — {title}"
+            for label, title in (_format_item(i) for i in _fetch_raw_items(chat_id, days))]
+
+
+def get_upcoming_events_raw(chat_id: int, days: int = 7) -> list[dict]:
+    """Return list of dicts with 'title' and 'date_label' for scene generation."""
+    result = []
+    for item in _fetch_raw_items(chat_id, days):
+        label, title = _format_item(item)
+        result.append({"title": title, "date_label": label})
+    return result
 
 
 def is_connected(chat_id: int) -> bool:

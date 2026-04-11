@@ -185,9 +185,16 @@ def _bg_lang_keyboard() -> InlineKeyboardMarkup:
     ])
 
 
-def _scene_keyboard(level: str) -> InlineKeyboardMarkup:
-    scenes = [s for s in SCENE_CATALOG if s["level"] == level] or SCENE_CATALOG
+def _scene_keyboard(level: str, cal_events: list[dict] | None = None) -> InlineKeyboardMarkup:
     rows = []
+    # Calendar-based scenes at the top (max 3 to keep keyboard tidy)
+    if cal_events:
+        for ev in cal_events[:3]:
+            label = f"📅 {ev['title']}"
+            # Telegram callback_data max 64 bytes — truncate title if needed
+            key = ev["title"][:50]
+            rows.append([InlineKeyboardButton(label, callback_data=f"cal_scene:{key}")])
+    scenes = [s for s in SCENE_CATALOG if s["level"] == level] or SCENE_CATALOG
     for i in range(0, len(scenes), 2):
         rows.append([
             InlineKeyboardButton(s["title"], callback_data=f"scene:{s['key']}")
@@ -205,10 +212,12 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if user["name"] and not user.get("setup_step"):
         level_labels = {"A1": "Beginner", "A2": "Elementary",
                         "B1": "Intermediate", "B2": "Upper Intermediate"}
+        cal_status = "✅ connected" if gcal.is_connected(chat_id) else "not connected — use /calendar to link it"
         await update.message.reply_text(
             f"Velkommen tilbage, *{user['name']}*! 👋\n"
             f"Level: *{user['level']} — {level_labels.get(user['level'], '')}*  |  "
-            f"Language: *{user['language']}*\n\n"
+            f"Language: *{user['language']}*\n"
+            f"📅 Calendar: {cal_status}\n\n"
             "Use /scene to start a conversation, or just send me a message to continue.",
             parse_mode="Markdown",
         )
@@ -230,6 +239,8 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             "/calendar — connect Google Calendar\n"
             "/reset    — start over with a new profile\n"
             "/help     — show this again\n\n"
+            "💡 *Tip:* Use /calendar to connect your Google Calendar — "
+            "your tutor will use your upcoming events as conversation topics!\n\n"
             "Let's get you set up. What's your name?",
             parse_mode="Markdown",
         )
@@ -241,9 +252,16 @@ async def cmd_scene(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if not user["name"] or user.get("setup_step"):
         await update.message.reply_text("Please finish setup first — use /start.")
         return
+    loop = asyncio.get_running_loop()
+    cal_events = await loop.run_in_executor(
+        _executor, lambda: gcal.get_upcoming_events_raw(chat_id)
+    )
+    intro = "Choose a scene to practise:"
+    if cal_events:
+        intro = "Choose a scene — or pick one of your upcoming events at the top 📅:"
     await update.message.reply_text(
-        "Choose a scene to practise:",
-        reply_markup=_scene_keyboard(user["level"]),
+        intro,
+        reply_markup=_scene_keyboard(user["level"], cal_events),
     )
 
 
@@ -271,8 +289,11 @@ async def cmd_stop(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     else:
         corrections = "_No corrections — great work!_ 🎉"
 
-    scene = next((s for s in SCENE_CATALOG if s["key"] == user.get("scene_key")), None)
-    scene_title = scene["title"] if scene else "—"
+    if user.get("scene_key") == "custom" and user.get("custom_scene"):
+        scene_title = user["custom_scene"].get("title", "Custom scene") + " 📅"
+    else:
+        scene = next((s for s in SCENE_CATALOG if s["key"] == user.get("scene_key")), None)
+        scene_title = scene["title"] if scene else "—"
 
     await update.message.reply_text(
         f"*Lesson complete!* 📋\n\n"
@@ -538,7 +559,7 @@ async def callback_handler(
         if not scene:
             await query.edit_message_text("Scene not found.")
             return
-        user.update({"scene_key": value, "chat": [], "turn_count": 0,
+        user.update({"scene_key": value, "custom_scene": None, "chat": [], "turn_count": 0,
                      "correct_log": [], "coaching_log": []})
         save_user(chat_id, user)
         await query.edit_message_text(
@@ -548,17 +569,95 @@ async def callback_handler(
             parse_mode="Markdown",
         )
 
+    elif action == "cal_scene":
+        # value is the event title (truncated to 50 chars)
+        event_title = value
+        await query.edit_message_text(
+            f"📅 Generating a scene for *{event_title}*…",
+            parse_mode="Markdown",
+        )
+        # Find matching raw event to get date label
+        loop = asyncio.get_running_loop()
+        raw_events = await loop.run_in_executor(
+            _executor, lambda: gcal.get_upcoming_events_raw(chat_id)
+        )
+        match = next((e for e in raw_events if e["title"].startswith(event_title)), None)
+        date_label = match["date_label"] if match else ""
+        try:
+            generated = await loop.run_in_executor(
+                _executor,
+                lambda: _generate_scene_sync(event_title, date_label, user["language"]),
+            )
+        except Exception:
+            log.exception("Scene generation failed for %s", chat_id)
+            await query.edit_message_text(
+                "⚠️ Couldn't generate a scene for that event. Try a regular scene instead."
+            )
+            return
+        user.update({
+            "scene_key":    "custom",
+            "custom_scene": generated,
+            "chat": [], "turn_count": 0, "correct_log": [], "coaching_log": [],
+        })
+        save_user(chat_id, user)
+        await query.edit_message_text(
+            f"*{generated.get('title', event_title)}* 📅🎬\n"
+            f"_{generated.get('desc', '')}_\n\n"
+            f"{generated.get('char_name', 'Character')} is ready. Start speaking!\n"
+            "_(Send a text message or voice note)_",
+            parse_mode="Markdown",
+        )
+
+
+# ── Calendar scene generation ─────────────────────────────────────────────────
+
+def _generate_scene_sync(event_title: str, date_label: str, language: str) -> dict:
+    """Call Claude to generate a scene dict from a calendar event."""
+    prompt = (
+        f"A language learner is practising {language}. "
+        f"They have an upcoming event: '{event_title}' on {date_label}. "
+        "Generate a short roleplay scene they can practise to prepare for it.\n\n"
+        "Respond with ONLY a JSON object on one line with these fields:\n"
+        '  "title": short scene title (max 5 words)\n'
+        '  "desc": one sentence describing what the student practises\n'
+        '  "char_name": name/role of the character (e.g. "Colleague", "Doctor", "Host")\n'
+        '  "scene_description": 1–2 sentence scene-setting description for the AI tutor '
+        "(describe the setting and character's role/mood — this becomes the system prompt scene)\n\n"
+        "Keep it realistic and directly relevant to the event."
+    )
+    sess = get_session()
+    resp = sess.post(
+        "https://api.anthropic.com/v1/messages",
+        headers={"x-api-key": CLAUDE_KEY, "anthropic-version": "2023-06-01",
+                 "Content-Type": "application/json"},
+        json={"model": "claude-haiku-4-5-20251001", "max_tokens": 300, "temperature": 0.7,
+              "messages": [{"role": "user", "content": prompt}]},
+        timeout=20,
+    )
+    resp.raise_for_status()
+    text = resp.json()["content"][0]["text"].strip()
+    # Strip markdown code fences if present
+    if text.startswith("```"):
+        text = text.split("```")[1]
+        if text.startswith("json"):
+            text = text[4:]
+    return json.loads(text.strip())
+
 
 # ── Pipeline helpers ──────────────────────────────────────────────────────────
 
 def _build_context(user: dict, chat_id: int) -> tuple[str, str, str, str, str]:
     """Return (system_prompt, voice_id, char_voice_id, lang_code, model)."""
-    scene  = next((s for s in SCENE_CATALOG if s["key"] == user["scene_key"]), None)
+    if user.get("scene_key") == "custom" and user.get("custom_scene"):
+        scene_description = user["custom_scene"].get("scene_description", "")
+    else:
+        scene = next((s for s in SCENE_CATALOG if s["key"] == user.get("scene_key")), None)
+        scene_description = scene["scene_description"] if scene else ""
     events = gcal.get_upcoming_events(chat_id)
     system = build_system_prompt(
         user["name"], user["level"], user["bg_lang"],
         target_lang=user["language"],
-        scene_description=scene["scene_description"] if scene else "",
+        scene_description=scene_description,
         turn_count=user.get("turn_count", 0),
         calendar_events=events or None,
     )
