@@ -122,7 +122,8 @@ def get_tutor_name(target_lang: str) -> str:
 def build_system_prompt(name: str, level: str, bg_lang: str,
                         target_lang: str = "Danish",
                         scene_description: str = "",
-                        turn_count: int = 0) -> str:
+                        turn_count: int = 0,
+                        calendar_events: list[str] | None = None) -> str:
     tutor_name = _TUTOR_NAME.get(target_lang, "Alex")
     tutor_persona = _TUTOR_PERSONA.get(target_lang, "warm and patient")
     lang_display = _LANG_DISPLAY.get(target_lang, target_lang)
@@ -138,6 +139,16 @@ def build_system_prompt(name: str, level: str, bg_lang: str,
         prompt = base + f"\n\n## Student's native language background: {bg_lang}\n{profile}"
     except FileNotFoundError:
         prompt = base
+
+    if calendar_events:
+        lines = "\n".join(f"  - {e}" for e in calendar_events)
+        prompt += (
+            f"\n\n## {name}'s upcoming calendar events (next 7 days)\n"
+            f"{lines}\n"
+            "Use these naturally as conversation topics when relevant — "
+            "ask about them, build vocabulary around them, weave them into the scene. "
+            "Do not list them all at once; bring them up organically."
+        )
 
     if scene_description:
         prompt += _SCENE_BLOCK.format(

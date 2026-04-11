@@ -53,6 +53,7 @@ from pipeline import (
     tts_chunk,
 )
 from prompts import build_system_prompt, get_tutor_name
+import gcal
 
 # ── Setup ─────────────────────────────────────────────────────────────────────
 
@@ -223,11 +224,12 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             "3️⃣ Your tutor plays the character and gently corrects mistakes along the way\n"
             "4️⃣ Use /stop at any time to end the lesson and see a corrections summary\n\n"
             "*Commands:*\n"
-            "/scene — pick a scene\n"
-            "/level — change your level\n"
-            "/stop  — end lesson & see feedback\n"
-            "/reset — start over with a new profile\n"
-            "/help  — show this again\n\n"
+            "/scene    — pick a scene\n"
+            "/level    — change your level\n"
+            "/stop     — end lesson & see feedback\n"
+            "/calendar — connect Google Calendar\n"
+            "/reset    — start over with a new profile\n"
+            "/help     — show this again\n\n"
             "Let's get you set up. What's your name?",
             parse_mode="Markdown",
         )
@@ -295,11 +297,13 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         "3️⃣ Your tutor plays the character and corrects mistakes gently\n"
         "4️⃣ Use /stop to end the lesson and see what to remember\n\n"
         "*Commands:*\n"
-        "/start — welcome & profile setup\n"
-        "/scene — pick or change your scene\n"
-        "/level — change your level (A1 → B2)\n"
-        "/stop  — end lesson & see corrections\n"
-        "/help  — show this message\n\n"
+        "/start               — welcome & profile setup\n"
+        "/scene               — pick or change your scene\n"
+        "/level               — change your level (A1 → B2)\n"
+        "/stop                — end lesson & see corrections\n"
+        "/calendar            — connect Google Calendar\n"
+        "/calendar\\_disconnect — remove calendar access\n"
+        "/help                — show this message\n\n"
         "*Tips:*\n"
         "• Voice notes are transcribed automatically — speak naturally\n"
         "• Your tutor echoes back what it heard before replying\n"
@@ -318,6 +322,102 @@ async def cmd_reset(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_text(
         "Profile cleared! Use /start to set up a new one."
     )
+
+
+async def cmd_calendar(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Start Google Calendar device-flow OAuth."""
+    chat_id = update.effective_chat.id
+
+    if gcal.is_connected(chat_id):
+        await update.message.reply_text(
+            "✅ Your Google Calendar is already connected.\n\n"
+            "Use /calendar\\_disconnect to remove access.",
+            parse_mode="Markdown",
+        )
+        return
+
+    try:
+        flow = gcal.start_device_flow()
+    except FileNotFoundError as e:
+        await update.message.reply_text(f"⚠️ {e}")
+        return
+    except Exception as e:
+        log.exception("Calendar device flow start failed")
+        await update.message.reply_text(f"⚠️ Could not start calendar login: {e}")
+        return
+
+    device_code  = flow["device_code"]
+    user_code    = flow["user_code"]
+    verify_url   = flow["verification_url"]
+    interval     = int(flow.get("interval", 5))
+    expires_in   = int(flow.get("expires_in", 1800))
+
+    await update.message.reply_text(
+        f"📅 *Connect Google Calendar*\n\n"
+        f"1. Open this URL on your phone or computer:\n{verify_url}\n\n"
+        f"2. Enter this code: `{user_code}`\n\n"
+        f"3. Sign in with Google and click *Allow*\n\n"
+        f"I'll automatically detect when you've approved it "
+        f"(checking for the next {expires_in // 60} minutes).",
+        parse_mode="Markdown",
+    )
+
+    # Poll in background — notify user when done
+    loop = asyncio.get_running_loop()
+
+    async def _poll():
+        try:
+            token = await loop.run_in_executor(
+                _executor,
+                lambda: gcal.poll_for_token(device_code, interval, expires_in),
+            )
+        except PermissionError:
+            await context.bot.send_message(
+                chat_id, "❌ Calendar access was denied. Use /calendar to try again."
+            )
+            return
+        except Exception:
+            log.exception("Calendar poll error for %s", chat_id)
+            await context.bot.send_message(
+                chat_id, "⚠️ Something went wrong while connecting calendar. Try /calendar again."
+            )
+            return
+
+        if token is None:
+            await context.bot.send_message(
+                chat_id,
+                "⏰ The login code expired before you approved it. Use /calendar to try again.",
+            )
+            return
+
+        gcal.save_token(chat_id, token)
+        events = gcal.get_upcoming_events(chat_id)
+        if events:
+            preview = "\n".join(f"  • {e}" for e in events[:5])
+            await context.bot.send_message(
+                chat_id,
+                f"✅ *Calendar connected!*\n\n"
+                f"Your upcoming events:\n{preview}\n\n"
+                "I'll weave these into your lessons as conversation topics.",
+                parse_mode="Markdown",
+            )
+        else:
+            await context.bot.send_message(
+                chat_id,
+                "✅ *Calendar connected!* No events found in the next 7 days, "
+                "but I'll check again at the start of each lesson.",
+                parse_mode="Markdown",
+            )
+
+    asyncio.create_task(_poll())
+
+
+async def cmd_calendar_disconnect(
+    update: Update, context: ContextTypes.DEFAULT_TYPE
+) -> None:
+    chat_id = update.effective_chat.id
+    gcal.revoke_token(chat_id)
+    await update.message.reply_text("🗓️ Calendar disconnected.")
 
 
 # ── Onboarding (text step) ────────────────────────────────────────────────────
@@ -451,15 +551,16 @@ async def callback_handler(
 
 # ── Pipeline helpers ──────────────────────────────────────────────────────────
 
-def _build_context(user: dict) -> tuple[str, str, str, str, str]:
+def _build_context(user: dict, chat_id: int) -> tuple[str, str, str, str, str]:
     """Return (system_prompt, voice_id, char_voice_id, lang_code, model)."""
-    scene         = next((s for s in SCENE_CATALOG if s["key"] == user["scene_key"]), None)
-    system        = build_system_prompt(
-        user["name"], user["level"],
-        date.today().strftime("%B %d, %Y"), user["bg_lang"],
+    scene  = next((s for s in SCENE_CATALOG if s["key"] == user["scene_key"]), None)
+    events = gcal.get_upcoming_events(chat_id)
+    system = build_system_prompt(
+        user["name"], user["level"], user["bg_lang"],
         target_lang=user["language"],
         scene_description=scene["scene_description"] if scene else "",
         turn_count=user.get("turn_count", 0),
+        calendar_events=events or None,
     )
     lang_voices   = VOICES_BY_LANG.get(user["language"], {})
     voice_id      = lang_voices.get(user["voice_label"]) or next(iter(lang_voices.values()))
@@ -541,7 +642,7 @@ async def _process_message(
         return
 
     loop = asyncio.get_running_loop()
-    system, voice_id, char_voice_id, lang_code, model = _build_context(user)
+    system, voice_id, char_voice_id, lang_code, model = _build_context(user, chat_id)
 
     # ── Step 1: Claude (show typing indicator while waiting) ──────────────────
     async def _keep_typing():
@@ -677,12 +778,14 @@ def build_app() -> Application:
             "TELEGRAM_BOT_TOKEN not set. Add it to keys.env and try again."
         )
     app = Application.builder().token(BOT_TOKEN).build()
-    app.add_handler(CommandHandler("start", cmd_start))
-    app.add_handler(CommandHandler("scene", cmd_scene))
-    app.add_handler(CommandHandler("level", cmd_level))
-    app.add_handler(CommandHandler("stop",  cmd_stop))
-    app.add_handler(CommandHandler("help",  cmd_help))
-    app.add_handler(CommandHandler("reset", cmd_reset))
+    app.add_handler(CommandHandler("start",                cmd_start))
+    app.add_handler(CommandHandler("scene",                cmd_scene))
+    app.add_handler(CommandHandler("level",                cmd_level))
+    app.add_handler(CommandHandler("stop",                 cmd_stop))
+    app.add_handler(CommandHandler("help",                 cmd_help))
+    app.add_handler(CommandHandler("reset",                cmd_reset))
+    app.add_handler(CommandHandler("calendar",             cmd_calendar))
+    app.add_handler(CommandHandler("calendar_disconnect",  cmd_calendar_disconnect))
     app.add_handler(CallbackQueryHandler(callback_handler))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, text_handler))
     app.add_handler(MessageHandler(filters.VOICE, voice_handler))
