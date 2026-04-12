@@ -30,12 +30,13 @@ def _start_telegram_bot():
 _start_telegram_bot()
 
 pages = [
-    st.Page("pages/home.py",         title="Home",         default=True),
-    st.Page("pages/login.py",        title="Login",        visibility="hidden"),
-    st.Page("pages/account.py",      title="Account",      visibility="hidden"),
-    st.Page("pages/scene_select.py", title="Scene Select", visibility="hidden"),
-    st.Page("pages/lesson.py",       title="Lesson",       visibility="hidden"),
-    st.Page("pages/feedback.py",     title="Feedback",     visibility="hidden"),
+    st.Page("pages/home.py",               title="Home",              default=True),
+    st.Page("pages/login.py",              title="Login",             visibility="hidden"),
+    st.Page("pages/account.py",            title="Account",           visibility="hidden"),
+    st.Page("pages/telegram_settings.py",  title="Telegram",          visibility="hidden"),
+    st.Page("pages/scene_select.py",       title="Scene Select",      visibility="hidden"),
+    st.Page("pages/lesson.py",             title="Lesson",            visibility="hidden"),
+    st.Page("pages/feedback.py",           title="Feedback",          visibility="hidden"),
 ]
 pg = st.navigation(pages, position="hidden")
 pg.run()

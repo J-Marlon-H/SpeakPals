@@ -236,7 +236,7 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if user["name"] and not user.get("setup_step"):
         level_labels = {"A1": "Beginner", "A2": "Elementary",
                         "B1": "Intermediate", "B2": "Upper Intermediate"}
-        cal_status = "✅ connected" if gcal.is_connected(chat_id) else "not connected — use /calendar to link it"
+        cal_status = "✅ connected" if gcal.is_connected(str(chat_id)) else "not connected — use /calendar to link it"
         await update.message.reply_text(
             f"Velkommen tilbage, *{user['name']}*! 👋\n"
             f"Level: *{user['level']} — {level_labels.get(user['level'], '')}*  |  "
@@ -278,7 +278,7 @@ async def cmd_scene(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         return
     loop = asyncio.get_running_loop()
     cal_events = await loop.run_in_executor(
-        _executor, lambda: gcal.get_upcoming_events_raw(chat_id)
+        _executor, lambda: gcal.get_upcoming_events_raw(str(chat_id))
     )
     intro = "Choose a scene to practise:"
     if cal_events:
@@ -373,7 +373,7 @@ async def cmd_calendar(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     """Start Google Calendar device-flow OAuth."""
     chat_id = update.effective_chat.id
 
-    if gcal.is_connected(chat_id):
+    if gcal.is_connected(str(chat_id)):
         await update.message.reply_text(
             "✅ Your Google Calendar is already connected.\n\n"
             "Use /calendar\\_disconnect to remove access.",
@@ -435,8 +435,8 @@ async def cmd_calendar(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
             )
             return
 
-        gcal.save_token(chat_id, token)
-        events = gcal.get_upcoming_events(chat_id)
+        gcal.save_token(str(chat_id), token)
+        events = gcal.get_upcoming_events(str(chat_id))
         if events:
             preview = "\n".join(f"  • {e}" for e in events[:5])
             await context.bot.send_message(
@@ -461,7 +461,7 @@ async def cmd_calendar_disconnect(
     update: Update, context: ContextTypes.DEFAULT_TYPE
 ) -> None:
     chat_id = update.effective_chat.id
-    gcal.revoke_token(chat_id)
+    gcal.revoke_token(str(chat_id))
     await update.message.reply_text("🗓️ Calendar disconnected.")
 
 
@@ -603,7 +603,7 @@ async def callback_handler(
         # Find matching raw event to get date label
         loop = asyncio.get_running_loop()
         raw_events = await loop.run_in_executor(
-            _executor, lambda: gcal.get_upcoming_events_raw(chat_id)
+            _executor, lambda: gcal.get_upcoming_events_raw(str(chat_id))
         )
         match = next((e for e in raw_events if e["title"].startswith(event_title)), None)
         date_label = match["date_label"] if match else ""
@@ -677,7 +677,7 @@ def _build_context(user: dict, chat_id: int) -> tuple[str, str, str, str, str]:
     else:
         scene = next((s for s in SCENE_CATALOG if s["key"] == user.get("scene_key")), None)
         scene_description = scene["scene_description"] if scene else ""
-    events = gcal.get_upcoming_events(chat_id)
+    events = gcal.get_upcoming_events(str(chat_id))
     system = build_system_prompt(
         user["name"], user["level"], user["bg_lang"],
         target_lang=user["language"],
