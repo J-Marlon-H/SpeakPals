@@ -78,18 +78,7 @@ st.markdown("""
 # ── Telegram bot section ───────────────────────────────────────────────────────
 st.markdown("<div class='sec-label'>Telegram Bot</div>", unsafe_allow_html=True)
 
-try:
-    import os
-    bot_enabled = st.secrets.get("TELEGRAM_BOT_ENABLED", "false").lower() == "true"
-    bot_token   = st.secrets.get("TELEGRAM_BOT_TOKEN") or os.getenv("TELEGRAM_BOT_TOKEN")
-except Exception:
-    import os
-    bot_enabled = os.getenv("TELEGRAM_BOT_ENABLED", "false").lower() == "true"
-    bot_token   = os.getenv("TELEGRAM_BOT_TOKEN")
 
-if bot_enabled and bot_token:
-    st.markdown("<div class='status-badge status-on'>● Bot is running</div>",
-                unsafe_allow_html=True)
 
 st.markdown("<br>", unsafe_allow_html=True)
 
@@ -111,9 +100,6 @@ st.markdown("""<div class='info-box'>
   • Send <b>text</b> if you prefer typing<br>
   • Use <code>/stop</code> after a scene to see what to remember
 </div>""", unsafe_allow_html=True)
-
-if bot_enabled and not bot_token:
-    st.warning("TELEGRAM_BOT_TOKEN is not set. Add it to your secrets.")
 
 st.markdown("<div class='sec-div'></div>", unsafe_allow_html=True)
 
