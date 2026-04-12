@@ -154,7 +154,7 @@ def load_user_synced(chat_id: int) -> dict:
                     if profile.get(key):
                         user[key] = profile[key]
             # Always refresh the knowledge profile from Supabase on /start
-            kp = load_knowledge_profile_for_bot(user["sb_user_id"])
+            kp = load_knowledge_profile_for_bot(chat_id)
             if kp:
                 user["knowledge_profile"] = kp
             save_user(chat_id, user)
@@ -438,7 +438,7 @@ async def cmd_link(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                 if profile.get(key):
                     user[key] = profile[key]
             user["setup_step"] = None  # skip onboarding if profile is complete
-        kp = load_knowledge_profile_for_bot(user_id)
+        kp = load_knowledge_profile_for_bot(chat_id)
         if kp:
             user["knowledge_profile"] = kp
     except Exception:
