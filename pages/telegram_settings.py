@@ -3,7 +3,7 @@ Telegram & Calendar settings page for SpeakPals.
 """
 import time
 import streamlit as st
-from db import require_auth
+from db import require_auth, create_link_code, get_telegram_link_status, unlink_telegram
 import gcal
 
 require_auth()
@@ -78,8 +78,6 @@ st.markdown("""
 # ── Telegram bot section ───────────────────────────────────────────────────────
 st.markdown("<div class='sec-label'>Telegram Bot</div>", unsafe_allow_html=True)
 
-
-
 st.markdown("<br>", unsafe_allow_html=True)
 
 st.markdown("""<div class='info-box'>
@@ -94,6 +92,7 @@ st.markdown("""<div class='info-box'>
   <code>/level</code> — change your level (A1 → B1)<br>
   <code>/stop</code> — end lesson &amp; see corrections<br>
   <code>/calendar</code> — connect Google Calendar<br>
+  <code>/link CODE</code> — link to your web account<br>
   <code>/reset</code> — start over with a new profile<br><br>
   <b>Tips</b><br>
   • Send a <b>voice note</b> to practise speaking — it's transcribed automatically<br>
@@ -103,12 +102,75 @@ st.markdown("""<div class='info-box'>
 
 st.markdown("<div class='sec-div'></div>", unsafe_allow_html=True)
 
+# ── Account link section ───────────────────────────────────────────────────────
+st.markdown("<div class='sec-label'>Link Account</div>", unsafe_allow_html=True)
+st.markdown("<br>", unsafe_allow_html=True)
+
+sb_user_id    = st.session_state.get("sb_user_id")
+sb_token      = st.session_state.get("sb_access_token")
+linked_chat   = get_telegram_link_status(sb_user_id, sb_token) if sb_user_id else None
+
+if linked_chat:
+    st.markdown(
+        "<div class='status-badge status-on'>● Telegram linked</div>",
+        unsafe_allow_html=True,
+    )
+    st.markdown(
+        f"<div style='font:400 12px Inter;color:rgba(17,24,39,.5);margin:8px 0 12px'>"
+        f"Chat ID: <code style='background:#f1f5f9;padding:1px 5px;border-radius:4px'>"
+        f"{linked_chat}</code> — your settings sync from this account to the bot.</div>",
+        unsafe_allow_html=True,
+    )
+    if st.button("Unlink Telegram account", use_container_width=True):
+        unlink_telegram(sb_user_id, sb_token)
+        st.rerun()
+else:
+    st.markdown(
+        "<div class='status-badge status-off'>○ Not linked</div>",
+        unsafe_allow_html=True,
+    )
+    st.markdown("<br>", unsafe_allow_html=True)
+    st.markdown("""<div class='info-box'>
+      Link your Telegram account so the bot uses your web settings (name, level,
+      language, voice) automatically. Generate a one-time code below, then send
+      it to the bot with <code>/link CODE</code>.
+    </div>""", unsafe_allow_html=True)
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    if "tg_link_code" in st.session_state:
+        code = st.session_state.tg_link_code
+        st.markdown(f"""<div class='info-box'>
+          <b>1.</b> Open the bot:
+          <a href='https://t.me/SpeakPalsBot' target='_blank'
+             style='color:#0d9488;font-weight:600'>t.me/SpeakPalsBot</a><br>
+          <b>2.</b> Send this command:
+          <div class='code-block'>/link {code}</div>
+          <span style='color:#6b7280;font-size:12px'>
+            This code expires in 10 minutes and can only be used once.
+          </span>
+        </div>""", unsafe_allow_html=True)
+        st.markdown("<br>", unsafe_allow_html=True)
+        if st.button("Generate a new code", use_container_width=True):
+            new_code = create_link_code(sb_user_id, sb_token)
+            if new_code:
+                st.session_state.tg_link_code = new_code
+            st.rerun()
+    else:
+        if st.button("Generate link code", use_container_width=True):
+            code = create_link_code(sb_user_id, sb_token)
+            if code:
+                st.session_state.tg_link_code = code
+                st.rerun()
+            else:
+                st.error("Could not generate code. Please try again.")
+
+st.markdown("<div class='sec-div'></div>", unsafe_allow_html=True)
+
 # ── Google Calendar section ────────────────────────────────────────────────────
 st.markdown("<div class='sec-label'>Google Calendar</div>", unsafe_allow_html=True)
 
 # user_key for web app: "web_{sb_user_id}"
-sb_user_id = st.session_state.get("sb_user_id")
-user_key   = f"web_{sb_user_id}" if sb_user_id else None
+user_key = f"web_{sb_user_id}" if sb_user_id else None
 
 cal_connected = gcal.is_connected(user_key) if user_key else False
 

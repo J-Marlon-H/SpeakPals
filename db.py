@@ -130,6 +130,77 @@ def upsert_profile(user_id: str, access_token: str, data: dict) -> None:
         pass
 
 
+# ── Telegram account linking ─────────────────────────────────────────────────
+
+def create_link_code(user_id: str, access_token: str) -> str | None:
+    """Generate a 6-char link code valid for 10 minutes. Returns the code."""
+    import secrets, string
+    code = ''.join(secrets.choice(string.ascii_uppercase + string.digits) for _ in range(6))
+    try:
+        c = _client(access_token)
+        c.table("telegram_link_codes").delete().eq("user_id", user_id).execute()
+        c.table("telegram_link_codes").insert({"code": code, "user_id": user_id}).execute()
+        return code
+    except Exception:
+        return None
+
+
+def consume_link_code(code: str, chat_id: int) -> str | None:
+    """Atomically validate the code and write chat_id to the user row.
+    Returns user_id on success, None if the code is invalid/expired.
+    Calls the link_telegram_account RPC (SECURITY DEFINER — no JWT needed)."""
+    try:
+        res = (_client()
+               .rpc("link_telegram_account", {"p_code": code.upper(), "p_chat_id": chat_id})
+               .execute())
+        uid = res.data
+        return str(uid) if uid else None
+    except Exception:
+        return None
+
+
+def get_telegram_profile(chat_id: int) -> dict:
+    """Return the user profile keyed by plain DB column names (name, level, …).
+    Uses the get_telegram_profile RPC (SECURITY DEFINER — no JWT needed).
+    Returns {} when the chat_id is not linked."""
+    try:
+        res = (_client()
+               .rpc("get_telegram_profile", {"p_chat_id": chat_id})
+               .execute())
+        rows = res.data or []
+        return dict(rows[0]) if rows else {}
+    except Exception:
+        return {}
+
+
+def get_telegram_link_status(user_id: str, access_token: str) -> int | None:
+    """Return the linked telegram_chat_id for this user, or None if not linked."""
+    try:
+        res = (_client(access_token)
+               .table("users")
+               .select("telegram_chat_id")
+               .eq("id", user_id)
+               .single()
+               .execute())
+        if res and res.data:
+            return res.data.get("telegram_chat_id")
+        return None
+    except Exception:
+        return None
+
+
+def unlink_telegram(user_id: str, access_token: str) -> None:
+    """Remove the telegram_chat_id from the user's account."""
+    try:
+        (_client(access_token)
+         .table("users")
+         .update({"telegram_chat_id": None})
+         .eq("id", user_id)
+         .execute())
+    except Exception:
+        pass
+
+
 # ── Session history ───────────────────────────────────────────────────────────
 
 def save_session(user_id: str, access_token: str, session_data: dict) -> None:
