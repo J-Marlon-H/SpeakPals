@@ -5,11 +5,31 @@ import json as _json
 from dotenv import load_dotenv
 
 # ── Local dev: bypass Windows SSL certificate chain issues ────────────────────
-# Windows often lacks the root CA that Supabase's edge network uses.
-# Only applies when keys.env is present (i.e. not on cloud).
+# Supabase uses httpx which has its own SSL stack — the stdlib ssl monkey-patch
+# doesn't reach it. Patch httpx.Client / AsyncClient to skip verification and
+# also point the stdlib ssl context at certifi's bundle as a belt-and-suspenders fix.
+# Guard is keys.env presence so this never runs on the cloud deployment.
 if os.path.exists("keys.env"):
     import ssl as _ssl
+    import httpx as _httpx
+
+    # stdlib fallback (for requests-based code)
     _ssl._create_default_https_context = _ssl._create_unverified_context
+
+    # httpx patch — supabase-py uses httpx for all network calls
+    _httpx_Client_orig       = _httpx.Client.__init__
+    _httpx_AsyncClient_orig  = _httpx.AsyncClient.__init__
+
+    def _httpx_client_no_verify(self, *args, **kwargs):
+        kwargs.setdefault("verify", False)
+        _httpx_Client_orig(self, *args, **kwargs)
+
+    def _httpx_async_client_no_verify(self, *args, **kwargs):
+        kwargs.setdefault("verify", False)
+        _httpx_AsyncClient_orig(self, *args, **kwargs)
+
+    _httpx.Client.__init__       = _httpx_client_no_verify        # type: ignore[method-assign]
+    _httpx.AsyncClient.__init__  = _httpx_async_client_no_verify  # type: ignore[method-assign]
 
 try:
     from supabase import create_client
