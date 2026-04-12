@@ -208,7 +208,8 @@ def build_system_prompt(name: str, level: str, bg_lang: str,
                         scene_description: str = "",
                         turn_count: int = 0,
                         knowledge_profile: dict | None = None,
-                        free_conv: bool = False) -> str:
+                        free_conv: bool = False,
+                        calendar_events: list[str] | None = None) -> str:
     tutor_name = "Tutor" if free_conv else _TUTOR_NAME.get(target_lang, "Alex")
     tutor_persona = _TUTOR_PERSONA.get(target_lang, "warm and patient")
     lang_display = _LANG_DISPLAY.get(target_lang, target_lang)
@@ -239,6 +240,16 @@ def build_system_prompt(name: str, level: str, bg_lang: str,
                     content = _decay_conv_history(content)
                 lines.append(f"**{heading}**: {content}")
             prompt += "\n".join(lines)
+
+    if calendar_events:
+        cal_lines = "\n".join(f"  - {e}" for e in calendar_events)
+        prompt += (
+            f"\n\n## {name}'s upcoming calendar events (next 7 days)\n"
+            f"{cal_lines}\n"
+            "Use these naturally as conversation topics when relevant — "
+            "ask about them, build vocabulary around them, weave them into the scene. "
+            "Do not list them all at once; bring them up organically."
+        )
 
     if free_conv:
         prompt += _FREE_CONV_BLOCK.format(

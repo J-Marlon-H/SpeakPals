@@ -8,6 +8,11 @@ keys.env
 .env
 *.env
 
+# Google OAuth credentials (contain client secrets)
+google_credentials.json
+client_secret_*.json
+telegram_users/
+
 # Python cache
 __pycache__/
 *.pyc

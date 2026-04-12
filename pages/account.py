@@ -179,6 +179,14 @@ with col_ob:
 
 st.markdown("<div class='sec-div'></div>", unsafe_allow_html=True)
 
+# ── Integrations ───────────────────────────────────────────────────────────────
+st.markdown("<div class='sec-label'>Integrations</div>", unsafe_allow_html=True)
+
+if st.button("✈ Telegram & Calendar settings", use_container_width=True):
+    st.switch_page("pages/telegram_settings.py")
+
+st.markdown("<div class='sec-div'></div>", unsafe_allow_html=True)
+
 # ── Session ────────────────────────────────────────────────────────────────────
 st.markdown("<div class='sec-label'>Session</div>", unsafe_allow_html=True)
 
