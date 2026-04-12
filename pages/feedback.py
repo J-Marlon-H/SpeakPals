@@ -2,24 +2,18 @@ import streamlit as st
 import streamlit.components.v1 as components
 import datetime
 import base64
-import os
 from dotenv import load_dotenv
 from pipeline import (SCENE_CATALOG, LESSON_STATE_KEYS, VOICES, SETTINGS_DEFAULTS,
                       generate_language_tip, extract_vocabulary, tts_chunk)
 import json as _json
 from concurrent.futures import ThreadPoolExecutor
-from db import require_auth, save_session, load_sessions, load_knowledge_profile, save_knowledge_profile
+from db import (require_auth, save_session, load_sessions, load_knowledge_profile,
+                save_knowledge_profile, _secret)
 from profile import update_knowledge_profile
 
 require_auth()
 
 load_dotenv("keys.env")
-
-def _secret(key):
-    try:
-        return st.secrets[key]
-    except Exception:
-        return os.getenv(key)
 
 CLAUDE_KEY  = _secret("CLAUDE_API_KEY")
 ELEVEN_KEY  = _secret("ELEVENLABS_API_KEY")

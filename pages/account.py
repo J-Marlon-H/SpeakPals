@@ -1,5 +1,6 @@
 import streamlit as st
-from pipeline import VOICES, VOICES_BY_LANG, MODELS, LESSON_STATE_KEYS, SCENE_CATALOG, SETTINGS_DEFAULTS
+from pipeline import (VOICES, VOICES_BY_LANG, MODELS, LESSON_STATE_KEYS, SCENE_CATALOG,
+                      SETTINGS_DEFAULTS, SCENE_PRIMARY_VOICE)
 from db import require_auth, upsert_profile, load_profile, load_knowledge_profile, get_user_email
 
 require_auth()
@@ -118,25 +119,6 @@ voice_label = st.selectbox(
     index=voice_keys.index(saved_voice) if saved_voice in voice_keys else 0
 )
 
-# Scene primary voices mapped per language label
-SCENE_PRIMARY_VOICE = {
-    "Danish": {
-        "meet_a_friend": "Søren — male, calm",
-        "cafe":          "Camilla — female",
-        "supermarket":   "Camilla — female",
-        "flower_store":  "Søren — male, calm",
-        "bakery":        "Camilla — female",
-        "restaurant":    "Mathias — male baritone",
-    },
-    "Portuguese (Brazilian)": {
-        "meet_a_friend": "Flavio — male, calm",
-        "cafe":          "Camila — female",
-        "supermarket":   "Camila — female",
-        "flower_store":  "Flavio — male, calm",
-        "bakery":        "Camila — female",
-        "restaurant":    "Matheus — male baritone",
-    },
-}
 scene_primary = SCENE_PRIMARY_VOICE.get(language, SCENE_PRIMARY_VOICE["Danish"])
 affected = [
     s["title"] for s in SCENE_CATALOG
@@ -229,39 +211,146 @@ if st.button("Sign out", use_container_width=True):
 
 st.markdown("<div class='sec-div'></div>", unsafe_allow_html=True)
 st.markdown("<div class='sec-label'>Your Learning Profile</div>", unsafe_allow_html=True)
-st.markdown(
-    "<div style='font:400 12px Inter;color:rgba(17,24,39,.5);margin-bottom:14px'>"
-    "What SpeakPals has learned about you across sessions.</div>",
-    unsafe_allow_html=True,
-)
 
+st.markdown("""
+<div style='background:linear-gradient(135deg,rgba(13,148,136,.08),rgba(13,148,136,.03));
+            border:1px solid rgba(13,148,136,.22);border-radius:14px;
+            padding:16px 18px;margin-bottom:20px'>
+  <div style='font:700 13px Inter;color:#0d9488;margin-bottom:6px'>
+    🧠 Your tutor remembers you
+  </div>
+  <div style='font:400 13px/1.65 Inter;color:rgba(17,24,39,.65)'>
+    Every session, SpeakPals builds a richer picture of who you are and how you learn.
+    Below is <strong>everything we store about you</strong> — fully transparent, always
+    up to date. The more you practise, the more personalised your experience becomes.
+  </div>
+</div>""", unsafe_allow_html=True)
+
+# ── Add expander card styles ────────────────────────────────────────────────────
+st.markdown("""<style>
+  /* Profile expander cards */
+  [data-testid="stExpander"]{
+    border:1px solid rgba(17,24,39,.1)!important;
+    border-radius:12px!important;
+    overflow:hidden!important;
+    margin-bottom:8px!important;
+    background:#ffffff!important;
+    box-shadow:0 1px 4px rgba(17,24,39,.05)!important;
+    transition:box-shadow .18s ease!important}
+  [data-testid="stExpander"]:hover{
+    box-shadow:0 3px 12px rgba(13,148,136,.12)!important;
+    border-color:rgba(13,148,136,.25)!important}
+  [data-testid="stExpander"] summary{
+    padding:14px 16px!important;
+    font:600 13px Inter,sans-serif!important;
+    color:#111827!important}
+  [data-testid="stExpander"] summary:hover{
+    background:rgba(13,148,136,.04)!important}
+  [data-testid="stExpanderDetails"]{
+    padding:0 16px 16px!important;
+    border-top:1px solid rgba(17,24,39,.07)!important}
+</style>""", unsafe_allow_html=True)
+
+# ── Always-shown category definitions ──────────────────────────────────────────
 if "sb_user_id" in st.session_state:
     _kp = load_knowledge_profile(st.session_state.sb_user_id, st.session_state.sb_access_token)
 else:
     _kp = {}
 
-if not _kp:
+_CATEGORIES = [
+    (
+        "language_level",
+        "📊", "Language Level",
+        "Your current proficiency in the target language — what vocabulary and grammar you've mastered, where you struggle, and how your level is progressing over time.",
+    ),
+    (
+        "learning_motivation",
+        "🎯", "Learning Motivation",
+        "Why you're learning this language. Your personal goals, dreams, and the stories behind them — this shapes what topics your tutor brings up.",
+    ),
+    (
+        "personal_use_context",
+        "🌍", "Where You'll Use It",
+        "The real-life situations where you need the language — at work, with a partner, travelling, living abroad, or daily errands. Your tutor picks scenarios relevant to your life.",
+    ),
+    (
+        "common_errors",
+        "🔍", "Errors & Patterns",
+        "Mistakes and habits your tutor has noticed across sessions — wrong words, grammar slips, a tendency to fall back on English. Tracked silently so your tutor can gently correct them.",
+    ),
+    (
+        "conversation_history",
+        "💬", "Conversation History",
+        "A running diary of what we've covered together — scenes practised, topics discussed, moments worth remembering. Your tutor uses this to pick up where you left off.",
+    ),
+    (
+        "personal_facts",
+        "👤", "Personal Facts",
+        "Facts you've shared about yourself — where you live, your job, people in your life. Your tutor uses these to make conversations feel natural and personal to you.",
+    ),
+    (
+        "tutor_observations",
+        "💡", "Tutor Observations",
+        "Anything else your tutor has noticed that doesn't fit the other categories — your learning style, confidence patterns, moments of breakthrough or frustration, curiosity spikes, pacing preferences, and more.",
+    ),
+]
+
+for _key, _icon, _label, _desc in _CATEGORIES:
+    _val     = _kp.get(_key, {})
+    _content = (_val.get("content", "") if isinstance(_val, dict) else str(_val)).strip()
+    _ts      = (_val.get("updated_at", "") if isinstance(_val, dict) else "")
+    _filled  = bool(_content)
+
+    if _filled and _ts:
+        _status = f"Updated {_ts[:10]}"
+        _dot    = "🟢"
+    elif _filled:
+        _status = "Updated"
+        _dot    = "🟢"
+    else:
+        _status = "Not yet filled"
+        _dot    = "⚪"
+
+    _exp_label = f"{_icon} **{_label}** &nbsp; {_dot} *{_status}*"
+
+    with st.expander(_exp_label, expanded=False):
+        st.markdown(
+            f"<div style='font:400 12px/1.6 Inter;color:rgba(17,24,39,.5);"
+            f"margin:10px 0 14px;font-style:italic'>{_desc}</div>",
+            unsafe_allow_html=True,
+        )
+        if _filled:
+            st.markdown(
+                f"<div style='font:400 13px/1.7 Inter;color:#111827;"
+                f"white-space:pre-wrap'>{_content}</div>",
+                unsafe_allow_html=True,
+            )
+        else:
+            st.markdown(
+                "<div style='font:400 13px Inter;color:rgba(17,24,39,.35);"
+                "font-style:italic;padding:4px 0'>"
+                "Nothing recorded yet — this fills up as you practise and chat with your tutor."
+                "</div>",
+                unsafe_allow_html=True,
+            )
+
+# ── Any AI-added custom categories not in the predefined list ──────────────────
+_known_keys = {c[0] for c in _CATEGORIES}
+_custom     = {k: v for k, v in _kp.items() if k not in _known_keys}
+if _custom:
     st.markdown(
-        "<div style='font:400 13px Inter;color:rgba(17,24,39,.4);padding:10px 0'>"
-        "No profile yet — complete a lesson to start building your profile.</div>",
+        "<div style='font:700 10px Inter;letter-spacing:2px;text-transform:uppercase;"
+        "color:rgba(17,24,39,.3);margin:18px 0 8px'>Also noted by your tutor</div>",
         unsafe_allow_html=True,
     )
-else:
-    _LABEL = {
-        "language_level":        "Language Level",
-        "learning_motivation":   "Learning Motivation",
-        "personal_use_context":  "Where You'll Use It",
-        "common_errors":         "Common Errors & Patterns",
-        "conversation_history":  "Conversation History",
-        "personal_facts":        "Personal Facts",
-    }
-    for _key, _val in _kp.items():
-        _label   = _LABEL.get(_key, _key.replace("_", " ").title())
-        _content = _val.get("content", "") if isinstance(_val, dict) else str(_val)
-        _ts      = _val.get("updated_at", "") if isinstance(_val, dict) else ""
-        _header  = f"**{_label}**" + (f"  ·  *{_ts[:10]}*" if _ts else "")
-        with st.expander(_header, expanded=True):
+    for _key, _val in _custom.items():
+        _label   = _key.replace("_", " ").title()
+        _content = (_val.get("content", "") if isinstance(_val, dict) else str(_val)).strip()
+        _ts      = (_val.get("updated_at", "") if isinstance(_val, dict) else "")
+        _exp_label = f"✨ **{_label}**" + (f"  ·  *{_ts[:10]}*" if _ts else "")
+        with st.expander(_exp_label, expanded=False):
             st.markdown(
-                f"<div style='font:400 13px/1.6 Inter;color:#111827'>{_content or '—'}</div>",
+                f"<div style='font:400 13px/1.7 Inter;color:#111827;"
+                f"white-space:pre-wrap'>{_content or '—'}</div>",
                 unsafe_allow_html=True,
             )

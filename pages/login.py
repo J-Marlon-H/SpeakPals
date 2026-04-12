@@ -23,12 +23,12 @@ st.markdown("""<style>
     border-color:#0d9488!important;
     box-shadow:0 0 0 3px rgba(13,148,136,.1)!important}
 
-  .stButton button{
+  .stButton button, .stFormSubmitButton button{
     border-radius:10px!important;font-weight:600!important;font-size:14px!important;
     border:1px solid rgba(13,148,136,.3)!important;
     background:rgba(13,148,136,.1)!important;color:#0d9488!important;
     transition:background .2s}
-  .stButton button:hover{background:rgba(13,148,136,.2)!important}
+  .stButton button:hover, .stFormSubmitButton button:hover{background:rgba(13,148,136,.2)!important}
   div[data-testid="stVerticalBlock"]{gap:0.4rem!important}
 </style>""", unsafe_allow_html=True)
 
@@ -44,10 +44,13 @@ st.markdown("""
 </div>""", unsafe_allow_html=True)
 
 # ── Sign in form ──────────────────────────────────────────────────────────────
-email_in    = st.text_input("Email", key="login_email", placeholder="you@example.com")
-password_in = st.text_input("Password", key="login_pw", type="password", placeholder="••••••••")
-st.markdown("<div style='height:4px'></div>", unsafe_allow_html=True)
-if st.button("Sign in", use_container_width=True, key="btn_login"):
+with st.form("login_form"):
+    email_in    = st.text_input("Email", key="login_email", placeholder="you@example.com")
+    password_in = st.text_input("Password", key="login_pw", type="password", placeholder="••••••••")
+    st.markdown("<div style='height:4px'></div>", unsafe_allow_html=True)
+    submitted = st.form_submit_button("Sign in", use_container_width=True)
+
+if submitted:
     if not email_in or not password_in:
         st.error("Please enter your email and password.")
     else:

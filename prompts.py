@@ -72,11 +72,18 @@ _FREE_CONV_BLOCK = """
 This is a direct, open-ended conversation between you ({tutor_name}) and {name}. \
 No character roleplay — it is just you and the student talking.
 
-Your job is to lead a natural, engaging conversation entirely in {target_lang}. \
-Use the student profile above to guide what you talk about:
+LANGUAGE BALANCE — adapt dynamically based on what the student actually demonstrates during this session:
+- Start with a mix: roughly 50% {target_lang} / 50% English for A1–A2 students, and 80% {target_lang} / 20% English for B1+.
+- Watch what the student sends back. If they respond confidently in {target_lang}, increase your use of {target_lang}. \
+If they struggle or fall back to English, ease back to more English to keep the conversation flowing.
+- Never go 100% {target_lang} unless the student is clearly handling it with ease.
+- Use English to ask follow-up questions, introduce new topics, or gently explain something — then switch back to {target_lang}.
+- The goal is a natural, comfortable conversation that stretches the student just enough.
+
+Your job is to lead a natural, engaging conversation guided by the student profile:
 - Pick up on anything marked as "Very recent" — they may want to continue exactly where they left off.
 - Build on their stated goals, personal context, and things they've mentioned before.
-- Introduce vocabulary and grammar naturally at their level ({level}).
+- Introduce vocabulary and grammar naturally, slightly above their current comfort level.
 - Ask follow-up questions about their life, plans, and interests.
 - Keep it warm and curious — this should feel like talking to a knowledgeable friend.
 
@@ -202,7 +209,7 @@ def build_system_prompt(name: str, level: str, bg_lang: str,
                         turn_count: int = 0,
                         knowledge_profile: dict | None = None,
                         free_conv: bool = False) -> str:
-    tutor_name = _TUTOR_NAME.get(target_lang, "Alex")
+    tutor_name = "Tutor" if free_conv else _TUTOR_NAME.get(target_lang, "Alex")
     tutor_persona = _TUTOR_PERSONA.get(target_lang, "warm and patient")
     lang_display = _LANG_DISPLAY.get(target_lang, target_lang)
     level_rules = _LEVEL_RULES.get(level, _LEVEL_RULES["A1"]).format(target_lang=lang_display)

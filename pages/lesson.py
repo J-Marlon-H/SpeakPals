@@ -4,57 +4,20 @@ import streamlit as st
 import streamlit.components.v1 as components
 import hashlib, pathlib, base64
 from dotenv import load_dotenv
-import os
-
 import json as _json
 from pipeline import (run_pipeline_stream, MODELS, VOICES, VOICES_BY_LANG, VOICE_GENDER,
                       SCENE_CATALOG, SETTINGS_DEFAULTS, TTS_LANG_CODE, STT_LANG_CODE,
-                      parse_claude_response, generate_scene_image, character_tts_b64)
+                      parse_claude_response, generate_scene_image, character_tts_b64,
+                      SCENE_OPENERS_BY_LANG, SCENE_CHAR_GENDER)
 from prompts import build_system_prompt, get_tutor_name
-from ws_proxy import start_in_thread, PROXY_PORT
-from db import require_auth, load_knowledge_profile
+from ws_proxy import start_in_thread, PROXY_PORT, scribe_token as _scribe_token
+from db import require_auth, load_knowledge_profile, _secret
 
 load_dotenv("keys.env")
-
-def _secret(key):
-    try:
-        return st.secrets[key]
-    except Exception:
-        return os.getenv(key)
 
 CLAUDE_KEY = _secret("CLAUDE_API_KEY")
 ELEVEN_KEY = _secret("ELEVENLABS_API_KEY")
 FAL_KEY    = _secret("FAL_KEY")
-
-# Opening line per scene — spoken by the character at lesson start (TTS pre-loaded)
-SCENE_OPENERS_BY_LANG = {
-    "Danish": {
-        "meet_a_friend": "Hej! Hvad hedder du?",
-        "cafe":          "Hej! Hvad må det være?",
-        "supermarket":   "Vil du betale med kort eller kontanter?",
-        "flower_store":  "Hej! Hvad kan jeg hjælpe dig med i dag?",
-        "bakery":        "Godmorgen! Hvad må det være?",
-        "restaurant":    "Goddag og velkommen! Har du reserveret bord?",
-    },
-    "Portuguese (Brazilian)": {
-        "meet_a_friend": "Oi! Qual é o seu nome?",
-        "cafe":          "Olá! O que vai ser?",
-        "supermarket":   "Vai pagar no débito ou no crédito?",
-        "flower_store":  "Oi! Em que posso ajudar você hoje?",
-        "bakery":        "Bom dia! O que vai ser?",
-        "restaurant":    "Boa tarde e bem-vindo! Tem reserva?",
-    },
-}
-
-# Gender of the visible character in each scene image
-SCENE_CHAR_GENDER = {
-    "meet_a_friend": "male",
-    "cafe":          "female",
-    "supermarket":   "female",
-    "flower_store":  "male",
-    "bakery":        "female",
-    "restaurant":    "male",
-}
 
 SCENE_NEXT_PROMPT = {
     "supermarket": (
@@ -317,7 +280,7 @@ with st.sidebar:
         for i, entry in enumerate(log):
             txt  = entry["text"].replace("<", "&lt;").replace(">", "&gt;")
             anim = "animation:msgSlideIn .4s cubic-bezier(.34,1.56,.64,1) both;" if i == last_i else ""
-            if entry["who"] == "character":
+            if entry["who"] == "character" and not is_free_conv:
                 parts.append(
                     f"<div style='padding:8px 12px 4px'>"
                     f"<div style='background:#ffffff;border:1px solid #e5e5e5;border-radius:12px 12px 12px 3px;"
@@ -326,7 +289,7 @@ with st.sidebar:
                     f"<span style='font:600 10px Inter;color:#9ca3af;display:block;margin-bottom:4px;letter-spacing:.5px;text-transform:uppercase'>{char_label}</span>"
                     f"<em>{txt}</em></div></div>"
                 )
-            elif entry["who"] == "tutor":
+            elif entry["who"] == "tutor" or (entry["who"] == "character" and is_free_conv):
                 parts.append(
                     f"<div style='padding:8px 12px 4px'>"
                     f"<div style='background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.25);border-radius:12px 12px 12px 3px;"
@@ -396,23 +359,6 @@ from vad_helper import mic
 chunks  = st.session_state.last_chunks or []
 caption = ("Generating next scene…" if st.session_state.scene_loading
            else f"Scene {scene_idx_1based}")
-
-def _scribe_token(eleven_key):
-    """Fetch a fresh single-use token for the ElevenLabs Scribe WS.
-    Must NOT be cached — tokens are consumed on first WS connection."""
-    if not eleven_key:
-        return None
-    try:
-        import requests as _req
-        r = _req.post(
-            "https://api.elevenlabs.io/v1/single-use-token/realtime_scribe",
-            headers={"xi-api-key": eleven_key},
-            timeout=8,
-        )
-        r.raise_for_status()
-        return r.json().get("token")
-    except Exception:
-        return None
 
 mic_props = dict(
     lang              = stt_lang_code,

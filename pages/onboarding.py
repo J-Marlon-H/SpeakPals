@@ -2,25 +2,17 @@
 from __future__ import annotations
 import hashlib
 import pathlib
-import os
 import streamlit as st
 import streamlit.components.v1 as components
 from dotenv import load_dotenv
 
 from pipeline import (run_pipeline_stream, MODELS, SETTINGS_DEFAULTS, character_tts_b64)
 from db import (require_auth, load_knowledge_profile, save_knowledge_profile,
-                delete_knowledge_profile)
+                delete_knowledge_profile, _secret)
 from profile import update_knowledge_profile
 from vad_helper import mic
 
 load_dotenv("keys.env")
-
-
-def _secret(key):
-    try:
-        return st.secrets[key]
-    except Exception:
-        return os.getenv(key)
 
 
 def _infer_settings(profile: dict) -> dict:
@@ -69,20 +61,20 @@ CLAUDE_KEY = _secret("CLAUDE_API_KEY")
 ELEVEN_KEY = _secret("ELEVENLABS_API_KEY")
 
 # ── Voice & language config ────────────────────────────────────────────────────
-# Alex voice — warm female, ElevenLabs multilingual model
+# Onboarding tutor voice — warm female, ElevenLabs multilingual model
 _OB_VOICE_ID   = "4RklGmuxoAskAbGXplXN"
 _OB_TTS_LANG   = "en"   # interview always in English
 _OB_MAX_TURNS  = 18     # ~8-10 minutes of conversation
 
 # ── Opening greeting ───────────────────────────────────────────────────────────
 _OPENER = (
-    "Hi {name}! I'm Alex, your SpeakPals companion. "
+    "Hi {name}! I'm your SpeakPals tutor. "
     "What language are you hoping to learn?"
 )
 
 # ── System prompt ──────────────────────────────────────────────────────────────
 _OB_SYSTEM = """\
-You are Alex, a warm, curious, and deeply empathetic language learning companion. \
+You are a warm, curious, and deeply empathetic language learning tutor. \
 You are meeting {name} for the very first time and having a friendly 8–12 minute \
 getting-to-know-you conversation.
 
@@ -194,7 +186,7 @@ st.markdown("""<style>
 
   /* Sidebar scroll + pinned buttons */
   [data-testid="stSidebar"] > div:first-child{
-    padding-bottom:120px!important;overflow-y:auto!important}
+    padding-bottom:140px!important;overflow-y:auto!important}
   [data-testid="stSidebar"] [data-testid="stVerticalBlock"]{
     gap:2px!important;overflow:visible!important}
 
@@ -207,8 +199,8 @@ st.markdown("""<style>
 
   /* Pin Reset button just above Home */
   [data-testid="stSidebar"] .st-key-btn_reset_knowledge{
-    position:fixed!important;bottom:46px!important;left:0!important;
-    width:320px!important;padding:6px 16px 2px!important;
+    position:fixed!important;bottom:62px!important;left:0!important;
+    width:320px!important;padding:6px 16px 4px!important;
     background:#f5f5f5!important;z-index:99!important}
   [data-testid="stSidebar"] .st-key-btn_reset_knowledge button{
     background:rgba(220,38,38,.07)!important;
@@ -259,7 +251,7 @@ for k, v in [
 
 IS_LOCAL = pathlib.Path("keys.env").exists()
 
-from ws_proxy import start_in_thread, PROXY_PORT
+from ws_proxy import start_in_thread, PROXY_PORT, scribe_token as _scribe_token
 
 @st.cache_resource
 def _start_proxy():
@@ -303,7 +295,7 @@ with st.sidebar:
     )
     st.markdown(
         "<div style='height:1px;background:linear-gradient(90deg,rgba(13,148,136,.3),"
-        "transparent);margin:0 12px 10px'></div>",
+        "transparent);margin:4px 12px 12px'></div>",
         unsafe_allow_html=True,
     )
 
@@ -312,7 +304,7 @@ with st.sidebar:
     if not st.session_state.ob_started:
         st.markdown(
             "<div style='padding:12px 16px;font-size:12px;color:rgba(17,24,39,.45);font-style:italic'>"
-            "Alex will start in a moment…"
+            "Your tutor will start in a moment…"
             "</div>",
             unsafe_allow_html=True,
         )
@@ -335,7 +327,7 @@ with st.sidebar:
                     f"border-radius:12px 12px 12px 3px;padding:10px 12px;font-size:13px;"
                     f"line-height:1.5;color:#111827;word-break:break-word;{anim}'>"
                     f"<span style='font:600 10px Inter;color:#9ca3af;display:block;"
-                    f"margin-bottom:4px;letter-spacing:.5px;text-transform:uppercase'>Alex</span>"
+                    f"margin-bottom:4px;letter-spacing:.5px;text-transform:uppercase'>Tutor</span>"
                     f"{txt}</div></div>"
                 )
             else:
@@ -389,23 +381,6 @@ with st.sidebar:
     # Finish interview — pinned to bottom
     if st.button("✅ Finish Interview", key="btn_ob_home", use_container_width=True):
         st.switch_page("pages/home.py")
-
-# ── Scribe token (cloud only) ──────────────────────────────────────────────────
-
-def _scribe_token(eleven_key):
-    if not eleven_key:
-        return None
-    try:
-        import requests as _req
-        r = _req.post(
-            "https://api.elevenlabs.io/v1/single-use-token/realtime_scribe",
-            headers={"xi-api-key": eleven_key},
-            timeout=8,
-        )
-        r.raise_for_status()
-        return r.json().get("token")
-    except Exception:
-        return None
 
 # ── VAD component ──────────────────────────────────────────────────────────────
 

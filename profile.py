@@ -14,6 +14,7 @@ REQUIRED_CATEGORIES = [
     "common_errors",
     "conversation_history",
     "personal_facts",
+    "tutor_observations",
 ]
 
 # ── Claude prompt ──────────────────────────────────────────────────────────────
@@ -39,9 +40,9 @@ Student: {name}  |  Level: {level}  |  Target language: {target_lang}  |  Native
 Return an updated profile JSON object that incorporates everything you learned about this student from the session.
 
 Rules:
-1. Always include all 6 predefined keys: language_level, learning_motivation, personal_use_context, common_errors, conversation_history, personal_facts.
-2. You may add up to 2 additional snake_case keys if the session reveals something important that does not fit the predefined categories. Choose short, descriptive key names (e.g. "pronunciation_notes", "cultural_interests").
-3. The total number of keys must not exceed 8.
+1. Always include all 7 predefined keys: language_level, learning_motivation, personal_use_context, common_errors, conversation_history, personal_facts, tutor_observations.
+2. You may add up to 2 additional snake_case keys if the session reveals something important that does not fit any predefined category. Choose short, descriptive key names (e.g. "pronunciation_notes", "cultural_interests").
+3. The total number of keys must not exceed 9.
 4. Preserve any existing custom keys from the current profile unless you have a strong reason to merge or remove them.
 5. Each category value must be a JSON object with exactly two fields:
    - "content": A comprehensive summary about the learner. Rules per category type:
@@ -55,13 +56,19 @@ There is no length limit — include everything meaningful.
 Only include facts the user has explicitly stated — never infer or guess. \
 Accumulate across sessions; never delete a confirmed fact unless the user contradicts it. \
 No length limit — record every confirmed detail.
+     • For tutor_observations: write as Markdown bullet points, one observation per line. \
+Use this category for anything meaningful you noticed about this learner that does not belong in any other category — \
+e.g. learning style preferences, emotional state during difficult topics, cultural curiosity, confidence patterns, \
+engagement spikes, moments of breakthrough or frustration, pacing preferences, or anything else that would help \
+a tutor serve this student better. Only include observations with real signal — skip generic filler. \
+Accumulate across sessions; never delete a prior observation unless it is clearly outdated or contradicted.
      • For all other categories: write in present tense, third person, plain prose. \
 Include ALL relevant observations — specific words, phrases, patterns, examples, context. \
 There is no sentence or length limit. The richer and more detailed the content, the better. \
 Accumulate and enrich across sessions — never discard relevant information.
    - "updated_at": The ISO 8601 UTC timestamp "{now_iso}" — use this exact value if content changed, keep the old timestamp if the category was not updated.
 6. If a session reveals nothing new for a category, keep the existing content and timestamp completely unchanged.
-7. If the current profile is empty ({{}}) this is the first session — populate all 6 predefined categories with whatever the session reveals. Set content to "" for categories with no evidence yet.
+7. If the current profile is empty ({{}}) this is the first session — populate all 7 predefined categories with whatever the session reveals. Set content to "" for categories with no evidence yet.
 8. Do not include any explanation, markdown, or text outside the JSON object.
 
 Reply with only the JSON object, starting with {{ and ending with }}.
@@ -157,7 +164,7 @@ def update_knowledge_profile(
             if key not in updated:
                 updated[key] = {"content": "", "updated_at": now_iso}
 
-        # Enforce max 8 keys: keep 6 required + up to 2 custom (alphabetical if >2)
+        # Enforce max 9 keys: keep 7 required + up to 2 custom (alphabetical if >2)
         custom_keys = [k for k in updated if k not in REQUIRED_CATEGORIES]
         if len(custom_keys) > 2:
             for k in sorted(custom_keys)[2:]:

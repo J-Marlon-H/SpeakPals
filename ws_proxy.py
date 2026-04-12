@@ -143,3 +143,21 @@ def start_in_thread():
     t = threading.Thread(target=_target, daemon=True, name="ws-proxy")
     t.start()
     return t
+
+
+def scribe_token(eleven_key: str) -> str | None:
+    """Fetch a fresh single-use ElevenLabs Scribe token for cloud deployments.
+    Must NOT be cached — tokens are consumed on first WS connection."""
+    if not eleven_key:
+        return None
+    try:
+        import requests as _req
+        r = _req.post(
+            "https://api.elevenlabs.io/v1/single-use-token/realtime_scribe",
+            headers={"xi-api-key": eleven_key},
+            timeout=8,
+        )
+        r.raise_for_status()
+        return r.json().get("token")
+    except Exception:
+        return None
