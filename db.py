@@ -292,35 +292,6 @@ def save_knowledge_profile(user_id: str, access_token: str, profile: dict) -> No
         pass
 
 
-def load_knowledge_profile_for_bot(chat_id: int) -> dict:
-    """Load a user's knowledge profile via the Telegram bot (no user JWT required).
-
-    Uses the get_knowledge_profile_by_chat_id RPC (SECURITY DEFINER), the same
-    pattern as get_telegram_profile — no extra credentials needed.
-    Returns {} when the chat_id is not linked or has no profile yet.
-
-    Required SQL (run once in Supabase SQL editor):
-
-        CREATE OR REPLACE FUNCTION get_knowledge_profile_by_chat_id(p_chat_id BIGINT)
-        RETURNS JSONB LANGUAGE plpgsql SECURITY DEFINER AS $$
-        DECLARE v_uid UUID; v_profile JSONB; BEGIN
-          SELECT id INTO v_uid FROM users WHERE telegram_chat_id = p_chat_id;
-          IF NOT FOUND THEN RETURN '{}'::JSONB; END IF;
-          SELECT profile INTO v_profile
-          FROM user_knowledge_profiles WHERE user_id = v_uid;
-          RETURN COALESCE(v_profile, '{}'::JSONB);
-        END; $$;
-    """
-    try:
-        res = (_client()
-               .rpc("get_knowledge_profile_by_chat_id", {"p_chat_id": chat_id})
-               .execute())
-        data = res.data
-        if not data:
-            return {}
-        return data if isinstance(data, dict) else _json.loads(data)
-    except Exception:
-        return {}
 
 
 def delete_knowledge_profile(user_id: str, access_token: str) -> None:

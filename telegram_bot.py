@@ -147,16 +147,12 @@ def load_user_synced(chat_id: int) -> dict:
     user = load_user(chat_id)
     if user.get("sb_user_id"):
         try:
-            from db import get_telegram_profile, load_knowledge_profile_for_bot
+            from db import get_telegram_profile
             profile = get_telegram_profile(chat_id)
             if profile:
                 for key in _PROFILE_KEYS:
                     if profile.get(key):
                         user[key] = profile[key]
-            # Always refresh the knowledge profile from Supabase on /start
-            kp = load_knowledge_profile_for_bot(chat_id)
-            if kp:
-                user["knowledge_profile"] = kp
             save_user(chat_id, user)
         except Exception:
             pass
@@ -431,16 +427,12 @@ async def cmd_link(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user = load_user(chat_id)
     user["sb_user_id"] = user_id
     try:
-        from db import load_knowledge_profile_for_bot
         profile = get_telegram_profile(chat_id)
         if profile:
             for key in _PROFILE_KEYS:
                 if profile.get(key):
                     user[key] = profile[key]
             user["setup_step"] = None  # skip onboarding if profile is complete
-        kp = load_knowledge_profile_for_bot(chat_id)
-        if kp:
-            user["knowledge_profile"] = kp
     except Exception:
         pass
     save_user(chat_id, user)
