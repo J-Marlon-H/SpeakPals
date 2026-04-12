@@ -292,8 +292,6 @@ def save_knowledge_profile(user_id: str, access_token: str, profile: dict) -> No
         pass
 
 
-
-
 def delete_knowledge_profile(user_id: str, access_token: str) -> None:
     """Delete the user's knowledge profile row entirely."""
     try:
