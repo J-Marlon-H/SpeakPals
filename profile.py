@@ -46,17 +46,19 @@ Rules:
 5. Each category value must be a JSON object with exactly two fields:
    - "content": A comprehensive summary about the learner. Rules per category type:
      • For conversation_history: write as Markdown bullet points with a date prefix on each line. \
-Format: "- YYYY-MM-DD: brief description of what was covered or discussed". \
+Format: "- YYYY-MM-DD: description of what was covered or discussed — include as much detail as is useful". \
 Use today's date {today_date} for entries from this session. \
 Accumulate bullets from prior sessions — NEVER delete existing dated bullets, only add new ones. \
 Sort with the most recent date at the top. \
-Example: "- 2026-04-12: Practiced cafe scene, ordered coffee and a pastry\n- 2026-04-05: Onboarding — learning Danish for Copenhagen move"
-     • For personal_facts: write as Markdown bullet points, one fact per line (e.g. "- Name: Marlon", "- Lives in: Copenhagen", "- Job: software engineer"). \
+There is no length limit — include everything meaningful.
+     • For personal_facts: write as Markdown bullet points, one fact per line (e.g. "- Name: Marlon", "- Lives in: Copenhagen", "- Job: software engineer at Tryg"). \
 Only include facts the user has explicitly stated — never infer or guess. \
-Accumulate across sessions; never delete a confirmed fact unless contradicted.
-     • For all other categories: write in present tense, third person, plain prose. Include all \
-relevant observations — specific words, phrases, patterns, examples. \
-Do not truncate; write as much as is genuinely useful. Accumulate and enrich across sessions.
+Accumulate across sessions; never delete a confirmed fact unless the user contradicts it. \
+No length limit — record every confirmed detail.
+     • For all other categories: write in present tense, third person, plain prose. \
+Include ALL relevant observations — specific words, phrases, patterns, examples, context. \
+There is no sentence or length limit. The richer and more detailed the content, the better. \
+Accumulate and enrich across sessions — never discard relevant information.
    - "updated_at": The ISO 8601 UTC timestamp "{now_iso}" — use this exact value if content changed, keep the old timestamp if the category was not updated.
 6. If a session reveals nothing new for a category, keep the existing content and timestamp completely unchanged.
 7. If the current profile is empty ({{}}) this is the first session — populate all 6 predefined categories with whatever the session reveals. Set content to "" for categories with no evidence yet.
@@ -132,7 +134,7 @@ def update_knowledge_profile(
             },
             json={
                 "model": model,
-                "max_tokens": 1500,
+                "max_tokens": 4096,
                 "temperature": 0.2,
                 "messages": [{"role": "user", "content": prompt}],
             },
