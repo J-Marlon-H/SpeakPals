@@ -344,15 +344,21 @@ with st.sidebar:
 
     # Completion banner
     if st.session_state.ob_complete:
+        _is_new = st.session_state.get("is_new_user", False)
         st.markdown(
             "<div style='margin:10px 12px;padding:14px 16px;"
             "background:rgba(13,148,136,.1);border:1px solid rgba(13,148,136,.3);"
             "border-radius:12px;font:500 12px Inter;color:#0d9488;line-height:1.5'>"
-            "Great chat! Your profile has been saved. Ready to start learning!</div>",
+            + ("Great chat! Your profile is saved. Let's finish setting up your account."
+               if _is_new else
+               "Great chat! Your profile has been saved. Ready to start learning!")
+            + "</div>",
             unsafe_allow_html=True,
         )
-        if st.button("🚀 Start Learning →", type="primary", use_container_width=True):
-            st.switch_page("pages/home.py")
+        _btn_label = "⚙ Go to Settings →" if _is_new else "🚀 Start Learning →"
+        _btn_dest  = "pages/account.py"   if _is_new else "pages/home.py"
+        if st.button(_btn_label, type="primary", use_container_width=True):
+            st.switch_page(_btn_dest)
 
     # Error
     if st.session_state.ob_error:
@@ -378,8 +384,8 @@ with st.sidebar:
             st.session_state.pop(k, None)
         st.rerun()
 
-    # Finish interview — pinned to bottom
-    if st.button("✅ Finish Interview", key="btn_ob_home", use_container_width=True):
+    # Finish onboarding — pinned to bottom
+    if st.button("✅ Finish Onboarding", key="btn_ob_home", use_container_width=True):
         st.switch_page("pages/home.py")
 
 # ── VAD component ──────────────────────────────────────────────────────────────

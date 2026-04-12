@@ -82,13 +82,16 @@ with tab_login:
 
 # ── Create account ────────────────────────────────────────────────────────────
 with tab_register:
-    reg_email    = st.text_input("Email", key="reg_email", placeholder="you@example.com")
-    reg_password = st.text_input("Password", key="reg_pw", type="password",
-                                 placeholder="At least 6 characters")
-    reg_confirm  = st.text_input("Confirm password", key="reg_confirm", type="password",
-                                 placeholder="••••••••")
-    st.markdown("<div style='height:4px'></div>", unsafe_allow_html=True)
-    if st.button("Create account", use_container_width=True, key="btn_register"):
+    with st.form("register_form"):
+        reg_email    = st.text_input("Email", key="reg_email", placeholder="you@example.com")
+        reg_password = st.text_input("Password", key="reg_pw", type="password",
+                                     placeholder="At least 6 characters")
+        reg_confirm  = st.text_input("Confirm password", key="reg_confirm", type="password",
+                                     placeholder="••••••••")
+        st.markdown("<div style='height:4px'></div>", unsafe_allow_html=True)
+        reg_submitted = st.form_submit_button("Create account", use_container_width=True)
+
+    if reg_submitted:
         if not reg_email or not reg_password or not reg_confirm:
             st.error("Please fill in all fields.")
         elif len(reg_password) < 6:
@@ -100,7 +103,17 @@ with tab_register:
             if err:
                 st.error(err)
             else:
-                st.success(
-                    "Account created! Check your email for a confirmation link, "
-                    "then sign in."
-                )
+                # Try to auto-login immediately (works when email confirmation is disabled)
+                session, login_err = sign_in(reg_email.strip(), reg_password)
+                if session:
+                    st.session_state.sb_access_token  = session["access_token"]
+                    st.session_state.sb_refresh_token = session["refresh_token"]
+                    st.session_state.sb_user_id       = session["user_id"]
+                    st.session_state.sb_email         = session["email"]
+                    st.session_state["is_new_user"]   = True
+                    st.switch_page("pages/onboarding.py")
+                else:
+                    st.success(
+                        "Account created! Check your email for a confirmation link, "
+                        "then sign in."
+                    )
