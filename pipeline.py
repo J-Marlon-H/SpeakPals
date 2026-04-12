@@ -21,11 +21,6 @@ def clean_for_tts(text):
 
 
 def tts_chunk(text, voice_id, eleven_key, lang_code="da"):
-    # Always use eleven_multilingual_v2 — handles target-language words correctly
-    # regardless of the surrounding language.
-    # Only send language_code when set: omitting it lets the model auto-detect per
-    # word, which is critical for tutor lines that mix English with target-language
-    # phrases (e.g. "Try saying 'Jeg hedder Marlon'").
     body = {
         "text": text.strip(),
         "model_id": "eleven_multilingual_v2",
@@ -46,6 +41,40 @@ def tts_chunk(text, voice_id, eleven_key, lang_code="da"):
         r.raise_for_status()
         return b"".join(r.iter_content(4096))
     r.raise_for_status()
+
+
+# Matches single- or double-quoted spans (straight and curly quotes), max 80 chars
+_QUOTED_RE = re.compile(r'["\u2018\u2019\u201c\u201d]([^"\u2018\u2019\u201c\u201d]{1,80})["\u2018\u2019\u201c\u201d]')
+
+
+def tts_tutor_mixed(text: str, voice_id: str, eleven_key: str, tl_lang_code: str) -> bytes:
+    """TTS for tutor lines that mix English with quoted target-language phrases.
+
+    ElevenLabs multilingual_v2 detects language at utterance level, not word level,
+    so an English sentence with embedded Danish words gets fully English-pronounced.
+    This splits on quoted spans (which the prompt always uses for target-language phrases),
+    TTS-ing them with the target lang_code and the surrounding English with auto-detect.
+    """
+    if not tl_lang_code:
+        return tts_chunk(text, voice_id, eleven_key, lang_code="")
+
+    parts = _QUOTED_RE.split(text)
+    if len(parts) == 1:
+        # No quoted phrase found — send as-is with auto-detect
+        return tts_chunk(text, voice_id, eleven_key, lang_code="")
+
+    # _QUOTED_RE.split() with one group returns [before, group1, after, group2, ...]
+    # Even indices are surrounding English text; odd indices are the captured phrases
+    audio_parts = []
+    for i, part in enumerate(parts):
+        stripped = part.strip()
+        if not stripped:
+            continue
+        lc = tl_lang_code if (i % 2 == 1) else ""
+        chunk = tts_chunk(stripped, voice_id, eleven_key, lang_code=lc)
+        if chunk:
+            audio_parts.append(chunk)
+    return b"".join(audio_parts)
 
 
 def generate_language_tip(conversation_lines: list, bg_lang: str, claude_key: str,
@@ -391,15 +420,16 @@ def run_pipeline_stream(system, user_input, history, voice_id, claude_key, eleve
     if tts_text is None:
         tts_text = clean_for_tts(raw_claude)
 
-    # Character: use target-language voice + lang_code so pronunciation is anchored.
-    # Tutor: no lang_code — the multilingual model auto-detects English and any
-    # embedded target-language words, keeping Danish/Portuguese phrases correct
-    # even inside an otherwise English sentence.
     tts_voice = (char_voice_id or voice_id) if speaker == "character" else voice_id
-    tts_lang  = lang_code if speaker == "character" else ""
 
     if tts_text:
-        audio = tts_chunk(tts_text, tts_voice, eleven_key, lang_code=tts_lang)
+        if speaker == "character":
+            # Character speaks target language only — lock to target lang_code
+            audio = tts_chunk(tts_text, tts_voice, eleven_key, lang_code=lang_code)
+        else:
+            # Tutor speaks English with embedded target-language phrases in quotes.
+            # Split on quoted spans so each segment gets the correct lang_code.
+            audio = tts_tutor_mixed(tts_text, tts_voice, eleven_key, tl_lang_code=lang_code)
         yield raw_claude, base64.b64encode(audio).decode(), speaker
     else:
         yield raw_claude, "", speaker
