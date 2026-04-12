@@ -6,7 +6,8 @@ import streamlit as st
 import streamlit.components.v1 as components
 from dotenv import load_dotenv
 
-from pipeline import (run_pipeline_stream, MODELS, SETTINGS_DEFAULTS, character_tts_b64)
+from pipeline import (run_pipeline_stream, MODELS, SETTINGS_DEFAULTS, character_tts_b64,
+                      VOICES_BY_LANG, VOICES, TTS_LANG_CODE)
 from db import (require_auth, load_knowledge_profile, save_knowledge_profile,
                 delete_knowledge_profile, _secret)
 from profile import update_knowledge_profile
@@ -60,10 +61,6 @@ def _infer_settings(profile: dict) -> dict:
 CLAUDE_KEY = _secret("CLAUDE_API_KEY")
 ELEVEN_KEY = _secret("ELEVENLABS_API_KEY")
 
-# ── Voice & language config ────────────────────────────────────────────────────
-# Onboarding tutor voice — warm female, ElevenLabs multilingual model
-_OB_VOICE_ID   = "4RklGmuxoAskAbGXplXN"
-_OB_TTS_LANG   = "en"   # interview always in English
 _OB_MAX_TURNS  = 18     # ~8-10 minutes of conversation
 
 # ── Opening greeting ───────────────────────────────────────────────────────────
@@ -215,6 +212,14 @@ target_lang = st.session_state.get("s_language",    SETTINGS_DEFAULTS["s_languag
 model_label = st.session_state.get("s_model_label", SETTINGS_DEFAULTS["s_model_label"])
 model_id    = MODELS[model_label]
 
+# ── Tutor voice — same selection as lessons so the voice is consistent ─────────
+_voice_label  = st.session_state.get("s_voice_label", SETTINGS_DEFAULTS["s_voice_label"])
+_lang_voices  = VOICES_BY_LANG.get(target_lang, VOICES)
+_ob_voice_id  = (_lang_voices[_voice_label]
+                 if _voice_label in _lang_voices
+                 else next(iter(_lang_voices.values())))
+_ob_tl_lang   = TTS_LANG_CODE.get(target_lang, "da")
+
 # ── Session state ──────────────────────────────────────────────────────────────
 
 for k, v in [
@@ -259,7 +264,7 @@ if st.session_state.ob_started and not st.session_state.ob_opener_loaded:
     st.session_state.ob_opener_text = opener_text
 
     if ELEVEN_KEY:
-        b64 = character_tts_b64(opener_text, _OB_VOICE_ID, ELEVEN_KEY, lang_code=_OB_TTS_LANG)
+        b64 = character_tts_b64(opener_text, _ob_voice_id, ELEVEN_KEY, lang_code="")
         if b64:
             st.session_state.ob_last_chunks    = [b64]
             st.session_state.ob_tutor_play_seq += 1
@@ -450,12 +455,12 @@ if student_text and not st.session_state.ob_complete:
                 system,
                 student_text,
                 st.session_state.ob_chat,
-                _OB_VOICE_ID,
+                _ob_voice_id,
                 CLAUDE_KEY,
                 ELEVEN_KEY,
                 model=model_id,
                 use_structured=False,
-                lang_code=_OB_TTS_LANG):
+                tl_lang_code=_ob_tl_lang):
             if chunk_b64:
                 all_chunks.append(chunk_b64)
 

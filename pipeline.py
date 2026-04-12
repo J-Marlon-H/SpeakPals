@@ -357,12 +357,17 @@ VERDICT_SCHEMA = {
 
 def run_pipeline_stream(system, user_input, history, voice_id, claude_key, eleven_key,
                         model="claude-sonnet-4-6", use_structured=False, lang_code="da",
-                        char_voice_id=None):
+                        char_voice_id=None, tl_lang_code=None):
     """Generator: yields (raw_claude_text, chunk_b64, speaker).
     Streams Claude fully, then makes a single TTS call for the complete response.
-    When use_structured=True, enforces VERDICT_SCHEMA via the structured outputs API,
-    extracts the "text" field for TTS, and picks the voice based on "speaker":
-    "character" → char_voice_id (falls back to voice_id); "tutor" → voice_id.
+
+    voice_id     — tutor voice (used for all tutor/onboarding speech)
+    char_voice_id — character voice in scene roleplay (falls back to voice_id)
+    lang_code    — target language TTS code for character speech (e.g. "da", "pt")
+    tl_lang_code — target language code for embedded phrases in tutor English speech;
+                   defaults to lang_code when not set. Passed to tts_tutor_mixed so
+                   quoted Danish/Portuguese words are pronounced correctly inside
+                   English sentences across onboarding, free conv, and lesson hints.
     """
     sess = get_session()
     messages = [{"role": m["role"], "content": m["content"]}
@@ -420,16 +425,24 @@ def run_pipeline_stream(system, user_input, history, voice_id, claude_key, eleve
     if tts_text is None:
         tts_text = clean_for_tts(raw_claude)
 
-    tts_voice = (char_voice_id or voice_id) if speaker == "character" else voice_id
+    # Effective target-language code for mixed tutor speech
+    _tl = tl_lang_code if tl_lang_code is not None else lang_code
+
+    tts_voice = (char_voice_id or voice_id) if (speaker == "character" and use_structured) else voice_id
 
     if tts_text:
-        if speaker == "character":
-            # Character speaks target language only — lock to target lang_code
+        if speaker == "character" and use_structured:
+            # Scene character: speaks target language only — lock to target lang_code
             audio = tts_chunk(tts_text, tts_voice, eleven_key, lang_code=lang_code)
         else:
-            # Tutor speaks English with embedded target-language phrases in quotes.
-            # Split on quoted spans so each segment gets the correct lang_code.
-            audio = tts_tutor_mixed(tts_text, tts_voice, eleven_key, tl_lang_code=lang_code)
+            # Tutor path — covers:
+            #   • lesson tutor hints (structured, speaker="tutor")
+            #   • free conversation (structured, speaker="tutor")
+            #   • onboarding (unstructured — speaker always defaults to "character"
+            #     but it IS the tutor, so route here too)
+            # Splits on quoted target-language phrases so Danish/Portuguese words
+            # inside English sentences are pronounced with the correct lang_code.
+            audio = tts_tutor_mixed(tts_text, tts_voice, eleven_key, tl_lang_code=_tl)
         yield raw_claude, base64.b64encode(audio).decode(), speaker
     else:
         yield raw_claude, "", speaker
