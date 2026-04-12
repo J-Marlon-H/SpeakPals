@@ -188,14 +188,25 @@ st.markdown("<div class='sec-label'>Your Learning Profile</div>", unsafe_allow_h
 st.markdown("""
 <div style='background:linear-gradient(135deg,rgba(13,148,136,.08),rgba(13,148,136,.03));
             border:1px solid rgba(13,148,136,.22);border-radius:14px;
-            padding:16px 18px;margin-bottom:20px'>
+            padding:16px 18px;margin-bottom:14px'>
   <div style='font:700 13px Inter;color:#0d9488;margin-bottom:6px'>
     🧠 Your tutor remembers you
   </div>
   <div style='font:400 13px/1.65 Inter;color:rgba(17,24,39,.65)'>
     Every session, SpeakPals builds a richer picture of who you are and how you learn.
-    Below is <strong>everything we store about you</strong> — fully transparent, always
-    up to date. The more you practise, the more personalised your experience becomes.
+    Below is <strong>everything we store about you</strong> — fully transparent, always up to date.
+  </div>
+</div>
+
+<div style='background:rgba(245,158,11,.07);border:1px solid rgba(245,158,11,.3);
+            border-radius:12px;padding:12px 16px;margin-bottom:20px;
+            display:flex;gap:10px;align-items:flex-start'>
+  <span style='font-size:16px;flex-shrink:0'>🔒</span>
+  <div style='font:400 12px/1.6 Inter;color:rgba(17,24,39,.65)'>
+    <strong style='color:#92400e'>Your data stays yours.</strong>
+    This profile is stored securely and used exclusively to personalise your experience
+    inside SpeakPals. It is never shared with third parties, never sold, and never used
+    to train AI models. You can reset it at any time.
   </div>
 </div>""", unsafe_allow_html=True)
 
@@ -254,15 +265,11 @@ for _key, _icon, _label, _desc in _CATEGORIES:
     with st.expander(f"{_icon} **{_label}** &nbsp; {_dot} *{_status}*", expanded=False):
         st.markdown(
             f"<div style='font:400 12px/1.6 Inter;color:rgba(17,24,39,.5);"
-            f"margin:10px 0 14px;font-style:italic'>{_desc}</div>",
+            f"margin:4px 0 10px;font-style:italic'>{_desc}</div>",
             unsafe_allow_html=True,
         )
         if _filled:
-            st.markdown(
-                f"<div style='font:400 13px/1.7 Inter;color:#111827;"
-                f"white-space:pre-wrap'>{_content}</div>",
-                unsafe_allow_html=True,
-            )
+            st.markdown(_content)   # renders bullet lists, bold, etc. natively
         else:
             st.markdown(
                 "<div style='font:400 13px Inter;color:rgba(17,24,39,.35);"
@@ -286,11 +293,7 @@ if _custom:
         _ts      = (_val.get("updated_at", "") if isinstance(_val, dict) else "")
         _exp_label = f"✨ **{_label}**" + (f"  ·  *{_ts[:10]}*" if _ts else "")
         with st.expander(_exp_label, expanded=False):
-            st.markdown(
-                f"<div style='font:400 13px/1.7 Inter;color:#111827;"
-                f"white-space:pre-wrap'>{_content or '—'}</div>",
-                unsafe_allow_html=True,
-            )
+            st.markdown(_content or "—")
 
 st.markdown("<div class='sec-div'></div>", unsafe_allow_html=True)
 

@@ -20,56 +20,57 @@ REQUIRED_CATEGORIES = [
 # ── Claude prompt ──────────────────────────────────────────────────────────────
 
 _UPDATE_PROMPT = """\
-You are a language learning analyst. Update a learner's knowledge profile based on a completed lesson.
+You are a language learning analyst. Update a learner's knowledge profile based on a completed session.
 
 ## Current profile (JSON)
 {current_profile_json}
 
-## Lesson data
+## Session data
 
 Student: {name}  |  Level: {level}  |  Target language: {target_lang}  |  Native language: {bg_lang}
 
 ### Conversation log
 {conversation_text}
 
-### Error log (mistakes noted during the lesson)
+### Error log (mistakes noted during the session)
 {error_text}
 
 ## Your task
 
-Return an updated profile JSON object that incorporates everything you learned about this student from the session.
+Return an updated profile JSON object that incorporates what you learned about this student.
+
+**Tone: concise, human-readable, like notes a good tutor would write.**
+Use bullet points where listing multiple items. Use short prose for single observations.
+No padding, no filler, no generic statements. Every word should be signal.
 
 Rules:
 1. Always include all 7 predefined keys: language_level, learning_motivation, personal_use_context, common_errors, conversation_history, personal_facts, tutor_observations.
-2. You may add up to 2 additional snake_case keys if the session reveals something important that does not fit any predefined category. Choose short, descriptive key names (e.g. "pronunciation_notes", "cultural_interests").
-3. The total number of keys must not exceed 9.
-4. Preserve any existing custom keys from the current profile unless you have a strong reason to merge or remove them.
-5. Each category value must be a JSON object with exactly two fields:
-   - "content": A comprehensive summary about the learner. Rules per category type:
-     • For conversation_history: write as Markdown bullet points with a date prefix on each line. \
-Format: "- YYYY-MM-DD: description of what was covered or discussed — include as much detail as is useful". \
-Use today's date {today_date} for entries from this session. \
-Accumulate bullets from prior sessions — NEVER delete existing dated bullets, only add new ones. \
-Sort with the most recent date at the top. \
-There is no length limit — include everything meaningful.
-     • For personal_facts: write as Markdown bullet points, one fact per line (e.g. "- Name: Marlon", "- Lives in: Copenhagen", "- Job: software engineer at Tryg"). \
-Only include facts the user has explicitly stated — never infer or guess. \
-Accumulate across sessions; never delete a confirmed fact unless the user contradicts it. \
-No length limit — record every confirmed detail.
-     • For tutor_observations: write as Markdown bullet points, one observation per line. \
-Use this category for anything meaningful you noticed about this learner that does not belong in any other category — \
-e.g. learning style preferences, emotional state during difficult topics, cultural curiosity, confidence patterns, \
-engagement spikes, moments of breakthrough or frustration, pacing preferences, or anything else that would help \
-a tutor serve this student better. Only include observations with real signal — skip generic filler. \
-Accumulate across sessions; never delete a prior observation unless it is clearly outdated or contradicted.
-     • For all other categories: write in present tense, third person, plain prose. \
-Include ALL relevant observations — specific words, phrases, patterns, examples, context. \
-There is no sentence or length limit. The richer and more detailed the content, the better. \
-Accumulate and enrich across sessions — never discard relevant information.
-   - "updated_at": The ISO 8601 UTC timestamp "{now_iso}" — use this exact value if content changed, keep the old timestamp if the category was not updated.
-6. If a session reveals nothing new for a category, keep the existing content and timestamp completely unchanged.
-7. If the current profile is empty ({{}}) this is the first session — populate all 7 predefined categories with whatever the session reveals. Set content to "" for categories with no evidence yet.
-8. Do not include any explanation, markdown, or text outside the JSON object.
+2. You may add up to 2 additional snake_case keys if the session reveals something important that does not fit any predefined category (e.g. "pronunciation_notes", "cultural_interests"). Total keys must not exceed 9.
+3. Preserve existing custom keys from the current profile unless merging makes clear sense.
+4. Each category value must be a JSON object with exactly two fields:
+   - "content": Updated notes about the learner. Style rules per category:
+     • conversation_history — Markdown bullet list, one entry per session, date prefix required.
+       Format: "- YYYY-MM-DD: what was covered, practised, or discussed (be specific)."
+       Use today's date {today_date} for this session. Keep all prior dated entries — never delete.
+       Sort newest first. Max 1–2 lines per session bullet.
+     • personal_facts — Markdown bullet list, one confirmed fact per line.
+       E.g. "- Lives in Copenhagen", "- Partner is Danish", "- Works at Tryg as an engineer".
+       Only include what the user explicitly stated. Never infer. Accumulate across sessions.
+     • tutor_observations — Markdown bullet list, one observation per line.
+       Include meaningful patterns only: learning style, confidence, pacing, breakthroughs,
+       cultural curiosity, frustration points — anything a good tutor would want to remember.
+       Skip anything generic or obvious.
+     • common_errors — Short bullets or brief prose listing specific patterns:
+       e.g. "- Drops definite articles (-en/-et)", "- Reverts to English under pressure".
+       Update with new patterns; keep all prior entries that are still relevant.
+     • language_level — 2–4 sentences or short bullets. State level, what they can do,
+       what they struggle with. Be specific (e.g. "knows 'hej', 'tak', 'undskyld'" not just "A1").
+     • learning_motivation — 1–3 sentences. Capture the personal 'why' specifically.
+     • personal_use_context — 1–3 sentences or bullets. Specific real-life situations.
+   - "updated_at": ISO 8601 UTC timestamp "{now_iso}" if content changed; keep old timestamp if unchanged.
+5. If a session reveals nothing new for a category, keep existing content and timestamp unchanged.
+6. First session (empty profile): populate all 7 keys. Use "" for categories with no evidence yet.
+7. Reply with only the JSON object — no markdown, no explanation, no text outside {{ }}.
 
 Reply with only the JSON object, starting with {{ and ending with }}.
 """
