@@ -16,16 +16,16 @@ if os.path.exists("keys.env"):
     # stdlib fallback (for requests-based code)
     _ssl._create_default_https_context = _ssl._create_unverified_context
 
-    # httpx patch — supabase-py uses httpx for all network calls
+    # httpx patch — supabase-py explicitly passes verify=True so we must force-override it
     _httpx_Client_orig       = _httpx.Client.__init__
     _httpx_AsyncClient_orig  = _httpx.AsyncClient.__init__
 
     def _httpx_client_no_verify(self, *args, **kwargs):
-        kwargs.setdefault("verify", False)
+        kwargs["verify"] = False          # force — supabase passes verify=True explicitly
         _httpx_Client_orig(self, *args, **kwargs)
 
     def _httpx_async_client_no_verify(self, *args, **kwargs):
-        kwargs.setdefault("verify", False)
+        kwargs["verify"] = False
         _httpx_AsyncClient_orig(self, *args, **kwargs)
 
     _httpx.Client.__init__       = _httpx_client_no_verify        # type: ignore[method-assign]
