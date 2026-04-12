@@ -70,6 +70,22 @@ def sign_in(email: str, password: str) -> tuple[dict | None, str | None]:
         return None, msg
 
 
+def refresh_session(refresh_token: str) -> tuple[dict | None, str | None]:
+    """Exchange a refresh token for a new session. Returns (session_dict, error_str)."""
+    try:
+        res = _client().auth.refresh_session(refresh_token)
+        if res.session and res.user:
+            return {
+                "access_token":  res.session.access_token,
+                "refresh_token": res.session.refresh_token,
+                "user_id":       res.user.id,
+                "email":         res.user.email or "",
+            }, None
+        return None, "Session expired."
+    except Exception as e:
+        return None, str(e)
+
+
 def sign_out(access_token: str) -> None:
     try:
         _client(access_token).auth.sign_out()
@@ -130,6 +146,78 @@ def upsert_profile(user_id: str, access_token: str, data: dict) -> None:
         pass
 
 
+# ── Telegram account linking ─────────────────────────────────────────────────
+
+def create_link_code(user_id: str, access_token: str) -> tuple[str | None, str | None]:
+    """Generate a 6-char link code valid for 10 minutes.
+    Returns (code, None) on success or (None, error_message) on failure."""
+    import secrets, string
+    code = ''.join(secrets.choice(string.ascii_uppercase + string.digits) for _ in range(6))
+    try:
+        c = _client(access_token)
+        c.table("telegram_link_codes").delete().eq("user_id", user_id).execute()
+        c.table("telegram_link_codes").insert({"code": code, "user_id": user_id}).execute()
+        return code, None
+    except Exception as e:
+        return None, str(e)
+
+
+def consume_link_code(code: str, chat_id: int) -> str | None:
+    """Atomically validate the code and write chat_id to the user row.
+    Returns user_id on success, None if the code is invalid/expired.
+    Calls the link_telegram_account RPC (SECURITY DEFINER — no JWT needed)."""
+    try:
+        res = (_client()
+               .rpc("link_telegram_account", {"p_code": code.upper(), "p_chat_id": chat_id})
+               .execute())
+        uid = res.data
+        return str(uid) if uid else None
+    except Exception:
+        return None
+
+
+def get_telegram_profile(chat_id: int) -> dict:
+    """Return the user profile keyed by plain DB column names (name, level, …).
+    Uses the get_telegram_profile RPC (SECURITY DEFINER — no JWT needed).
+    Returns {} when the chat_id is not linked."""
+    try:
+        res = (_client()
+               .rpc("get_telegram_profile", {"p_chat_id": chat_id})
+               .execute())
+        rows = res.data or []
+        return dict(rows[0]) if rows else {}
+    except Exception:
+        return {}
+
+
+def get_telegram_link_status(user_id: str, access_token: str) -> int | None:
+    """Return the linked telegram_chat_id for this user, or None if not linked."""
+    try:
+        res = (_client(access_token)
+               .table("users")
+               .select("telegram_chat_id")
+               .eq("id", user_id)
+               .single()
+               .execute())
+        if res and res.data:
+            return res.data.get("telegram_chat_id")
+        return None
+    except Exception:
+        return None
+
+
+def unlink_telegram(user_id: str, access_token: str) -> None:
+    """Remove the telegram_chat_id from the user's account."""
+    try:
+        (_client(access_token)
+         .table("users")
+         .update({"telegram_chat_id": None})
+         .eq("id", user_id)
+         .execute())
+    except Exception:
+        pass
+
+
 # ── Session history ───────────────────────────────────────────────────────────
 
 def save_session(user_id: str, access_token: str, session_data: dict) -> None:
@@ -168,4 +256,9 @@ def require_auth() -> None:
         return
     import streamlit as st
     if "sb_user_id" not in st.session_state:
+        if st.session_state.get("_cookie_restoring"):
+            # Cookie component is still initialising — pause here so the render
+            # completes and the React component can send back the cookie value.
+            # The component's setComponentValue() will trigger an automatic rerun.
+            st.stop()
         st.switch_page("pages/login.py")
