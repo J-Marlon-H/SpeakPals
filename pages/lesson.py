@@ -204,9 +204,11 @@ if not st.session_state.scene_images:
     selected = st.session_state.get("selected_scene")
     scene_data = _SCENE_BY_KEY.get(selected) if selected else None
     if scene_data:
+        is_free_conv = scene_data.get("free_conv", False)
         st.session_state.scene_images = [{
-            "src":         f"scenes/{scene_data['file']}",
+            "src":         "" if is_free_conv else f"scenes/{scene_data['file']}",
             "description": scene_data["scene_description"],
+            "free_conv":   is_free_conv,
         }]
     else:
         st.switch_page("pages/home.py")
@@ -217,13 +219,14 @@ scene_list        = st.session_state.scene_images
 current_scene     = scene_list[st.session_state.scene_idx] if scene_list else None
 scene_description = current_scene["description"] if current_scene else ""
 _scene_src_raw    = current_scene["src"] if current_scene else ""
+is_free_conv      = current_scene.get("free_conv", False) if current_scene else False
 scene_idx_1based  = st.session_state.scene_idx + 1
 
 # Convert local images to base64; FAL URLs pass through as-is
 if _scene_src_raw and not _scene_src_raw.startswith(("http", "data:")):
     scene_src = _scene_to_data_url(_scene_src_raw)
 else:
-    scene_src = _scene_src_raw
+    scene_src = _scene_src_raw  # "" for free conversation — ob_mode handles the background
 
 voice_id = lang_voices[voice_label] if voice_label in lang_voices else next(iter(lang_voices.values()))
 
@@ -241,7 +244,7 @@ char_label  = _SCENE_BY_KEY[sk]["char_name"] if sk and sk in _SCENE_BY_KEY else 
 tutor_name  = get_tutor_name(target_lang)
 turn_count = st.session_state.turn_count
 _lang_openers = SCENE_OPENERS_BY_LANG.get(target_lang, SCENE_OPENERS_BY_LANG["Danish"])
-opener_line   = _lang_openers.get(sk, "") if sk else ""
+opener_line   = _lang_openers.get(sk, "") if (sk and not is_free_conv) else ""
 
 system = build_system_prompt(
     name, level, bg_lang,
@@ -249,6 +252,7 @@ system = build_system_prompt(
     scene_description=scene_description,
     turn_count=turn_count,
     knowledge_profile=st.session_state.get("knowledge_profile"),
+    free_conv=is_free_conv,
 )
 
 # Load opener TTS once at lesson start
@@ -425,6 +429,7 @@ mic_props = dict(
                          if st.session_state.last_response else ""),
     progress_current  = 0,
     progress_total    = 0,
+    ob_mode           = is_free_conv,   # light bg + centred avatar for free conversation
     default           = None,
     height            = 900,
 )
@@ -481,15 +486,15 @@ if student_text:
         st.session_state.avatar_thinking = False
         st.session_state.last_response   = (student_text, tutor_text)
 
-        # ── Route audio to character or tutor based on speaker ────────────────
+        # ── Route audio: free conv always goes to tutor avatar ───────────────
         if all_chunks:
-            if last_speaker == "character":
+            if is_free_conv or last_speaker != "character":
+                st.session_state.last_chunks    = all_chunks
+                st.session_state.tutor_play_seq += 1
+            else:
                 st.session_state.char_audio    = all_chunks
                 st.session_state.char_play_seq += 1
                 st.session_state.last_chunks   = None
-            else:
-                st.session_state.last_chunks    = all_chunks
-                st.session_state.tutor_play_seq += 1
 
         # ── Determine last character line (for coaching log context) ──────────
         _last_char = next(
@@ -518,7 +523,7 @@ if student_text:
         # ── Handle scene done ─────────────────────────────────────────────────
         if scene_done:
             st.session_state.scene_complete = True
-            if st.session_state.scene_idx < 4 and FAL_KEY:
+            if not is_free_conv and st.session_state.scene_idx < 4 and FAL_KEY:
                 next_prompt = SCENE_NEXT_PROMPT.get(sk, "")
                 if next_prompt:
                     st.session_state.scene_loading = True

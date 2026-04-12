@@ -63,6 +63,35 @@ Always respond with the JSON format defined in the scene block below. No markdow
 
 _LANG_PROFILE_DIR = pathlib.Path(__file__).parent / "lang_profiles"
 
+# ── Free conversation block ─────────────────────────────────────────────────────
+
+_FREE_CONV_BLOCK = """
+
+## Mode: Free Conversation
+
+This is a direct, open-ended conversation between you ({tutor_name}) and {name}. \
+No character roleplay — it is just you and the student talking.
+
+Your job is to lead a natural, engaging conversation entirely in {target_lang}. \
+Use the student profile above to guide what you talk about:
+- Pick up on anything marked as "Very recent" — they may want to continue exactly where they left off.
+- Build on their stated goals, personal context, and things they've mentioned before.
+- Introduce vocabulary and grammar naturally at their level ({level}).
+- Ask follow-up questions about their life, plans, and interests.
+- Keep it warm and curious — this should feel like talking to a knowledgeable friend.
+
+Turns so far: {turn_count}
+
+ROUTING — respond ONLY with a single JSON object on one line, no extra text:
+Normal turn:   {{"verdict":"accept","speaker":"tutor","text":"[your reply in {target_lang}]","scene_done":false,"correct":true}}
+With error:    {{"verdict":"accept","speaker":"tutor","text":"[your reply]","scene_done":false,"correct":false,"correction":"[ideal phrase the student should have said]"}}
+Wrap-up:       {{"verdict":"accept","speaker":"tutor","text":"[warm closing in {target_lang}]","scene_done":true,"correct":true}}
+
+correct:false — only when the student used the wrong language or was clearly missing key vocabulary.
+correct:true  — any {target_lang} attempt, even imperfect grammar.
+HARD RULES: max 3 sentences · no bullets · no markdown · after ~12 turns wrap up warmly.
+"""
+
 # ── Scene roleplay block ────────────────────────────────────────────────────────
 
 _SCENE_BLOCK = """
@@ -171,7 +200,8 @@ def build_system_prompt(name: str, level: str, bg_lang: str,
                         target_lang: str = "Danish",
                         scene_description: str = "",
                         turn_count: int = 0,
-                        knowledge_profile: dict | None = None) -> str:
+                        knowledge_profile: dict | None = None,
+                        free_conv: bool = False) -> str:
     tutor_name = _TUTOR_NAME.get(target_lang, "Alex")
     tutor_persona = _TUTOR_PERSONA.get(target_lang, "warm and patient")
     lang_display = _LANG_DISPLAY.get(target_lang, target_lang)
@@ -203,7 +233,15 @@ def build_system_prompt(name: str, level: str, bg_lang: str,
                 lines.append(f"**{heading}**: {content}")
             prompt += "\n".join(lines)
 
-    if scene_description:
+    if free_conv:
+        prompt += _FREE_CONV_BLOCK.format(
+            tutor_name=tutor_name,
+            name=name,
+            target_lang=lang_display,
+            level=level,
+            turn_count=turn_count,
+        )
+    elif scene_description:
         prompt += _SCENE_BLOCK.format(
             scene_description=scene_description,
             turn_count=turn_count,

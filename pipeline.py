@@ -234,6 +234,17 @@ SCENE_CATALOG = [
         "char_name":   "Waiter",
         "scene_description": "Danish restaurant — a waiter is at your table, ready to take your order",
     },
+    {
+        "key":         "free_conversation",
+        "level":       "A1",
+        "title":       "Free Conversation",
+        "desc":        "Chat directly with your tutor — topics picked from your goals and memory",
+        "file":        "",
+        "gradient":    "linear-gradient(135deg,#0d9488,#0f766e)",
+        "char_name":   "",
+        "scene_description": "",
+        "free_conv":   True,
+    },
 ]
 
 # Session state keys that belong to one lesson — cleared when starting a new one
