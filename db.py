@@ -4,6 +4,13 @@ import os
 import json as _json
 from dotenv import load_dotenv
 
+# ── Local dev: bypass Windows SSL certificate chain issues ────────────────────
+# Windows often lacks the root CA that Supabase's edge network uses.
+# Only applies when keys.env is present (i.e. not on cloud).
+if os.path.exists("keys.env"):
+    import ssl as _ssl
+    _ssl._create_default_https_context = _ssl._create_unverified_context
+
 try:
     from supabase import create_client
     _SUPABASE_AVAILABLE = True
