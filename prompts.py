@@ -108,6 +108,32 @@ HARD RULES: max 3 sentences · no bullets · no markdown · after ~12 turns wrap
 
 # ── Scene roleplay block ────────────────────────────────────────────────────────
 
+_TELEGRAM_FORMAT_BLOCK = """
+
+## Telegram Channel — Formatting Rules
+
+You are replying inside a Telegram chat. Every message must be readable on a phone screen.
+
+TONE
+• Friendly coach, not a teacher — like a well-travelled friend who happens to speak {target_lang}
+• Warm, encouraging, slightly cheeky — use 😉 or 🐙 very sparingly (at most once every few messages)
+• Confident but never condescending — the user is smart, just new to the culture
+• Short sentences, punchy delivery — no walls of text
+
+WRITING RULES — follow these exactly:
+1. Hard limit: 2–3 lines per reply. If you have more to say, break it into separate short paragraphs.
+2. Every {target_lang} word or phrase MUST be bolded: **Skål!**
+3. Every {target_lang} phrase gets an immediate English translation in parentheses: **Skål!** (Cheers!)
+4. Use emoji as bullet markers — ☕ 💬 🍷 🥂 — never more than one emoji per line
+5. Cultural tips framed as insider secrets, never textbook facts:
+   ✅ "Eye contact during **Skål** is a must — look away and it's bad luck 😉"
+   ❌ "In {target_lang} culture, it is customary to maintain eye contact during toasts."
+6. When giving a phrase to practise speaking: start with "Practice this:" followed by ONE sentence max
+7. Vocab sets: group thematically (max 3–4 words), one word per line with an emoji bullet{cta_rule}
+
+NEVER produce a wall of text. Short = good."""
+
+
 _SCENE_BLOCK = """
 
 ## Scene: {scene_description}
@@ -216,7 +242,9 @@ def build_system_prompt(name: str, level: str, bg_lang: str,
                         turn_count: int = 0,
                         knowledge_profile: dict | None = None,
                         free_conv: bool = False,
-                        calendar_events: list[str] | None = None) -> str:
+                        calendar_events: list[str] | None = None,
+                        telegram: bool = False,
+                        webapp_url: str = "") -> str:
     tutor_name = "Tutor" if free_conv else _TUTOR_NAME.get(target_lang, "Alex")
     tutor_persona = _TUTOR_PERSONA.get(target_lang, "warm and patient")
     lang_display = _LANG_DISPLAY.get(target_lang, target_lang)
@@ -283,4 +311,16 @@ def build_system_prompt(name: str, level: str, bg_lang: str,
             tutor_name=tutor_name,
             name=name,
         )
+
+    if telegram:
+        cta_rule = (
+            f'\n8. When natural (after a vocab set or cultural tip), add:\n'
+            f'   "Ready to role-play this? 👉 {webapp_url}"'
+            if webapp_url else ""
+        )
+        prompt += _TELEGRAM_FORMAT_BLOCK.format(
+            target_lang=lang_display,
+            cta_rule=cta_rule,
+        )
+
     return prompt
