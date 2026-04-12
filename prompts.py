@@ -61,7 +61,14 @@ Always respond with the JSON format defined in the scene block below. No markdow
 
 {level_rules}"""
 
-_LANG_PROFILE_DIR = pathlib.Path(__file__).parent / "lang_profiles"
+_LANG_PROFILE_DIR    = pathlib.Path(__file__).parent / "lang_profiles"
+_CULTURE_PROFILE_DIR = pathlib.Path(__file__).parent / "culture_profiles"
+
+# Map target language display names → culture profile filenames
+_CULTURE_PROFILE_FILE = {
+    "Danish":                 "danish.txt",
+    "Portuguese (Brazilian)": "portuguese_brazilian.txt",
+}
 
 # ── Free conversation block ─────────────────────────────────────────────────────
 
@@ -225,6 +232,15 @@ def build_system_prompt(name: str, level: str, bg_lang: str,
         prompt = base + f"\n\n## Student's native language background: {bg_lang}\n{profile}"
     except FileNotFoundError:
         prompt = base
+
+    culture_file = _CULTURE_PROFILE_FILE.get(target_lang)
+    if culture_file:
+        culture_path = _CULTURE_PROFILE_DIR / culture_file
+        try:
+            culture = culture_path.read_text(encoding="utf-8")
+            prompt += f"\n\n## Cultural context: {target_lang}\n{culture}"
+        except FileNotFoundError:
+            pass
 
     if knowledge_profile:
         _nonempty = {
