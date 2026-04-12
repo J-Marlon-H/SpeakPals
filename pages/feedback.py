@@ -328,6 +328,8 @@ if (correct_log or coaching_log) and not st.session_state.get("current_session_i
                 st.session_state.sb_access_token,
                 _updated_profile,
             )
+            # Keep session state fresh so the next lesson sees the updated profile
+            st.session_state["knowledge_profile"] = _updated_profile
         save_session(
             st.session_state.sb_user_id,
             st.session_state.sb_access_token,
