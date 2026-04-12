@@ -1,7 +1,7 @@
 import streamlit as st
 from pipeline import (VOICES, VOICES_BY_LANG, MODELS, LESSON_STATE_KEYS, SCENE_CATALOG,
                       SETTINGS_DEFAULTS, SCENE_PRIMARY_VOICE)
-from db import require_auth, upsert_profile, load_profile, load_knowledge_profile, get_user_email
+from db import require_auth, upsert_profile, load_profile, load_knowledge_profile, delete_knowledge_profile, get_user_email
 
 require_auth()
 
@@ -294,6 +294,42 @@ if _custom:
         _exp_label = f"✨ **{_label}**" + (f"  ·  *{_ts[:10]}*" if _ts else "")
         with st.expander(_exp_label, expanded=False):
             st.markdown(_content or "—")
+
+# ── Delete knowledge ──────────────────────────────────────────────────────────
+st.markdown("<br>", unsafe_allow_html=True)
+
+if not st.session_state.get("_confirm_delete_profile"):
+    if st.button("🗑 Delete all my learning data", use_container_width=True):
+        st.session_state["_confirm_delete_profile"] = True
+        st.rerun()
+else:
+    st.markdown("""
+<div style='background:rgba(220,38,38,.07);border:1px solid rgba(220,38,38,.25);
+            border-radius:12px;padding:14px 16px;margin-bottom:12px'>
+  <div style='font:700 13px Inter;color:#dc2626;margin-bottom:4px'>⚠ Are you sure?</div>
+  <div style='font:400 12px/1.6 Inter;color:rgba(17,24,39,.6)'>
+    This will permanently delete everything SpeakPals knows about you —
+    your learning history, personal context, and all tutor observations.
+    Your account and lesson settings are not affected.
+    This cannot be undone.
+  </div>
+</div>""", unsafe_allow_html=True)
+    _col_yes, _col_no = st.columns(2)
+    with _col_yes:
+        if st.button("Yes, delete everything", use_container_width=True):
+            if "sb_user_id" in st.session_state:
+                delete_knowledge_profile(
+                    st.session_state.sb_user_id,
+                    st.session_state.sb_access_token,
+                )
+            st.session_state.pop("knowledge_profile", None)
+            st.session_state.pop("_confirm_delete_profile", None)
+            st.success("Your learning data has been deleted.")
+            st.rerun()
+    with _col_no:
+        if st.button("Cancel", use_container_width=True):
+            st.session_state.pop("_confirm_delete_profile", None)
+            st.rerun()
 
 st.markdown("<div class='sec-div'></div>", unsafe_allow_html=True)
 
