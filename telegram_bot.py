@@ -109,7 +109,11 @@ DEFAULT_STATE: dict = {
     "correct_log":  [],
     "coaching_log": [],
     "setup_step":   "name",   # None = fully set up
+    "sb_user_id":   None,     # set when linked to a web account
 }
+
+# Mapping from Supabase column names to bot state keys (they match, listed for clarity)
+_PROFILE_KEYS = ("name", "level", "language", "voice_label", "bg_lang")
 
 BG_LANGS = ["English", "German", "Swedish", "Other"]
 
@@ -133,6 +137,23 @@ def load_user(chat_id: int) -> dict:
 
 def save_user(chat_id: int, state: dict) -> None:
     _user_file(chat_id).write_text(json.dumps(state, indent=2))
+
+
+def load_user_synced(chat_id: int) -> dict:
+    """Load user state, pulling fresh settings from Supabase if the account is linked."""
+    user = load_user(chat_id)
+    if user.get("sb_user_id"):
+        try:
+            from db import get_telegram_profile
+            profile = get_telegram_profile(chat_id)
+            if profile:
+                for key in _PROFILE_KEYS:
+                    if profile.get(key):
+                        user[key] = profile[key]
+                save_user(chat_id, user)
+        except Exception:
+            pass
+    return user
 
 
 # ── Audio conversion ─────────────────────────────────────────────────────────
@@ -231,7 +252,7 @@ def _scene_keyboard(level: str, cal_events: list[dict] | None = None) -> InlineK
 
 async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     chat_id = update.effective_chat.id
-    user = load_user(chat_id)
+    user = load_user_synced(chat_id)  # pulls fresh settings from Supabase if linked
 
     if user["name"] and not user.get("setup_step"):
         level_labels = {"A1": "Beginner", "A2": "Elementary",
@@ -348,6 +369,7 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         "/stop                — end lesson & see corrections\n"
         "/calendar            — connect Google Calendar\n"
         "/calendar\\_disconnect — remove calendar access\n"
+        "/link CODE           — link to your SpeakPals web account\n"
         "/help                — show this message\n\n"
         "*Tips:*\n"
         "• Voice notes are transcribed automatically — speak naturally\n"
@@ -366,6 +388,57 @@ async def cmd_reset(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         f.unlink()
     await update.message.reply_text(
         "Profile cleared! Use /start to set up a new one."
+    )
+
+
+async def cmd_link(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Link this Telegram account to a SpeakPals web account via a one-time code."""
+    chat_id = update.effective_chat.id
+
+    if not context.args:
+        await update.message.reply_text(
+            "Usage: `/link CODE`\n\n"
+            "Get your code from the *Telegram & Calendar* settings page on the "
+            "SpeakPals web app, then paste it here.",
+            parse_mode="Markdown",
+        )
+        return
+
+    code = context.args[0].strip()
+    try:
+        from db import consume_link_code, get_telegram_profile
+        user_id = consume_link_code(code, chat_id)
+    except Exception as exc:
+        log.error("Link code error for chat %s: %s", chat_id, exc)
+        await update.message.reply_text("⚠️ Could not reach the account service. Try again later.")
+        return
+
+    if not user_id:
+        await update.message.reply_text(
+            "❌ That code is invalid or has expired.\n\n"
+            "Generate a new one on the SpeakPals settings page."
+        )
+        return
+
+    # Persist the link and pull the web-app profile into the bot state
+    user = load_user(chat_id)
+    user["sb_user_id"] = user_id
+    try:
+        profile = get_telegram_profile(chat_id)
+        if profile:
+            for key in _PROFILE_KEYS:
+                if profile.get(key):
+                    user[key] = profile[key]
+            user["setup_step"] = None  # skip onboarding if profile is complete
+    except Exception:
+        pass
+    save_user(chat_id, user)
+
+    await update.message.reply_text(
+        "✅ *Account linked!*\n\n"
+        "Your SpeakPals web settings (name, level, language, voice) are now "
+        "active in the bot. They'll refresh automatically each time you use /start.",
+        parse_mode="Markdown",
     )
 
 
@@ -907,6 +980,7 @@ def build_app() -> Application:
     app.add_handler(CommandHandler("stop",                 cmd_stop))
     app.add_handler(CommandHandler("help",                 cmd_help))
     app.add_handler(CommandHandler("reset",                cmd_reset))
+    app.add_handler(CommandHandler("link",                 cmd_link))
     app.add_handler(CommandHandler("calendar",             cmd_calendar))
     app.add_handler(CommandHandler("calendar_disconnect",  cmd_calendar_disconnect))
     app.add_handler(CallbackQueryHandler(callback_handler))
