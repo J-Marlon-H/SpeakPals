@@ -386,7 +386,10 @@ with st.sidebar:
 
     # Finish onboarding — pinned to bottom
     if st.button("✅ Finish Onboarding", key="btn_ob_home", use_container_width=True):
-        st.switch_page("pages/home.py")
+        if st.session_state.get("is_new_user"):
+            st.switch_page("pages/telegram_settings.py")
+        else:
+            st.switch_page("pages/home.py")
 
 # ── VAD component ──────────────────────────────────────────────────────────────
 

@@ -203,6 +203,11 @@ else:
 
 st.markdown("<div class='sec-div'></div>", unsafe_allow_html=True)
 
-# ── Back button ───────────────────────────────────────────────────────────────
-if st.button("← Back to Settings"):
-    st.switch_page("pages/account.py")
+# ── Navigation ────────────────────────────────────────────────────────────────
+_col1, _col2 = st.columns(2)
+with _col1:
+    if st.button("← Back to Settings", use_container_width=True):
+        st.switch_page("pages/account.py")
+with _col2:
+    if st.button("🏠 Start Learning", use_container_width=True, type="primary"):
+        st.switch_page("pages/home.py")
