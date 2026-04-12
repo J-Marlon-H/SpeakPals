@@ -1,7 +1,35 @@
 """db.py — Supabase client, auth, and per-user data access."""
 from __future__ import annotations
 import os
+import json as _json
 from dotenv import load_dotenv
+
+# ── Local dev: bypass Windows SSL certificate chain issues ────────────────────
+# Supabase uses httpx which has its own SSL stack — the stdlib ssl monkey-patch
+# doesn't reach it. Patch httpx.Client / AsyncClient to skip verification and
+# also point the stdlib ssl context at certifi's bundle as a belt-and-suspenders fix.
+# Guard is keys.env presence so this never runs on the cloud deployment.
+if os.path.exists("keys.env"):
+    import ssl as _ssl
+    import httpx as _httpx
+
+    # stdlib fallback (for requests-based code)
+    _ssl._create_default_https_context = _ssl._create_unverified_context
+
+    # httpx patch — supabase-py explicitly passes verify=True so we must force-override it
+    _httpx_Client_orig       = _httpx.Client.__init__
+    _httpx_AsyncClient_orig  = _httpx.AsyncClient.__init__
+
+    def _httpx_client_no_verify(self, *args, **kwargs):
+        kwargs["verify"] = False          # force — supabase passes verify=True explicitly
+        _httpx_Client_orig(self, *args, **kwargs)
+
+    def _httpx_async_client_no_verify(self, *args, **kwargs):
+        kwargs["verify"] = False
+        _httpx_AsyncClient_orig(self, *args, **kwargs)
+
+    _httpx.Client.__init__       = _httpx_client_no_verify        # type: ignore[method-assign]
+    _httpx.AsyncClient.__init__  = _httpx_async_client_no_verify  # type: ignore[method-assign]
 
 try:
     from supabase import create_client
@@ -91,6 +119,15 @@ def sign_out(access_token: str) -> None:
         _client(access_token).auth.sign_out()
     except Exception:
         pass
+
+
+def get_user_email(access_token: str) -> str:
+    """Return the email address for the authenticated user, or '' on failure."""
+    try:
+        res = _client(access_token).auth.get_user(access_token)
+        return res.user.email if res and res.user else ""
+    except Exception:
+        return ""
 
 
 # ── Profile key mapping ───────────────────────────────────────────────────────
@@ -213,6 +250,55 @@ def unlink_telegram(user_id: str, access_token: str) -> None:
          .table("users")
          .update({"telegram_chat_id": None})
          .eq("id", user_id)
+         .execute())
+    except Exception:
+        pass
+
+
+# ── User knowledge profile ────────────────────────────────────────────────────
+
+def load_knowledge_profile(user_id: str, access_token: str) -> dict:
+    """Return the user's knowledge profile JSON, or {} if none exists yet."""
+    try:
+        res = (_client(access_token)
+               .table("user_knowledge_profiles")
+               .select("profile")
+               .eq("user_id", user_id)
+               .maybe_single()
+               .execute())
+        if res is not None and res.data:
+            p = res.data.get("profile")
+            if not p:
+                return {}
+            return p if isinstance(p, dict) else _json.loads(p)
+        return {}
+    except Exception:
+        return {}
+
+
+def save_knowledge_profile(user_id: str, access_token: str, profile: dict) -> None:
+    """Upsert the user's knowledge profile JSON."""
+    import datetime as _dt
+    try:
+        (_client(access_token)
+         .table("user_knowledge_profiles")
+         .upsert({
+             "user_id":    user_id,
+             "profile":    _json.dumps(profile, ensure_ascii=False),
+             "updated_at": _dt.datetime.utcnow().isoformat() + "Z",
+         })
+         .execute())
+    except Exception:
+        pass
+
+
+def delete_knowledge_profile(user_id: str, access_token: str) -> None:
+    """Delete the user's knowledge profile row entirely."""
+    try:
+        (_client(access_token)
+         .table("user_knowledge_profiles")
+         .delete()
+         .eq("user_id", user_id)
          .execute())
     except Exception:
         pass

@@ -68,13 +68,14 @@ if "sb_user_id" not in st.session_state:
         st.session_state.pop("_cookie_restoring", None)
 
 pages = [
-    st.Page("pages/home.py",               title="Home",              default=True),
-    st.Page("pages/login.py",              title="Login",             visibility="hidden"),
-    st.Page("pages/account.py",            title="Account",           visibility="hidden"),
-    st.Page("pages/telegram_settings.py",  title="Telegram",          visibility="hidden"),
-    st.Page("pages/scene_select.py",       title="Scene Select",      visibility="hidden"),
-    st.Page("pages/lesson.py",             title="Lesson",            visibility="hidden"),
-    st.Page("pages/feedback.py",           title="Feedback",          visibility="hidden"),
+    st.Page("pages/home.py",              title="Home",         default=True),
+    st.Page("pages/login.py",             title="Login",        visibility="hidden"),
+    st.Page("pages/account.py",           title="Account",      visibility="hidden"),
+    st.Page("pages/telegram_settings.py", title="Telegram",     visibility="hidden"),
+    st.Page("pages/scene_select.py",      title="Scene Select", visibility="hidden"),
+    st.Page("pages/lesson.py",            title="Lesson",       visibility="hidden"),
+    st.Page("pages/feedback.py",          title="Feedback",     visibility="hidden"),
+    st.Page("pages/onboarding.py",        title="Onboarding",   visibility="hidden"),
 ]
 pg = st.navigation(pages, position="hidden")
 pg.run()

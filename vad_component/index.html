@@ -269,12 +269,13 @@ function sendToStreamlit(val) {
 window.parent.postMessage({isStreamlitMessage:true, type:"streamlit:componentReady", apiVersion:1}, "*");
 
 // ── State ─────────────────────────────────────────────────────────────────────
-var lang         = "da";
-var proxyPort    = null;
-var wsToken      = null;
-var rendered     = false;
-var pendingStart = false;
-var started      = false;          // true after user clicks Start
+var lang           = "da";
+var proxyPort      = null;
+var wsToken        = null;
+var rendered       = false;
+var pendingStart   = false;
+var started        = false;        // true after user clicks Start (or ob_mode auto-start)
+var obAutoStarted  = false;        // guard: only schedule ob auto-start once
 
 var lastTutorPlaySeq      = 0;
 var lastCharPlaySeq       = 0;
@@ -324,6 +325,66 @@ window.addEventListener("message", function(e) {
   wsToken   = a.ws_token   || null;
   rendered  = true;
 
+  // ── Onboarding mode — light background, centred large avatar, auto-start ──
+  var obMode = !!a.ob_mode;
+  if (obMode) {
+    document.body.style.background = '#f5f0eb';
+    wrapEl.style.backgroundColor   = '#f5f0eb';
+    noScene.style.display = 'none'; // never show "Loading scene…" text
+
+    // Centre + enlarge avatar panel (apply once)
+    var ap = document.querySelector('.avatar-panel');
+    if (ap && !ap.dataset.obStyled) {
+      ap.dataset.obStyled = '1';
+      ap.style.position       = 'absolute';
+      ap.style.bottom         = 'auto';
+      ap.style.right          = 'auto';
+      ap.style.top            = '46%';
+      ap.style.left           = '50%';
+      ap.style.transform      = 'translate(-50%, -50%) scale(2.6)';
+      ap.style.transformOrigin= 'center center';
+      ap.style.background     = 'transparent';
+      ap.style.border         = 'none';
+      ap.style.boxShadow      = 'none';
+      // Fix text colours for light background
+      var avTitle = ap.querySelector('.av-title');
+      if (avTitle) avTitle.style.color = 'rgba(17,24,39,.5)';
+      var avLblEl = ap.querySelector('.av-lbl');
+      if (avLblEl) avLblEl.style.color = 'rgba(17,24,39,.5)';
+      var rBtn = ap.querySelector('.replay-btn');
+      if (rBtn) {
+        rBtn.style.background  = 'rgba(0,0,0,.07)';
+        rBtn.style.border      = '1px solid rgba(0,0,0,.13)';
+        rBtn.style.color       = 'rgba(17,24,39,.55)';
+      }
+    }
+
+    // Mic wrap — subtle dark backdrop on light bg
+    var micW = document.querySelector('.mic-wrap');
+    if (micW && !micW.dataset.obStyled) {
+      micW.dataset.obStyled = '1';
+      micW.style.background = 'rgba(0,0,0,.12)';
+    }
+
+    // Hide start overlay and auto-start after 1.5 s (browser allows audio after page nav)
+    startOverlay.style.display = 'none';
+    if (!obAutoStarted) {
+      obAutoStarted = true;
+      setTimeout(function() {
+        if (!started) {
+          started = true;
+          sendToStreamlit("__started__");
+          if (pendingCharChunks.length > 0) {
+            currentCharChunks = pendingCharChunks;
+            pendingCharChunks = [];
+            playCharChunks(currentCharChunks);
+          }
+          prewarm();
+        }
+      }, 1500);
+    }
+  }
+
   // ── Scene image (CSS background — fills container with no cropping at top)
   var src = a.scene_src || "";
   var currentBg = wrapEl.dataset.sceneSrc || "";
@@ -332,12 +393,14 @@ window.addEventListener("message", function(e) {
     var tmp = new Image();
     tmp.onload = function() {
       wrapEl.style.backgroundImage = "url('" + src.replace(/'/g, "\\'") + "')";
-      noScene.style.display = 'none';
+      if (!obMode) noScene.style.display = 'none';
     };
     tmp.src = src;
-  } else if (!src) {
+  } else if (!src && !obMode) {
     wrapEl.style.backgroundImage = "none";
     noScene.style.display = "flex";
+  } else if (!src) {
+    wrapEl.style.backgroundImage = "none";
   }
 
   // ── Avatar (tutor) — seq-number based detection, checked FIRST ──────────

@@ -23,12 +23,12 @@ st.markdown("""<style>
     border-color:#0d9488!important;
     box-shadow:0 0 0 3px rgba(13,148,136,.1)!important}
 
-  .stButton button{
+  .stButton button, .stFormSubmitButton button{
     border-radius:10px!important;font-weight:600!important;font-size:14px!important;
     border:1px solid rgba(13,148,136,.3)!important;
     background:rgba(13,148,136,.1)!important;color:#0d9488!important;
     transition:background .2s}
-  .stButton button:hover{background:rgba(13,148,136,.2)!important}
+  .stButton button:hover, .stFormSubmitButton button:hover{background:rgba(13,148,136,.2)!important}
   div[data-testid="stVerticalBlock"]{gap:0.4rem!important}
 
   /* Tab styling */
@@ -60,10 +60,13 @@ tab_login, tab_register = st.tabs(["Sign in", "Create account"])
 
 # ── Sign in ───────────────────────────────────────────────────────────────────
 with tab_login:
-    email_in    = st.text_input("Email", key="login_email", placeholder="you@example.com")
-    password_in = st.text_input("Password", key="login_pw", type="password", placeholder="••••••••")
-    st.markdown("<div style='height:4px'></div>", unsafe_allow_html=True)
-    if st.button("Sign in", use_container_width=True, key="btn_login"):
+    with st.form("login_form"):
+        email_in    = st.text_input("Email", key="login_email", placeholder="you@example.com")
+        password_in = st.text_input("Password", key="login_pw", type="password", placeholder="••••••••")
+        st.markdown("<div style='height:4px'></div>", unsafe_allow_html=True)
+        submitted = st.form_submit_button("Sign in", use_container_width=True)
+
+    if submitted:
         if not email_in or not password_in:
             st.error("Please enter your email and password.")
         else:
@@ -79,13 +82,16 @@ with tab_login:
 
 # ── Create account ────────────────────────────────────────────────────────────
 with tab_register:
-    reg_email    = st.text_input("Email", key="reg_email", placeholder="you@example.com")
-    reg_password = st.text_input("Password", key="reg_pw", type="password",
-                                 placeholder="At least 6 characters")
-    reg_confirm  = st.text_input("Confirm password", key="reg_confirm", type="password",
-                                 placeholder="••••••••")
-    st.markdown("<div style='height:4px'></div>", unsafe_allow_html=True)
-    if st.button("Create account", use_container_width=True, key="btn_register"):
+    with st.form("register_form"):
+        reg_email    = st.text_input("Email", key="reg_email", placeholder="you@example.com")
+        reg_password = st.text_input("Password", key="reg_pw", type="password",
+                                     placeholder="At least 6 characters")
+        reg_confirm  = st.text_input("Confirm password", key="reg_confirm", type="password",
+                                     placeholder="••••••••")
+        st.markdown("<div style='height:4px'></div>", unsafe_allow_html=True)
+        reg_submitted = st.form_submit_button("Create account", use_container_width=True)
+
+    if reg_submitted:
         if not reg_email or not reg_password or not reg_confirm:
             st.error("Please fill in all fields.")
         elif len(reg_password) < 6:
@@ -97,7 +103,17 @@ with tab_register:
             if err:
                 st.error(err)
             else:
-                st.success(
-                    "Account created! Check your email for a confirmation link, "
-                    "then sign in."
-                )
+                # Try to auto-login immediately (works when email confirmation is disabled)
+                session, login_err = sign_in(reg_email.strip(), reg_password)
+                if session:
+                    st.session_state.sb_access_token  = session["access_token"]
+                    st.session_state.sb_refresh_token = session["refresh_token"]
+                    st.session_state.sb_user_id       = session["user_id"]
+                    st.session_state.sb_email         = session["email"]
+                    st.session_state["is_new_user"]   = True
+                    st.switch_page("pages/onboarding.py")
+                else:
+                    st.success(
+                        "Account created! Check your email for a confirmation link, "
+                        "then sign in."
+                    )
