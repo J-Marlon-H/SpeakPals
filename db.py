@@ -70,6 +70,22 @@ def sign_in(email: str, password: str) -> tuple[dict | None, str | None]:
         return None, msg
 
 
+def refresh_session(refresh_token: str) -> tuple[dict | None, str | None]:
+    """Exchange a refresh token for a new session. Returns (session_dict, error_str)."""
+    try:
+        res = _client().auth.refresh_session(refresh_token)
+        if res.session and res.user:
+            return {
+                "access_token":  res.session.access_token,
+                "refresh_token": res.session.refresh_token,
+                "user_id":       res.user.id,
+                "email":         res.user.email or "",
+            }, None
+        return None, "Session expired."
+    except Exception as e:
+        return None, str(e)
+
+
 def sign_out(access_token: str) -> None:
     try:
         _client(access_token).auth.sign_out()
@@ -168,4 +184,9 @@ def require_auth() -> None:
         return
     import streamlit as st
     if "sb_user_id" not in st.session_state:
+        if st.session_state.get("_cookie_restoring"):
+            # Cookie component is still initialising — pause here so the render
+            # completes and the React component can send back the cookie value.
+            # The component's setComponentValue() will trigger an automatic rerun.
+            st.stop()
         st.switch_page("pages/login.py")
