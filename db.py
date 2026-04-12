@@ -48,8 +48,9 @@ def _secret(key: str) -> str:
         return os.getenv(key, "")
 
 
-SUPABASE_URL = _secret("SUPABASE_URL")
-SUPABASE_KEY = _secret("SUPABASE_ANON_KEY") or _secret("SUPABASE_PUBLISHABLE_KEY")
+SUPABASE_URL         = _secret("SUPABASE_URL")
+SUPABASE_KEY         = _secret("SUPABASE_ANON_KEY") or _secret("SUPABASE_PUBLISHABLE_KEY")
+SUPABASE_SERVICE_KEY = _secret("SUPABASE_SERVICE_KEY")  # service-role key (bypasses RLS)
 
 
 def _client(access_token: str | None = None):
@@ -60,6 +61,19 @@ def _client(access_token: str | None = None):
     if access_token:
         c.auth.set_session(access_token, "")
     return c
+
+
+def _service_client():
+    """Return a Supabase client using the service-role key (bypasses RLS).
+
+    Used by server-side processes (telegram bot) that act on behalf of users
+    without holding their session token.  Falls back to the anon client when the
+    service key is not configured (queries may then be blocked by RLS).
+    """
+    if not _SUPABASE_AVAILABLE:
+        raise RuntimeError("supabase package not installed")
+    key = SUPABASE_SERVICE_KEY or SUPABASE_KEY
+    return create_client(SUPABASE_URL, key)  # type: ignore[name-defined]
 
 
 # ── Auth ──────────────────────────────────────────────────────────────────────
@@ -290,6 +304,29 @@ def save_knowledge_profile(user_id: str, access_token: str, profile: dict) -> No
          .execute())
     except Exception:
         pass
+
+
+def load_knowledge_profile_for_bot(user_id: str) -> dict:
+    """Load a user's knowledge profile from the server side (no user JWT required).
+
+    Uses the service-role key so RLS is bypassed.  Called by the Telegram bot which
+    holds the user_id but not a live session token.  Returns {} on any error.
+    """
+    try:
+        res = (_service_client()
+               .table("user_knowledge_profiles")
+               .select("profile")
+               .eq("user_id", user_id)
+               .maybe_single()
+               .execute())
+        if res is not None and res.data:
+            p = res.data.get("profile")
+            if not p:
+                return {}
+            return p if isinstance(p, dict) else _json.loads(p)
+        return {}
+    except Exception:
+        return {}
 
 
 def delete_knowledge_profile(user_id: str, access_token: str) -> None:

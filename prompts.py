@@ -226,6 +226,26 @@ def get_tutor_name(target_lang: str) -> str:
     return _TUTOR_NAME.get(target_lang, "Alex")
 
 
+def build_cal_scene_prompt(event_title: str, date_label: str, language: str) -> str:
+    """Return the Claude prompt used to generate a calendar-based roleplay scene.
+
+    The response is expected to be a single JSON object with keys:
+    title, desc, char_name, scene_description.
+    """
+    return (
+        f"A language learner is practising {language}. "
+        f"They have an upcoming event: '{event_title}' on {date_label}. "
+        "Generate a short roleplay scene they can practise to prepare for it.\n\n"
+        "Respond with ONLY a JSON object on one line with these fields:\n"
+        '  "title": short scene title (max 5 words)\n'
+        '  "desc": one sentence describing what the student practises\n'
+        '  "char_name": name/role of the character (e.g. "Colleague", "Doctor", "Host")\n'
+        '  "scene_description": 1–2 sentence scene-setting description for the AI tutor '
+        "(describe the setting and character's role/mood — this becomes the system prompt scene)\n\n"
+        "Keep it realistic and directly relevant to the event."
+    )
+
+
 def build_system_prompt(name: str, level: str, bg_lang: str,
                         target_lang: str = "Danish",
                         scene_description: str = "",
