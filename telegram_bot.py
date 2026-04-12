@@ -757,6 +757,7 @@ def _build_context(user: dict, chat_id: int) -> tuple[str, str, str, str, str]:
         scene_description=scene_description,
         turn_count=user.get("turn_count", 0),
         calendar_events=events or None,
+        telegram=True,
     )
     lang_voices   = VOICES_BY_LANG.get(user["language"], {})
     voice_id      = lang_voices.get(user["voice_label"]) or next(iter(lang_voices.values()))
