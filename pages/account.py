@@ -252,7 +252,8 @@ else:
         "learning_motivation":   "Learning Motivation",
         "personal_use_context":  "Where You'll Use It",
         "common_errors":         "Common Errors & Patterns",
-        "conversation_history":   "Conversation History",
+        "conversation_history":  "Conversation History",
+        "personal_facts":        "Personal Facts",
     }
     for _key, _val in _kp.items():
         _label   = _LABEL.get(_key, _key.replace("_", " ").title())

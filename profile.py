@@ -13,6 +13,7 @@ REQUIRED_CATEGORIES = [
     "personal_use_context",
     "common_errors",
     "conversation_history",
+    "personal_facts",
 ]
 
 # ── Claude prompt ──────────────────────────────────────────────────────────────
@@ -38,22 +39,27 @@ Student: {name}  |  Level: {level}  |  Target language: {target_lang}  |  Native
 Return an updated profile JSON object that incorporates everything you learned about this student from the session.
 
 Rules:
-1. Always include all 5 predefined keys: language_level, learning_motivation, personal_use_context, common_errors, conversation_history.
+1. Always include all 6 predefined keys: language_level, learning_motivation, personal_use_context, common_errors, conversation_history, personal_facts.
 2. You may add up to 2 additional snake_case keys if the session reveals something important that does not fit the predefined categories. Choose short, descriptive key names (e.g. "pronunciation_notes", "cultural_interests").
-3. The total number of keys must not exceed 7.
+3. The total number of keys must not exceed 8.
 4. Preserve any existing custom keys from the current profile unless you have a strong reason to merge or remove them.
 5. Each category value must be a JSON object with exactly two fields:
    - "content": A comprehensive summary about the learner. Rules per category type:
-     • For conversation_history: write as Markdown bullet points (each starting with "- "), \
-one bullet per notable topic or fact that has come up across all sessions. \
-Accumulate bullets from prior sessions — never delete existing bullets, only add new ones. \
-Keep each bullet concise (one line). Example: "- Mentioned Danish partner named Sofie\n- Plans to move to Copenhagen in June 2026"
+     • For conversation_history: write as Markdown bullet points with a date prefix on each line. \
+Format: "- YYYY-MM-DD: brief description of what was covered or discussed". \
+Use today's date {today_date} for entries from this session. \
+Accumulate bullets from prior sessions — NEVER delete existing dated bullets, only add new ones. \
+Sort with the most recent date at the top. \
+Example: "- 2026-04-12: Practiced cafe scene, ordered coffee and a pastry\n- 2026-04-05: Onboarding — learning Danish for Copenhagen move"
+     • For personal_facts: write as Markdown bullet points, one fact per line (e.g. "- Name: Marlon", "- Lives in: Copenhagen", "- Job: software engineer"). \
+Only include facts the user has explicitly stated — never infer or guess. \
+Accumulate across sessions; never delete a confirmed fact unless contradicted.
      • For all other categories: write in present tense, third person, plain prose. Include all \
 relevant observations — specific words, phrases, patterns, examples. \
 Do not truncate; write as much as is genuinely useful. Accumulate and enrich across sessions.
    - "updated_at": The ISO 8601 UTC timestamp "{now_iso}" — use this exact value if content changed, keep the old timestamp if the category was not updated.
 6. If a session reveals nothing new for a category, keep the existing content and timestamp completely unchanged.
-7. If the current profile is empty ({{}}) this is the first session — populate all 5 predefined categories with whatever the session reveals. Set content to "" for categories with no evidence yet.
+7. If the current profile is empty ({{}}) this is the first session — populate all 6 predefined categories with whatever the session reveals. Set content to "" for categories with no evidence yet.
 8. Do not include any explanation, markdown, or text outside the JSON object.
 
 Reply with only the JSON object, starting with {{ and ending with }}.
@@ -101,7 +107,8 @@ def update_knowledge_profile(
     Returns the updated profile dict on success, or the unchanged current_profile
     on any error — data is never lost.
     """
-    now_iso = datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+    now_iso    = datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+    today_date = datetime.date.today().isoformat()
     prompt = _UPDATE_PROMPT.format(
         current_profile_json=json.dumps(current_profile, ensure_ascii=False, indent=2),
         name=name,
@@ -111,6 +118,7 @@ def update_knowledge_profile(
         conversation_text=_format_conversation(correct_log),
         error_text=_format_errors(coaching_log),
         now_iso=now_iso,
+        today_date=today_date,
     )
 
     sess = http_session or requests.Session()
@@ -147,7 +155,7 @@ def update_knowledge_profile(
             if key not in updated:
                 updated[key] = {"content": "", "updated_at": now_iso}
 
-        # Enforce max 7 keys: keep 5 required + up to 2 custom (alphabetical if >2)
+        # Enforce max 8 keys: keep 6 required + up to 2 custom (alphabetical if >2)
         custom_keys = [k for k in updated if k not in REQUIRED_CATEGORIES]
         if len(custom_keys) > 2:
             for k in sorted(custom_keys)[2:]:

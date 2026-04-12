@@ -1,5 +1,7 @@
 from __future__ import annotations
 import pathlib
+import re as _re
+import datetime as _dt
 
 # ── Short display name used inside prompts (avoids "Portuguese (Brazilian)") ────
 _LANG_DISPLAY = {
@@ -119,6 +121,48 @@ HARD RULES: max 2 sentences · no bullets · no markdown · correction is always
 """
 
 
+def _decay_conv_history(content: str) -> str:
+    """Re-format conversation_history bullets with time-decay labels.
+
+    Bullets are expected to start with a YYYY-MM-DD: prefix.
+    Buckets: today/yesterday → "Recent (high priority)", last 7 days → "This week", older → "Earlier".
+    Undated bullets fall into "Earlier".
+    """
+    today = _dt.date.today()
+    buckets: dict[str, list[str]] = {"recent": [], "week": [], "older": []}
+
+    for raw_line in content.splitlines():
+        line = raw_line.strip()
+        if not line:
+            continue
+        m = _re.match(r'^[-•]?\s*(\d{4}-\d{2}-\d{2}):\s*(.+)$', line)
+        if m:
+            try:
+                entry_date = _dt.date.fromisoformat(m.group(1))
+                delta = (today - entry_date).days
+                text = f"- [{m.group(1)}] {m.group(2).strip()}"
+                if delta <= 1:
+                    buckets["recent"].append(text)
+                elif delta <= 7:
+                    buckets["week"].append(text)
+                else:
+                    buckets["older"].append(text)
+                continue
+            except ValueError:
+                pass
+        buckets["older"].append(line)
+
+    parts = []
+    if buckets["recent"]:
+        parts.append("⚡ Very recent — last 24 h (HIGH PRIORITY — student may want to continue this):\n"
+                     + "\n".join(buckets["recent"]))
+    if buckets["week"]:
+        parts.append("This week:\n" + "\n".join(buckets["week"]))
+    if buckets["older"]:
+        parts.append("Earlier sessions:\n" + "\n".join(buckets["older"]))
+    return "\n\n".join(parts) if parts else content
+
+
 def get_tutor_name(target_lang: str) -> str:
     return _TUTOR_NAME.get(target_lang, "Alex")
 
@@ -153,7 +197,10 @@ def build_system_prompt(name: str, level: str, bg_lang: str,
             lines = ["\n\n## What you know about this student"]
             for key, val in _nonempty.items():
                 heading = key.replace("_", " ").title()
-                lines.append(f"**{heading}**: {val['content']}")
+                content = val["content"]
+                if key == "conversation_history":
+                    content = _decay_conv_history(content)
+                lines.append(f"**{heading}**: {content}")
             prompt += "\n".join(lines)
 
     if scene_description:
