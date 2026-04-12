@@ -292,6 +292,33 @@ def save_knowledge_profile(user_id: str, access_token: str, profile: dict) -> No
         pass
 
 
+def save_knowledge_profile_for_bot(chat_id: int, profile: dict) -> None:
+    """Upsert a user's knowledge profile from the Telegram bot (no user JWT needed).
+
+    Uses the upsert_knowledge_profile_by_chat_id RPC (SECURITY DEFINER).
+
+    Required SQL (run once in Supabase SQL editor):
+
+        CREATE OR REPLACE FUNCTION upsert_knowledge_profile_by_chat_id(
+            p_chat_id BIGINT, p_profile JSONB)
+        RETURNS VOID LANGUAGE plpgsql SECURITY DEFINER AS $$
+        DECLARE v_uid UUID; BEGIN
+          SELECT id INTO v_uid FROM users WHERE telegram_chat_id = p_chat_id;
+          IF NOT FOUND THEN RETURN; END IF;
+          INSERT INTO user_knowledge_profiles (user_id, profile, updated_at)
+          VALUES (v_uid, p_profile, now())
+          ON CONFLICT (user_id) DO UPDATE
+            SET profile = p_profile, updated_at = now();
+        END; $$;
+    """
+    try:
+        _client().rpc("upsert_knowledge_profile_by_chat_id",
+                      {"p_chat_id": chat_id,
+                       "p_profile": _json.dumps(profile, ensure_ascii=False)}).execute()
+    except Exception:
+        pass
+
+
 def load_knowledge_profile_for_bot(chat_id: int) -> dict:
     """Load a user's knowledge profile from the Telegram bot (no user JWT needed).
 

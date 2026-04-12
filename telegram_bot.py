@@ -86,6 +86,63 @@ USERS_DIR.mkdir(exist_ok=True)
 
 _executor = ThreadPoolExecutor(max_workers=4)
 
+# ── Inactivity-based profile update ──────────────────────────────────────────
+# After PROFILE_UPDATE_DELAY seconds of silence, update the knowledge profile.
+PROFILE_UPDATE_DELAY = 120  # 2 minutes
+
+# Pending asyncio tasks keyed by chat_id — cancelled when a new message arrives
+_profile_tasks: dict[int, asyncio.Task] = {}
+
+
+def _build_profile_log(user: dict) -> list[dict]:
+    """Convert the bot chat history into the format expected by update_knowledge_profile."""
+    log = []
+    for m in user.get("chat", []):
+        if m.get("role") == "user":
+            log.append({"who": "student", "text": m.get("content", "")})
+        elif m.get("role") == "assistant":
+            log.append({"who": "tutor",   "text": m.get("content", "")})
+    return log
+
+
+def _run_profile_update(chat_id: int) -> None:
+    """Blocking: update knowledge profile from latest chat and persist to Supabase."""
+    from profile import update_knowledge_profile
+    from db import save_knowledge_profile_for_bot
+    user = load_user(chat_id)
+    conv_log = _build_profile_log(user)
+    if not conv_log or not user.get("sb_user_id"):
+        return
+    updated = update_knowledge_profile(
+        user.get("knowledge_profile") or {},
+        user.get("name", ""), user.get("level", "A1"),
+        user.get("language", "Danish"), user.get("bg_lang", "English"),
+        conv_log, user.get("coaching_log", []),
+        CLAUDE_KEY,
+    )
+    if updated:
+        user["knowledge_profile"] = updated
+        save_user(chat_id, user)
+        save_knowledge_profile_for_bot(chat_id, updated)
+        log.info("Knowledge profile updated for chat %s", chat_id)
+
+
+async def _schedule_profile_update(chat_id: int) -> None:
+    """Wait for inactivity then save the knowledge profile in the background."""
+    await asyncio.sleep(PROFILE_UPDATE_DELAY)
+    loop = asyncio.get_running_loop()
+    await loop.run_in_executor(_executor, lambda: _run_profile_update(chat_id))
+    _profile_tasks.pop(chat_id, None)
+
+
+def _reset_profile_timer(chat_id: int) -> None:
+    """Cancel any pending profile update and start a fresh countdown."""
+    existing = _profile_tasks.pop(chat_id, None)
+    if existing:
+        existing.cancel()
+    task = asyncio.create_task(_schedule_profile_update(chat_id))
+    _profile_tasks[chat_id] = task
+
 # Scribe v1 REST API needs an explicit language code to avoid misidentifying
 # similar languages (e.g. Danish → Swedish). Different from STT_LANG_CODE
 # which is used by the Streamlit app's Scribe v2 Realtime WebSocket stream.
@@ -354,7 +411,13 @@ async def cmd_stop(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         parse_mode="Markdown",
     )
 
-    # Clear lesson state, keep profile
+    # Trigger immediate profile update then clear lesson state
+    loop = asyncio.get_running_loop()
+    await loop.run_in_executor(_executor, lambda: _run_profile_update(chat_id))
+    existing = _profile_tasks.pop(chat_id, None)
+    if existing:
+        existing.cancel()
+
     user.update({"chat": [], "turn_count": 0, "correct_log": [],
                  "coaching_log": [], "scene_key": None})
     save_user(chat_id, user)
@@ -907,6 +970,9 @@ async def _process_message(
         await update.effective_message.reply_text(
             "🎉 Scene complete! Use /stop to review corrections, or /scene for a new one."
         )
+
+    # Start/reset the inactivity timer — profile is saved after 2 min of silence
+    _reset_profile_timer(chat_id)
 
 
 # ── Message handlers ──────────────────────────────────────────────────────────

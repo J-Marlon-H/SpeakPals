@@ -4,6 +4,7 @@ import json
 import re
 import datetime
 import requests
+from pipeline import get_session as _get_pipeline_session
 
 # ── Predefined category keys ───────────────────────────────────────────────────
 
@@ -44,10 +45,12 @@ Use bullet points where listing multiple items. Use short prose for single obser
 No padding, no filler, no generic statements. Every word should be signal.
 
 Rules:
-1. Always include all 7 predefined keys: language_level, learning_motivation, personal_use_context, common_errors, conversation_history, personal_facts, tutor_observations.
-2. You may add up to 2 additional snake_case keys if the session reveals something important that does not fit any predefined category (e.g. "pronunciation_notes", "cultural_interests"). Total keys must not exceed 9.
-3. Preserve existing custom keys from the current profile unless merging makes clear sense.
-4. Each category value must be a JSON object with exactly two fields:
+1. Always include exactly these 7 keys — no more, no fewer:
+   language_level, learning_motivation, personal_use_context, common_errors,
+   conversation_history, personal_facts, tutor_observations.
+2. Do NOT create new keys. If an observation does not fit the first 6 categories,
+   add it to tutor_observations instead.
+3. Each category value must be a JSON object with exactly two fields:
    - "content": Updated notes about the learner. Style rules per category:
      • conversation_history — Markdown bullet list, one entry per session, date prefix required.
        Format: "- YYYY-MM-DD: what was covered, practised, or discussed (be specific)."
@@ -57,10 +60,11 @@ Rules:
        E.g. "- Lives in Copenhagen", "- Partner is Danish", "- Works at Tryg as an engineer".
        Only include what the user explicitly stated. Never infer. Accumulate across sessions.
      • tutor_observations — Markdown bullet list, one observation per line.
-       Include meaningful patterns only: learning style, confidence, pacing, breakthroughs,
-       cultural curiosity, frustration points — anything a good tutor would want to remember.
+       Include meaningful patterns: learning style, confidence, pacing, breakthroughs,
+       cultural curiosity, frustration points, pronunciation notes, cultural interests —
+       anything a good tutor would want to remember that doesn't fit another category.
        Skip anything generic or obvious.
-     • common_errors — Short bullets or brief prose listing specific patterns:
+     • common_errors — Short bullets listing specific patterns:
        e.g. "- Drops definite articles (-en/-et)", "- Reverts to English under pressure".
        Update with new patterns; keep all prior entries that are still relevant.
      • language_level — 2–4 sentences or short bullets. State level, what they can do,
@@ -68,9 +72,9 @@ Rules:
      • learning_motivation — 1–3 sentences. Capture the personal 'why' specifically.
      • personal_use_context — 1–3 sentences or bullets. Specific real-life situations.
    - "updated_at": ISO 8601 UTC timestamp "{now_iso}" if content changed; keep old timestamp if unchanged.
-5. If a session reveals nothing new for a category, keep existing content and timestamp unchanged.
-6. First session (empty profile): populate all 7 keys. Use "" for categories with no evidence yet.
-7. Reply with only the JSON object — no markdown, no explanation, no text outside {{ }}.
+4. If a session reveals nothing new for a category, keep existing content and timestamp unchanged.
+5. First session (empty profile): populate all 7 keys. Use "" for categories with no evidence yet.
+6. Reply with only the JSON object — no markdown, no explanation, no text outside {{ }}.
 
 Reply with only the JSON object, starting with {{ and ending with }}.
 """
@@ -131,7 +135,7 @@ def update_knowledge_profile(
         today_date=today_date,
     )
 
-    sess = http_session or requests.Session()
+    sess = http_session or _get_pipeline_session()
     try:
         r = sess.post(
             "https://api.anthropic.com/v1/messages",
@@ -165,11 +169,9 @@ def update_knowledge_profile(
             if key not in updated:
                 updated[key] = {"content": "", "updated_at": now_iso}
 
-        # Enforce max 9 keys: keep 7 required + up to 2 custom (alphabetical if >2)
-        custom_keys = [k for k in updated if k not in REQUIRED_CATEGORIES]
-        if len(custom_keys) > 2:
-            for k in sorted(custom_keys)[2:]:
-                del updated[k]
+        # Remove any extra keys Claude may have added despite instructions
+        for k in [k for k in updated if k not in REQUIRED_CATEGORIES]:
+            del updated[k]
 
         return updated
 
