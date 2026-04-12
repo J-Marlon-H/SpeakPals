@@ -37,10 +37,12 @@ if "sb_user_id" not in st.session_state:
     # outside any try/except block or they get silently swallowed.
     _stored_token = None
     _session_restored = False
+    _cookie_controller_ok = False
     try:
         from streamlit_cookies_controller import CookieController
         from db import refresh_session
         _cookies = CookieController(key="sp_ctrl")
+        _cookie_controller_ok = True
         _stored_token = _cookies.get("sp_refresh_token")
         if _stored_token:
             _sess, _err = refresh_session(_stored_token)
@@ -56,11 +58,11 @@ if "sb_user_id" not in st.session_state:
 
     if _session_restored:
         st.rerun()
-    elif _stored_token is None and not st.session_state.get("_cookie_init_done"):
+    elif _cookie_controller_ok and _stored_token is None and not st.session_state.get("_cookie_init_done"):
         # First render — component hasn't sent back cookie data yet.
         # Set a flag so require_auth() waits (via st.stop()) instead of
-        # redirecting to login. pg.run() still executes, which keeps
-        # Streamlit's navigation state pointing at the correct page.
+        # redirecting to login. Only set when the component actually loaded;
+        # if the import failed this flag must not be set or the app hangs blank.
         st.session_state["_cookie_init_done"] = True
         st.session_state["_cookie_restoring"] = True
     else:
