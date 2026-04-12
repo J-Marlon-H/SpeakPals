@@ -10,11 +10,17 @@ def img_b64(filename: str) -> str | None:
     if not path.exists():
         return None
     data = path.read_bytes()
-    mime = "image/jpeg" if filename.lower().endswith((".jpg", ".jpeg")) else "image/png"
+    if filename.lower().endswith((".jpg", ".jpeg")):
+        mime = "image/jpeg"
+    elif filename.lower().endswith(".svg"):
+        mime = "image/svg+xml"
+    else:
+        mime = "image/png"
     return f"data:{mime};base64," + base64.b64encode(data).decode()
 
 
 def preload_all_images() -> None:
     """Warm the @st.cache_resource cache for all scene images."""
     for s in SCENE_CATALOG:
-        img_b64(s["file"])
+        if s.get("file"):
+            img_b64(s["file"])

@@ -2,23 +2,18 @@ import streamlit as st
 import streamlit.components.v1 as components
 import datetime
 import base64
-import os
 from dotenv import load_dotenv
 from pipeline import (SCENE_CATALOG, LESSON_STATE_KEYS, VOICES, SETTINGS_DEFAULTS,
                       generate_language_tip, extract_vocabulary, tts_chunk)
 import json as _json
 from concurrent.futures import ThreadPoolExecutor
-from db import require_auth, save_session, load_sessions
+from db import (require_auth, save_session, load_sessions, load_knowledge_profile,
+                save_knowledge_profile, _secret)
+from profile import update_knowledge_profile
 
 require_auth()
 
 load_dotenv("keys.env")
-
-def _secret(key):
-    try:
-        return st.secrets[key]
-    except Exception:
-        return os.getenv(key)
 
 CLAUDE_KEY  = _secret("CLAUDE_API_KEY")
 ELEVEN_KEY  = _secret("ELEVENLABS_API_KEY")
@@ -236,7 +231,7 @@ if (correct_log or coaching_log) and not st.session_state.get("current_session_i
     <div class="sp-overlay">
       <div class="sp-ring"></div>
       <div class="sp-label">Analysing your lesson</div>
-      <div class="sp-sub">Extracting vocabulary · Generating tip</div>
+      <div class="sp-sub">Extracting vocabulary · Generating tip · Updating your profile</div>
     </div>
     """, unsafe_allow_html=True)
 
@@ -250,14 +245,30 @@ if (correct_log or coaching_log) and not st.session_state.get("current_session_i
 
     lang_tip = None
     vocab    = []
+    _updated_profile = {}
     if all_lines and CLAUDE_KEY:
         voice_label = st.session_state.get("s_voice_label", "")
         voice_id    = VOICES.get(voice_label, _DEFAULT_VOICE)
 
-        # Run tip + vocab extraction in parallel
-        with ThreadPoolExecutor(max_workers=2) as ex:
-            fut_tip   = ex.submit(generate_language_tip, all_lines, _bg_lang, CLAUDE_KEY)
-            fut_vocab = ex.submit(extract_vocabulary, all_lines, _bg_lang, _level, CLAUDE_KEY)
+        # Load current knowledge profile before analysis
+        _current_profile = {}
+        if "sb_user_id" in st.session_state:
+            _current_profile = load_knowledge_profile(
+                st.session_state.sb_user_id,
+                st.session_state.sb_access_token,
+            )
+
+        # Run tip + vocab extraction + profile update in parallel
+        with ThreadPoolExecutor(max_workers=3) as ex:
+            fut_tip     = ex.submit(generate_language_tip, all_lines, _bg_lang, CLAUDE_KEY)
+            fut_vocab   = ex.submit(extract_vocabulary, all_lines, _bg_lang, _level, CLAUDE_KEY)
+            fut_profile = ex.submit(
+                update_knowledge_profile,
+                _current_profile,
+                st.session_state.get("s_name", ""),
+                _level, _target_lang, _bg_lang,
+                correct_log, coaching_log, CLAUDE_KEY,
+            )
             try:
                 lang_tip = fut_tip.result()
             except Exception:
@@ -266,6 +277,10 @@ if (correct_log or coaching_log) and not st.session_state.get("current_session_i
                 items = fut_vocab.result()
             except Exception:
                 items = []
+            try:
+                _updated_profile = fut_profile.result()
+            except Exception:
+                _updated_profile = _current_profile
 
         # Run all TTS calls in parallel
         if items and ELEVEN_KEY:
@@ -307,6 +322,12 @@ if (correct_log or coaching_log) and not st.session_state.get("current_session_i
         for item in vocab
     ]
     if "sb_user_id" in st.session_state:
+        if _updated_profile:
+            save_knowledge_profile(
+                st.session_state.sb_user_id,
+                st.session_state.sb_access_token,
+                _updated_profile,
+            )
         save_session(
             st.session_state.sb_user_id,
             st.session_state.sb_access_token,

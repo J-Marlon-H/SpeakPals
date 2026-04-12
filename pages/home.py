@@ -1,13 +1,12 @@
 import streamlit as st
 from pipeline import SCENE_CATALOG, LESSON_STATE_KEYS, SETTINGS_DEFAULTS
 from scene_images import img_b64 as _img_b64
-from db import require_auth, load_profile
+from db import require_auth, load_profile, load_knowledge_profile
+from prompts import get_tutor_name
 
 require_auth()
 
 # ── Load profile from Supabase into session_state ──────────────────────────────
-# Always overwrite so switching users gets the correct settings.
-# Skipped if not authenticated (Supabase not configured).
 if "sb_user_id" in st.session_state:
     _profile = load_profile(st.session_state.sb_user_id, st.session_state.sb_access_token)
 else:
@@ -16,46 +15,56 @@ for _k, _v in {**SETTINGS_DEFAULTS, **_profile}.items():
     if _k not in st.session_state:
         st.session_state[_k] = _v
 
+# ── Load knowledge profile once per session ────────────────────────────────────
+if "sb_user_id" in st.session_state and not st.session_state.get("onboarding_checked"):
+    _kp = load_knowledge_profile(
+        st.session_state.sb_user_id,
+        st.session_state.sb_access_token,
+    )
+    st.session_state["knowledge_profile"]  = _kp
+    st.session_state["onboarding_checked"] = True
+
 st.set_page_config(page_title="SpeakPals", page_icon="🇩🇰",
                    layout="wide", initial_sidebar_state="collapsed")
 
-# ── Build CSS selectors ────────────────────────────────────────────────────────
-_sel  = ", ".join(f".st-key-{s['key']} button" for s in SCENE_CATALOG)
-_selH = ", ".join(f".st-key-{s['key']} button:hover" for s in SCENE_CATALOG)
+# ── Separate lesson scenes from free conversation ──────────────────────────────
+_LESSON_SCENES = [s for s in SCENE_CATALOG if not s.get("free_conv")]
+_FREE_SCENE    = next((s for s in SCENE_CATALOG if s.get("free_conv")), None)
+
+# ── Build CSS selectors (lesson scenes only) ───────────────────────────────────
+_sel  = ", ".join(f".st-key-{s['key']} button" for s in _LESSON_SCENES)
+_selH = ", ".join(f".st-key-{s['key']} button:hover" for s in _LESSON_SCENES)
 _selP = ", ".join(
     f".st-key-{s['key']} button [data-testid='stMarkdownContainer'],"
     f" .st-key-{s['key']} button p"
-    for s in SCENE_CATALOG
+    for s in _LESSON_SCENES
 )
-_selP2 = ", ".join(f".st-key-{s['key']} button p" for s in SCENE_CATALOG)
+_selP2 = ", ".join(f".st-key-{s['key']} button p" for s in _LESSON_SCENES)
 
-# Per-scene height based on column count — avoids cropping at different widths.
-# 1 col (~900px wide): 380px  2 cols (~450px): 260px  3 cols (~290px): 200px
-_HEIGHT_BY_COLS = {1: "380px", 2: "260px", 3: "200px"}
-
-def _height_css() -> str:
+def _scene_card_css() -> str:
+    """Per-scene height + background image/gradient rules in one pass."""
     parts = []
-    for s in SCENE_CATALOG:
-        scenes_in_level = [x for x in SCENE_CATALOG if x["level"] == s["level"]]
-        n_cols = min(len(scenes_in_level), 3)
-        h = _HEIGHT_BY_COLS[n_cols]
+    for s in _LESSON_SCENES:
+        n = min(len([x for x in _LESSON_SCENES if x["level"] == s["level"]]), 3)
+        h = {1: "340px", 2: "240px", 3: "185px"}[n]
         parts.append(f".st-key-{s['key']} button{{height:{h}!important}}")
-    return " ".join(parts)
-
-# Build background CSS per scene — use image if cached, fall back to gradient.
-def _bg_css() -> str:
-    parts = []
-    for s in SCENE_CATALOG:
-        img = _img_b64(s["file"])
+        img = _img_b64(s["file"]) if s.get("file") else None
         if img:
             rule = (f"background-image:url('{img}')!important;"
                     f"background-size:cover!important;"
                     f"background-position:top center!important")
         else:
             rule = f"background:{s['gradient']}!important"
-        key = s["key"]
-        parts.append(f".st-key-{key} button,.st-key-{key} button:hover{{{rule}}}")
+        parts.append(f".st-key-{s['key']} button,.st-key-{s['key']} button:hover{{{rule}}}")
     return " ".join(parts)
+
+_tutor_img = _img_b64("tutor.svg") if _FREE_SCENE else None
+_tutor_bg_rule = (
+    f"background-image:url('{_tutor_img}')!important;"
+    "background-size:cover!important;background-position:top center!important"
+    if _tutor_img else
+    "background:linear-gradient(160deg,#0d9488 0%,#065f46 60%,#042f2e 100%)!important"
+)
 
 st.markdown(f"""<style>
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
@@ -65,17 +74,16 @@ st.markdown(f"""<style>
   [data-testid="collapsedControl"],[data-testid="stSidebarCollapseButton"],
   [data-testid="stSidebarNav"]{{display:none!important}}
   [data-testid="stAppViewContainer"],[data-testid="stMain"]{{background:#ffffff!important}}
-  .block-container{{padding:2.5rem 3rem!important;max-width:960px!important;margin:auto}}
+  .block-container{{padding:2.5rem 3rem!important;max-width:1120px!important;margin:auto}}
 
   .section-head{{
     font:700 11px/1 'Inter',sans-serif;letter-spacing:2px;
     text-transform:uppercase;color:rgba(17,24,39,.4);
-    margin:32px 0 14px;padding-bottom:8px;
+    margin:28px 0 12px;padding-bottom:8px;
     border-bottom:1px solid rgba(17,24,39,.1)}}
-  .section-head.current{{color:#0d9488;
-    border-bottom-color:rgba(13,148,136,.3)}}
+  .section-head.current{{color:#0d9488;border-bottom-color:rgba(13,148,136,.3)}}
 
-  /* Header nav buttons — two-line layout, equal size, neutral white style */
+  /* Header nav buttons */
   .st-key-nav_feedback button,.st-key-nav_settings button{{
     white-space:pre-wrap!important;text-align:center!important;
     height:70px!important;flex-direction:column!important;
@@ -85,7 +93,6 @@ st.markdown(f"""<style>
     border-color:rgba(13,148,136,.4)!important;color:#0d9488!important;
     background:#ffffff!important;box-shadow:0 2px 8px rgba(13,148,136,.1)!important}}
 
-  /* Header buttons */
   label,.stButton button{{color:#111827!important}}
   .stButton button{{
     border-radius:12px!important;font-weight:600!important;font-size:13px!important;
@@ -96,10 +103,9 @@ st.markdown(f"""<style>
     background:rgba(13,148,136,.22)!important;
     border-color:rgba(13,148,136,.5)!important}}
 
-  /* ── Scene card buttons ─────────────────────────────────────────────────── */
+  /* ── Lesson scene card buttons ──────────────────────────────────────────── */
   {_sel} {{
     display:block!important;width:100%!important;
-    height:200px!important;
     padding:0!important;margin:0!important;
     border-radius:18px!important;overflow:hidden!important;border:none!important;
     background-size:cover!important;background-position:top center!important;
@@ -111,8 +117,6 @@ st.markdown(f"""<style>
     transform:scale(1.035) translateY(-4px)!important;
     box-shadow:0 16px 40px rgba(13,148,136,.3),0 4px 16px rgba(17,24,39,.15)!important;
     filter:brightness(1.05)!important}}
-
-  /* Title text pinned to bottom */
   {_selP} {{
     position:absolute!important;
     bottom:0!important;left:0!important;right:0!important;top:auto!important;
@@ -129,20 +133,47 @@ st.markdown(f"""<style>
     font:400 12px 'Inter',sans-serif;color:rgba(17,24,39,.5);
     margin-top:7px;padding:0 2px;line-height:1.5}}
 
-  /* Per-scene background images (or gradient fallback if not yet cached) */
-  {_bg_css()}
+  /* ── Tutor card button — same style as lesson scene cards ──────────────── */
+  .st-key-btn_tutor_chat button {{
+    display:block!important;width:100%!important;height:320px!important;
+    padding:0!important;margin:0!important;
+    border-radius:18px!important;overflow:hidden!important;border:none!important;
+    {_tutor_bg_rule}
+    background-size:cover!important;background-position:top center!important;
+    box-shadow:0 4px 20px rgba(17,24,39,.18)!important;
+    cursor:pointer!important;position:relative!important;
+    transition:transform .22s cubic-bezier(.34,1.56,.64,1),
+               box-shadow .22s ease!important}}
+  .st-key-btn_tutor_chat button:hover {{
+    {_tutor_bg_rule}
+    background-size:cover!important;background-position:top center!important;
+    transform:scale(1.035) translateY(-4px)!important;
+    box-shadow:0 16px 40px rgba(13,148,136,.3),0 4px 16px rgba(17,24,39,.15)!important}}
+  .st-key-btn_tutor_chat button [data-testid="stMarkdownContainer"],
+  .st-key-btn_tutor_chat button p {{
+    position:absolute!important;
+    bottom:0!important;left:0!important;right:0!important;top:auto!important;
+    padding:28px 16px 14px!important;
+    background:linear-gradient(to top,rgba(10,10,20,.88) 0%,
+               rgba(10,10,20,.35) 55%,transparent 100%)!important;
+    border-radius:0 0 18px 18px!important;
+    text-align:left!important;pointer-events:none!important;margin:0!important}}
+  .st-key-btn_tutor_chat button p {{
+    font:800 17px/1.2 'Inter',sans-serif!important;
+    color:#fff!important;text-align:left!important;margin:0!important}}
 
-  /* Per-scene heights — scaled to column count so nothing gets cropped */
-  {_height_css()}
+  /* Per-scene heights + background images */
+  {_scene_card_css()}
 </style>""", unsafe_allow_html=True)
 
 
 # ── Settings ───────────────────────────────────────────────────────────────────
-name  = st.session_state.get("s_name",  "there")
-level = st.session_state.get("s_level", "A1")
-language = st.session_state.get("s_language", "Danish")
+name        = st.session_state.get("s_name",     "there")
+level       = st.session_state.get("s_level",    "A1")
+language    = st.session_state.get("s_language", "Danish")
+tutor_name  = get_tutor_name(language)
 LEVEL_LABELS = {"A1": "Beginner", "A2": "Elementary", "B1": "Intermediate", "B2": "Upper Intermediate"}
-# Inline SVG flag images — no external files, crisp at any size
+
 _FLAG_SVG = {
     "Danish": (
         '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 37 28">'
@@ -184,7 +215,7 @@ with col_hdr:
   </div>
   <div style='font:400 14px Inter;color:rgba(17,24,39,.6);margin-top:6px'>
     Your level: <span style='color:#0d9488;font-weight:600'>{level} — {LEVEL_LABELS.get(level,"")}</span>
-    &nbsp;·&nbsp; Choose a scene to practise {language}
+    &nbsp;·&nbsp; Practise {language} with {tutor_name}
   </div>
 </div>""", unsafe_allow_html=True)
 with col_fb:
@@ -198,30 +229,67 @@ with col_acct:
         st.switch_page("pages/account.py")
     st.markdown("</div>", unsafe_allow_html=True)
 
+# ── Two-column layout ──────────────────────────────────────────────────────────
+col_scenes, col_tutor = st.columns([3, 1], gap="large")
 
-# ── Scene cards ────────────────────────────────────────────────────────────────
-LEVEL_ORDER = ["A1", "A2", "B1", "B2"]
-levels_with_scenes = [lvl for lvl in LEVEL_ORDER
-                      if any(s["level"] == lvl for s in SCENE_CATALOG)]
-
-for lvl in levels_with_scenes:
-    scenes = [s for s in SCENE_CATALOG if s["level"] == lvl]
-    is_cur = lvl == level
+# ── LEFT: Lesson scene cards ───────────────────────────────────────────────────
+with col_scenes:
     st.markdown(
-        f"<div class='section-head{'current' if is_cur else ''}'>"
-        f"{lvl} · {LEVEL_LABELS.get(lvl, lvl)}{' — Your level' if is_cur else ''}</div>",
+        "<div style='font:700 11px/1 Inter,sans-serif;letter-spacing:2px;"
+        "text-transform:uppercase;color:rgba(17,24,39,.4);margin:28px 0 4px;"
+        "padding-bottom:8px;border-bottom:1px solid rgba(17,24,39,.1)'>"
+        "Recommended Lessons</div>",
         unsafe_allow_html=True,
     )
-    cols = st.columns(min(len(scenes), 3), gap="large")
-    for col, scene in zip(cols, scenes):
-        with col:
-            if st.button(scene["title"], key=scene["key"], use_container_width=True):
-                st.session_state["selected_scene"] = scene["key"]
-                for k in LESSON_STATE_KEYS:
-                    st.session_state.pop(k, None)
-                st.switch_page("pages/lesson.py")
-            st.markdown(
-                f"<div class='scene-desc'>{scene['desc']}</div>",
-                unsafe_allow_html=True,
-            )
+    LEVEL_ORDER = ["A1", "A2", "B1", "B2"]
+    levels_with_scenes = [lvl for lvl in LEVEL_ORDER
+                          if any(s["level"] == lvl for s in _LESSON_SCENES)]
 
+    for lvl in levels_with_scenes:
+        scenes = [s for s in _LESSON_SCENES if s["level"] == lvl]
+        is_cur = lvl == level
+        st.markdown(
+            f"<div class='section-head{'current' if is_cur else ''}'>"
+            f"{lvl} · {LEVEL_LABELS.get(lvl, lvl)}{' — Your level' if is_cur else ''}</div>",
+            unsafe_allow_html=True,
+        )
+        cols = st.columns(min(len(scenes), 3), gap="large")
+        for col, scene in zip(cols, scenes):
+            with col:
+                if st.button(scene["title"], key=scene["key"], use_container_width=True):
+                    st.session_state["selected_scene"] = scene["key"]
+                    for k in LESSON_STATE_KEYS:
+                        st.session_state.pop(k, None)
+                    st.switch_page("pages/lesson.py")
+                st.markdown(
+                    f"<div class='scene-desc'>{scene['desc']}</div>",
+                    unsafe_allow_html=True,
+                )
+
+# ── RIGHT: Tutor conversation card ────────────────────────────────────────────
+with col_tutor:
+    st.markdown(
+        "<div style='margin-top:28px'>"
+        "<div style='font:700 11px/1 Inter,sans-serif;letter-spacing:2px;"
+        "text-transform:uppercase;color:rgba(17,24,39,.4);margin-bottom:12px;"
+        "padding-bottom:8px;border-bottom:1px solid rgba(17,24,39,.1)'>"
+        "Your Tutor</div>"
+        "</div>",
+        unsafe_allow_html=True,
+    )
+
+    if _FREE_SCENE and st.button(
+        "Talk with your Tutor",
+        key="btn_tutor_chat",
+        use_container_width=True,
+    ):
+        st.session_state["selected_scene"] = "free_conversation"
+        for k in LESSON_STATE_KEYS:
+            st.session_state.pop(k, None)
+        st.switch_page("pages/lesson.py")
+
+    st.markdown(
+        "<div class='scene-desc' style='margin-top:8px'>"
+        "Free conversation with your tutor — topics guided by your goals and memory</div>",
+        unsafe_allow_html=True,
+    )

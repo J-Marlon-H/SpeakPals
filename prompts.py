@@ -1,5 +1,7 @@
 from __future__ import annotations
 import pathlib
+import re as _re
+import datetime as _dt
 
 # ── Short display name used inside prompts (avoids "Portuguese (Brazilian)") ────
 _LANG_DISPLAY = {
@@ -59,7 +61,50 @@ Always respond with the JSON format defined in the scene block below. No markdow
 
 {level_rules}"""
 
-_LANG_PROFILE_DIR = pathlib.Path(__file__).parent / "lang_profiles"
+_LANG_PROFILE_DIR    = pathlib.Path(__file__).parent / "lang_profiles"
+_CULTURE_PROFILE_DIR = pathlib.Path(__file__).parent / "culture_profiles"
+
+# Map target language display names → culture profile filenames
+_CULTURE_PROFILE_FILE = {
+    "Danish":                 "danish.txt",
+    "Portuguese (Brazilian)": "portuguese_brazilian.txt",
+}
+
+# ── Free conversation block ─────────────────────────────────────────────────────
+
+_FREE_CONV_BLOCK = """
+
+## Mode: Free Conversation
+
+This is a direct, open-ended conversation between you ({tutor_name}) and {name}. \
+No character roleplay — it is just you and the student talking.
+
+LANGUAGE BALANCE — adapt dynamically based on what the student actually demonstrates during this session:
+- Start with a mix: roughly 50% {target_lang} / 50% English for A1–A2 students, and 80% {target_lang} / 20% English for B1+.
+- Watch what the student sends back. If they respond confidently in {target_lang}, increase your use of {target_lang}. \
+If they struggle or fall back to English, ease back to more English to keep the conversation flowing.
+- Never go 100% {target_lang} unless the student is clearly handling it with ease.
+- Use English to ask follow-up questions, introduce new topics, or gently explain something — then switch back to {target_lang}.
+- The goal is a natural, comfortable conversation that stretches the student just enough.
+
+Your job is to lead a natural, engaging conversation guided by the student profile:
+- Pick up on anything marked as "Very recent" — they may want to continue exactly where they left off.
+- Build on their stated goals, personal context, and things they've mentioned before.
+- Introduce vocabulary and grammar naturally, slightly above their current comfort level.
+- Ask follow-up questions about their life, plans, and interests.
+- Keep it warm and curious — this should feel like talking to a knowledgeable friend.
+
+Turns so far: {turn_count}
+
+ROUTING — respond ONLY with a single JSON object on one line, no extra text:
+Normal turn:   {{"verdict":"accept","speaker":"tutor","text":"[your reply in {target_lang}]","scene_done":false,"correct":true}}
+With error:    {{"verdict":"accept","speaker":"tutor","text":"[your reply]","scene_done":false,"correct":false,"correction":"[ideal phrase the student should have said]"}}
+Wrap-up:       {{"verdict":"accept","speaker":"tutor","text":"[warm closing in {target_lang}]","scene_done":true,"correct":true}}
+
+correct:false — only when the student used the wrong language or was clearly missing key vocabulary.
+correct:true  — any {target_lang} attempt, even imperfect grammar.
+HARD RULES: max 3 sentences · no bullets · no markdown · after ~12 turns wrap up warmly.
+"""
 
 # ── Scene roleplay block ────────────────────────────────────────────────────────
 
@@ -86,13 +131,17 @@ ROUTING DECISION — follow these steps in order, then emit one JSON line:
 
 STEP 1 — Detect the primary language of the student's input:
   A) Primarily {target_lang} (even with mistakes, mixed words, or broken grammar) → go to STEP 2.
+     IMPORTANT: Short {target_lang} words — "ja", "nej", "tak", "ingen", "to", "en", "et", "sim",
+     "não", "obrigado", "por favor" and similar — are ALWAYS {target_lang}. Never treat a known
+     {target_lang} word as unclear just because it is short.
   B) Primarily English or native language → speaker:"tutor". Skip STEP 2.
   C) Clearly a meta-question regardless of language ("what does X mean?", "how do I say X?",
      "I don't understand", "what should I say?", or addressing {tutor_name} by name) → speaker:"tutor".
 
-STEP 2 (only reached for {target_lang} attempts) — Did the student's attempt communicate
-something meaningful, even imperfectly?
+STEP 2 (only reached for {target_lang} attempts) — Did the student's attempt answer or react to
+what the character just said, even with a single word?
   YES → speaker:"character". CHARACTER advances the scene. This is the normal path.
+        A one-word reply like "Nej", "Ja", "Tak" fully answers a yes/no question — that is YES.
         Log a silent correction only if a key vocabulary word was clearly wrong or missing.
   NO (the input is noise, completely off-topic, or zero recognisable {target_lang}) → speaker:"tutor".
 
@@ -115,6 +164,48 @@ HARD RULES: max 2 sentences · no bullets · no markdown · correction is always
 """
 
 
+def _decay_conv_history(content: str) -> str:
+    """Re-format conversation_history bullets with time-decay labels.
+
+    Bullets are expected to start with a YYYY-MM-DD: prefix.
+    Buckets: today/yesterday → "Recent (high priority)", last 7 days → "This week", older → "Earlier".
+    Undated bullets fall into "Earlier".
+    """
+    today = _dt.date.today()
+    buckets: dict[str, list[str]] = {"recent": [], "week": [], "older": []}
+
+    for raw_line in content.splitlines():
+        line = raw_line.strip()
+        if not line:
+            continue
+        m = _re.match(r'^[-•]?\s*(\d{4}-\d{2}-\d{2}):\s*(.+)$', line)
+        if m:
+            try:
+                entry_date = _dt.date.fromisoformat(m.group(1))
+                delta = (today - entry_date).days
+                text = f"- [{m.group(1)}] {m.group(2).strip()}"
+                if delta <= 1:
+                    buckets["recent"].append(text)
+                elif delta <= 7:
+                    buckets["week"].append(text)
+                else:
+                    buckets["older"].append(text)
+                continue
+            except ValueError:
+                pass
+        buckets["older"].append(line)
+
+    parts = []
+    if buckets["recent"]:
+        parts.append("⚡ Very recent — last 24 h (HIGH PRIORITY — student may want to continue this):\n"
+                     + "\n".join(buckets["recent"]))
+    if buckets["week"]:
+        parts.append("This week:\n" + "\n".join(buckets["week"]))
+    if buckets["older"]:
+        parts.append("Earlier sessions:\n" + "\n".join(buckets["older"]))
+    return "\n\n".join(parts) if parts else content
+
+
 def get_tutor_name(target_lang: str) -> str:
     return _TUTOR_NAME.get(target_lang, "Alex")
 
@@ -123,8 +214,10 @@ def build_system_prompt(name: str, level: str, bg_lang: str,
                         target_lang: str = "Danish",
                         scene_description: str = "",
                         turn_count: int = 0,
+                        knowledge_profile: dict | None = None,
+                        free_conv: bool = False,
                         calendar_events: list[str] | None = None) -> str:
-    tutor_name = _TUTOR_NAME.get(target_lang, "Alex")
+    tutor_name = "Tutor" if free_conv else _TUTOR_NAME.get(target_lang, "Alex")
     tutor_persona = _TUTOR_PERSONA.get(target_lang, "warm and patient")
     lang_display = _LANG_DISPLAY.get(target_lang, target_lang)
     level_rules = _LEVEL_RULES.get(level, _LEVEL_RULES["A1"]).format(target_lang=lang_display)
@@ -140,17 +233,49 @@ def build_system_prompt(name: str, level: str, bg_lang: str,
     except FileNotFoundError:
         prompt = base
 
+    culture_file = _CULTURE_PROFILE_FILE.get(target_lang)
+    if culture_file:
+        culture_path = _CULTURE_PROFILE_DIR / culture_file
+        try:
+            culture = culture_path.read_text(encoding="utf-8")
+            prompt += f"\n\n## Cultural context: {target_lang}\n{culture}"
+        except FileNotFoundError:
+            pass
+
+    if knowledge_profile:
+        _nonempty = {
+            k: v for k, v in knowledge_profile.items()
+            if isinstance(v, dict) and v.get("content", "").strip()
+        }
+        if _nonempty:
+            lines = ["\n\n## What you know about this student"]
+            for key, val in _nonempty.items():
+                heading = key.replace("_", " ").title()
+                content = val["content"]
+                if key == "conversation_history":
+                    content = _decay_conv_history(content)
+                lines.append(f"**{heading}**: {content}")
+            prompt += "\n".join(lines)
+
     if calendar_events:
-        lines = "\n".join(f"  - {e}" for e in calendar_events)
+        cal_lines = "\n".join(f"  - {e}" for e in calendar_events)
         prompt += (
             f"\n\n## {name}'s upcoming calendar events (next 7 days)\n"
-            f"{lines}\n"
+            f"{cal_lines}\n"
             "Use these naturally as conversation topics when relevant — "
             "ask about them, build vocabulary around them, weave them into the scene. "
             "Do not list them all at once; bring them up organically."
         )
 
-    if scene_description:
+    if free_conv:
+        prompt += _FREE_CONV_BLOCK.format(
+            tutor_name=tutor_name,
+            name=name,
+            target_lang=lang_display,
+            level=level,
+            turn_count=turn_count,
+        )
+    elif scene_description:
         prompt += _SCENE_BLOCK.format(
             scene_description=scene_description,
             turn_count=turn_count,

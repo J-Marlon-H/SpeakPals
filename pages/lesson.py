@@ -4,57 +4,20 @@ import streamlit as st
 import streamlit.components.v1 as components
 import hashlib, pathlib, base64
 from dotenv import load_dotenv
-import os
-
 import json as _json
 from pipeline import (run_pipeline_stream, MODELS, VOICES, VOICES_BY_LANG, VOICE_GENDER,
                       SCENE_CATALOG, SETTINGS_DEFAULTS, TTS_LANG_CODE, STT_LANG_CODE,
-                      parse_claude_response, generate_scene_image, character_tts_b64)
+                      parse_claude_response, generate_scene_image, character_tts_b64,
+                      SCENE_OPENERS_BY_LANG, SCENE_CHAR_GENDER)
 from prompts import build_system_prompt, get_tutor_name
-from ws_proxy import start_in_thread, PROXY_PORT
-from db import require_auth
+from ws_proxy import start_in_thread, PROXY_PORT, scribe_token as _scribe_token
+from db import require_auth, load_knowledge_profile, _secret
 
 load_dotenv("keys.env")
-
-def _secret(key):
-    try:
-        return st.secrets[key]
-    except Exception:
-        return os.getenv(key)
 
 CLAUDE_KEY = _secret("CLAUDE_API_KEY")
 ELEVEN_KEY = _secret("ELEVENLABS_API_KEY")
 FAL_KEY    = _secret("FAL_KEY")
-
-# Opening line per scene — spoken by the character at lesson start (TTS pre-loaded)
-SCENE_OPENERS_BY_LANG = {
-    "Danish": {
-        "meet_a_friend": "Hej! Hvad hedder du?",
-        "cafe":          "Hej! Hvad må det være?",
-        "supermarket":   "Vil du betale med kort eller kontanter?",
-        "flower_store":  "Hej! Hvad kan jeg hjælpe dig med i dag?",
-        "bakery":        "Godmorgen! Hvad må det være?",
-        "restaurant":    "Goddag og velkommen! Har du reserveret bord?",
-    },
-    "Portuguese (Brazilian)": {
-        "meet_a_friend": "Oi! Qual é o seu nome?",
-        "cafe":          "Olá! O que vai ser?",
-        "supermarket":   "Vai pagar no débito ou no crédito?",
-        "flower_store":  "Oi! Em que posso ajudar você hoje?",
-        "bakery":        "Bom dia! O que vai ser?",
-        "restaurant":    "Boa tarde e bem-vindo! Tem reserva?",
-    },
-}
-
-# Gender of the visible character in each scene image
-SCENE_CHAR_GENDER = {
-    "meet_a_friend": "male",
-    "cafe":          "female",
-    "supermarket":   "female",
-    "flower_store":  "male",
-    "bakery":        "female",
-    "restaurant":    "male",
-}
 
 SCENE_NEXT_PROMPT = {
     "supermarket": (
@@ -162,6 +125,16 @@ for _k, _v in _saved.items():
     if _k not in st.session_state:
         st.session_state[_k] = _v
 
+# Load knowledge profile once per lesson session
+if "knowledge_profile" not in st.session_state:
+    if "sb_user_id" in st.session_state:
+        st.session_state["knowledge_profile"] = load_knowledge_profile(
+            st.session_state.sb_user_id,
+            st.session_state.sb_access_token,
+        )
+    else:
+        st.session_state["knowledge_profile"] = {}
+
 name        = st.session_state.get("s_name",        SETTINGS_DEFAULTS["s_name"])
 _sel_scene  = st.session_state.get("selected_scene")
 level       = _SCENE_BY_KEY[_sel_scene]["level"] if _sel_scene in _SCENE_BY_KEY else "A1"
@@ -194,9 +167,11 @@ if not st.session_state.scene_images:
     selected = st.session_state.get("selected_scene")
     scene_data = _SCENE_BY_KEY.get(selected) if selected else None
     if scene_data:
+        is_free_conv = scene_data.get("free_conv", False)
         st.session_state.scene_images = [{
-            "src":         f"scenes/{scene_data['file']}",
+            "src":         "" if is_free_conv else f"scenes/{scene_data['file']}",
             "description": scene_data["scene_description"],
+            "free_conv":   is_free_conv,
         }]
     else:
         st.switch_page("pages/home.py")
@@ -207,13 +182,14 @@ scene_list        = st.session_state.scene_images
 current_scene     = scene_list[st.session_state.scene_idx] if scene_list else None
 scene_description = current_scene["description"] if current_scene else ""
 _scene_src_raw    = current_scene["src"] if current_scene else ""
+is_free_conv      = current_scene.get("free_conv", False) if current_scene else False
 scene_idx_1based  = st.session_state.scene_idx + 1
 
 # Convert local images to base64; FAL URLs pass through as-is
 if _scene_src_raw and not _scene_src_raw.startswith(("http", "data:")):
     scene_src = _scene_to_data_url(_scene_src_raw)
 else:
-    scene_src = _scene_src_raw
+    scene_src = _scene_src_raw  # "" for free conversation — ob_mode handles the background
 
 voice_id = lang_voices[voice_label] if voice_label in lang_voices else next(iter(lang_voices.values()))
 
@@ -231,13 +207,15 @@ char_label  = _SCENE_BY_KEY[sk]["char_name"] if sk and sk in _SCENE_BY_KEY else 
 tutor_name  = get_tutor_name(target_lang)
 turn_count = st.session_state.turn_count
 _lang_openers = SCENE_OPENERS_BY_LANG.get(target_lang, SCENE_OPENERS_BY_LANG["Danish"])
-opener_line   = _lang_openers.get(sk, "") if sk else ""
+opener_line   = _lang_openers.get(sk, "") if (sk and not is_free_conv) else ""
 
 system = build_system_prompt(
     name, level, bg_lang,
     target_lang=target_lang,
     scene_description=scene_description,
     turn_count=turn_count,
+    knowledge_profile=st.session_state.get("knowledge_profile"),
+    free_conv=is_free_conv,
 )
 
 # Load opener TTS once at lesson start
@@ -302,7 +280,7 @@ with st.sidebar:
         for i, entry in enumerate(log):
             txt  = entry["text"].replace("<", "&lt;").replace(">", "&gt;")
             anim = "animation:msgSlideIn .4s cubic-bezier(.34,1.56,.64,1) both;" if i == last_i else ""
-            if entry["who"] == "character":
+            if entry["who"] == "character" and not is_free_conv:
                 parts.append(
                     f"<div style='padding:8px 12px 4px'>"
                     f"<div style='background:#ffffff;border:1px solid #e5e5e5;border-radius:12px 12px 12px 3px;"
@@ -311,7 +289,7 @@ with st.sidebar:
                     f"<span style='font:600 10px Inter;color:#9ca3af;display:block;margin-bottom:4px;letter-spacing:.5px;text-transform:uppercase'>{char_label}</span>"
                     f"<em>{txt}</em></div></div>"
                 )
-            elif entry["who"] == "tutor":
+            elif entry["who"] == "tutor" or (entry["who"] == "character" and is_free_conv):
                 parts.append(
                     f"<div style='padding:8px 12px 4px'>"
                     f"<div style='background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.25);border-radius:12px 12px 12px 3px;"
@@ -382,23 +360,6 @@ chunks  = st.session_state.last_chunks or []
 caption = ("Generating next scene…" if st.session_state.scene_loading
            else f"Scene {scene_idx_1based}")
 
-def _scribe_token(eleven_key):
-    """Fetch a fresh single-use token for the ElevenLabs Scribe WS.
-    Must NOT be cached — tokens are consumed on first WS connection."""
-    if not eleven_key:
-        return None
-    try:
-        import requests as _req
-        r = _req.post(
-            "https://api.elevenlabs.io/v1/single-use-token/realtime_scribe",
-            headers={"xi-api-key": eleven_key},
-            timeout=8,
-        )
-        r.raise_for_status()
-        return r.json().get("token")
-    except Exception:
-        return None
-
 mic_props = dict(
     lang              = stt_lang_code,
     scene_src         = scene_src,
@@ -414,6 +375,7 @@ mic_props = dict(
                          if st.session_state.last_response else ""),
     progress_current  = 0,
     progress_total    = 0,
+    ob_mode           = is_free_conv,   # light bg + centred avatar for free conversation
     default           = None,
     height            = 900,
 )
@@ -470,15 +432,15 @@ if student_text:
         st.session_state.avatar_thinking = False
         st.session_state.last_response   = (student_text, tutor_text)
 
-        # ── Route audio to character or tutor based on speaker ────────────────
+        # ── Route audio: free conv always goes to tutor avatar ───────────────
         if all_chunks:
-            if last_speaker == "character":
+            if is_free_conv or last_speaker != "character":
+                st.session_state.last_chunks    = all_chunks
+                st.session_state.tutor_play_seq += 1
+            else:
                 st.session_state.char_audio    = all_chunks
                 st.session_state.char_play_seq += 1
                 st.session_state.last_chunks   = None
-            else:
-                st.session_state.last_chunks    = all_chunks
-                st.session_state.tutor_play_seq += 1
 
         # ── Determine last character line (for coaching log context) ──────────
         _last_char = next(
@@ -507,7 +469,7 @@ if student_text:
         # ── Handle scene done ─────────────────────────────────────────────────
         if scene_done:
             st.session_state.scene_complete = True
-            if st.session_state.scene_idx < 4 and FAL_KEY:
+            if not is_free_conv and st.session_state.scene_idx < 4 and FAL_KEY:
                 next_prompt = SCENE_NEXT_PROMPT.get(sk, "")
                 if next_prompt:
                     st.session_state.scene_loading = True

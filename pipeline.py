@@ -29,7 +29,7 @@ def tts_chunk(text, voice_id, eleven_key, lang_code="da"):
     body = {
         "text": text.strip(),
         "model_id": "eleven_multilingual_v2",
-        "voice_settings": {"stability": 0.4, "similarity_boost": 0.75, "speed": 0.92},
+        "voice_settings": {"stability": 0.4, "similarity_boost": 0.75, "speed": 1.0},
     }
     if lang_code:
         body["language_code"] = lang_code
@@ -234,7 +234,69 @@ SCENE_CATALOG = [
         "char_name":   "Waiter",
         "scene_description": "Danish restaurant — a waiter is at your table, ready to take your order",
     },
+    {
+        "key":         "free_conversation",
+        "level":       "A1",
+        "title":       "Free Conversation",
+        "desc":        "Chat directly with your tutor — topics picked from your goals and memory",
+        "file":        "tutor.svg",
+        "gradient":    "linear-gradient(135deg,#0d9488,#0f766e)",
+        "char_name":   "",
+        "scene_description": "",
+        "free_conv":   True,
+    },
 ]
+
+# ── Scene opening lines spoken by the character at lesson start ───────────────
+SCENE_OPENERS_BY_LANG = {
+    "Danish": {
+        "meet_a_friend": "Hej! Hvad hedder du?",
+        "cafe":          "Hej! Hvad må det være?",
+        "supermarket":   "Vil du betale med kort eller kontanter?",
+        "flower_store":  "Hej! Hvad kan jeg hjælpe dig med i dag?",
+        "bakery":        "Godmorgen! Hvad må det være?",
+        "restaurant":    "Goddag og velkommen! Har du reserveret bord?",
+    },
+    "Portuguese (Brazilian)": {
+        "meet_a_friend": "Oi! Qual é o seu nome?",
+        "cafe":          "Olá! O que vai ser?",
+        "supermarket":   "Vai pagar no débito ou no crédito?",
+        "flower_store":  "Oi! Em que posso ajudar você hoje?",
+        "bakery":        "Bom dia! O que vai ser?",
+        "restaurant":    "Boa tarde e bem-vindo! Tem reserva?",
+    },
+}
+
+# Gender of the visible character in each scene image (used for voice matching)
+SCENE_CHAR_GENDER = {
+    "meet_a_friend": "male",
+    "cafe":          "female",
+    "supermarket":   "female",
+    "flower_store":  "male",
+    "bakery":        "female",
+    "restaurant":    "male",
+}
+
+# Which voice label is the primary character voice per scene/language
+# (used in account.py to show the auto-swap warning)
+SCENE_PRIMARY_VOICE = {
+    "Danish": {
+        "meet_a_friend": "Søren — male, calm",
+        "cafe":          "Camilla — female",
+        "supermarket":   "Camilla — female",
+        "flower_store":  "Søren — male, calm",
+        "bakery":        "Camilla — female",
+        "restaurant":    "Mathias — male baritone",
+    },
+    "Portuguese (Brazilian)": {
+        "meet_a_friend": "Flavio — male, calm",
+        "cafe":          "Camila — female",
+        "supermarket":   "Camila — female",
+        "flower_store":  "Flavio — male, calm",
+        "bakery":        "Camila — female",
+        "restaurant":    "Matheus — male baritone",
+    },
+}
 
 # Session state keys that belong to one lesson — cleared when starting a new one
 LESSON_STATE_KEYS = [
@@ -244,7 +306,7 @@ LESSON_STATE_KEYS = [
     "pipeline_error", "pending_student", "avatar_thinking",
     "correct_log", "coaching_log", "lesson_started",
     "tutor_play_seq", "char_play_seq", "replay_char_seq",
-    "current_session_id",
+    "current_session_id", "knowledge_profile",
 ]
 
 # ── Structured output schema ────────────────────────────────────────────────────
