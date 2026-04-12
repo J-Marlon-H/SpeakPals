@@ -50,13 +50,24 @@ def _find_creds_file() -> pathlib.Path | None:
 
 
 def _load_client() -> tuple[str, str]:
-    """Return (client_id, client_secret) from Streamlit secrets or file on disk."""
+    """Return (client_id, client_secret).
+
+    Sources tried in order:
+    1. Streamlit secrets (Streamlit Cloud)
+    2. GOOGLE_CLIENT_SECRET_JSON env var / keys.env (local dev)
+    3. client_secret_*.json file on disk (fallback)
+    """
+    import os
     raw = None
+
     try:
         import streamlit as st
         raw = st.secrets["GOOGLE_CLIENT_SECRET_JSON"]
     except Exception:
         pass
+
+    if not raw:
+        raw = os.getenv("GOOGLE_CLIENT_SECRET_JSON")
 
     if raw:
         data = json.loads(raw)
@@ -66,7 +77,7 @@ def _load_client() -> tuple[str, str]:
             raise FileNotFoundError(
                 "Google credentials not found. Either:\n"
                 "  • Set GOOGLE_CLIENT_SECRET_JSON in Streamlit secrets\n"
-                "  • Place client_secret_*.json in the project root (local)"
+                "  • Set GOOGLE_CLIENT_SECRET_JSON in keys.env (local)"
             )
         data = json.loads(path.read_text())
 

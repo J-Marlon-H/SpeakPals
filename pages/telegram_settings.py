@@ -90,9 +90,6 @@ except Exception:
 if bot_enabled and bot_token:
     st.markdown("<div class='status-badge status-on'>● Bot is running</div>",
                 unsafe_allow_html=True)
-else:
-    st.markdown("<div class='status-badge status-off'>○ Bot not active</div>",
-                unsafe_allow_html=True)
 
 st.markdown("<br>", unsafe_allow_html=True)
 
