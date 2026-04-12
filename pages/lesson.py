@@ -5,11 +5,12 @@ import streamlit.components.v1 as components
 import hashlib, pathlib, base64
 from dotenv import load_dotenv
 import json as _json
-from pipeline import (run_pipeline_stream, MODELS, VOICES, VOICES_BY_LANG, VOICE_GENDER,
-                      SCENE_CATALOG, SETTINGS_DEFAULTS, TTS_LANG_CODE, STT_LANG_CODE,
+from pipeline import (VOICES, VOICES_BY_LANG, VOICE_GENDER,
+                      SCENE_CATALOG, SETTINGS_DEFAULTS, STT_LANG_CODE,
                       parse_claude_response, generate_scene_image, character_tts_b64,
                       SCENE_OPENERS_BY_LANG, SCENE_CHAR_GENDER)
 from prompts import build_system_prompt, get_tutor_name
+from tutor import Tutor
 from ws_proxy import start_in_thread, PROXY_PORT, scribe_token as _scribe_token
 from db import require_auth, load_knowledge_profile, _secret
 
@@ -135,17 +136,18 @@ if "knowledge_profile" not in st.session_state:
     else:
         st.session_state["knowledge_profile"] = {}
 
-name        = st.session_state.get("s_name",        SETTINGS_DEFAULTS["s_name"])
+tutor = Tutor.from_session(st.session_state)
+
+# Unpack for local use — level comes from scene data, not user settings
+name          = tutor.name
+bg_lang       = tutor.bg_lang
+target_lang   = tutor.target_lang
+tts_lang_code = tutor.tl_lang_code
+stt_lang_code = STT_LANG_CODE.get(target_lang, "da")
+
 _sel_scene  = st.session_state.get("selected_scene")
 level       = _SCENE_BY_KEY[_sel_scene]["level"] if _sel_scene in _SCENE_BY_KEY else "A1"
-bg_lang     = st.session_state.get("s_bg_lang",     SETTINGS_DEFAULTS["s_bg_lang"])
-voice_label = st.session_state.get("s_voice_label", SETTINGS_DEFAULTS["s_voice_label"])
-model_label = st.session_state.get("s_model_label", SETTINGS_DEFAULTS["s_model_label"])
-model_id    = MODELS[model_label]
-target_lang    = st.session_state.get("s_language", SETTINGS_DEFAULTS["s_language"])
-lang_voices    = VOICES_BY_LANG.get(target_lang, VOICES)
-tts_lang_code  = TTS_LANG_CODE.get(target_lang, "da")
-stt_lang_code  = STT_LANG_CODE.get(target_lang, "da")
+lang_voices = VOICES_BY_LANG.get(target_lang, VOICES)
 
 # ── Session state ──────────────────────────────────────────────────────────────
 
@@ -191,15 +193,13 @@ if _scene_src_raw and not _scene_src_raw.startswith(("http", "data:")):
 else:
     scene_src = _scene_src_raw  # "" for free conversation — ob_mode handles the background
 
-voice_id = lang_voices[voice_label] if voice_label in lang_voices else next(iter(lang_voices.values()))
-
 _scene_gender = SCENE_CHAR_GENDER.get(st.session_state.get("selected_scene") or "", None)
 _same_gender  = [vid for lbl, vid in lang_voices.items()
                  if VOICE_GENDER.get(lbl) == _scene_gender]
 char_voice_id = (
-    next((v for v in _same_gender if v != voice_id), None)
+    next((v for v in _same_gender if v != tutor.voice_id), None)
     or (_same_gender[0] if _same_gender else None)
-    or next((v for v in lang_voices.values() if v != voice_id), next(iter(lang_voices.values())))
+    or next((v for v in lang_voices.values() if v != tutor.voice_id), next(iter(lang_voices.values())))
 )
 
 sk          = _scene_key(_scene_src_raw)
@@ -308,6 +308,15 @@ with st.sidebar:
                     f"{txt}</div></div>"
                 )
         st.markdown("".join(parts), unsafe_allow_html=True)
+        components.html("""<script>
+(function(){
+  function scroll(){
+    var s=window.parent.document.querySelector('[data-testid="stSidebar"]>div:first-child');
+    if(s) s.scrollTop=s.scrollHeight;
+  }
+  scroll(); setTimeout(scroll,120); setTimeout(scroll,350);
+})();
+</script>""", height=0)
         # Replay button rendered separately after the chat block
         if last_char_i is not None and st.session_state.char_audio:
             _, rb = st.columns([5, 1])
@@ -415,11 +424,10 @@ if student_text:
         raw_tutor_text = ""
         last_speaker   = "character"
 
-        for raw_tutor_text, chunk_b64, last_speaker in run_pipeline_stream(
-                system, student_text, st.session_state.chat, voice_id,
-                CLAUDE_KEY, ELEVEN_KEY, model=model_id,
-                use_structured=True, lang_code=tts_lang_code,
-                char_voice_id=char_voice_id):
+        for raw_tutor_text, chunk_b64, last_speaker in tutor.stream(
+                system, student_text, st.session_state.chat,
+                CLAUDE_KEY, ELEVEN_KEY,
+                use_structured=True, char_voice_id=char_voice_id):
             if chunk_b64:
                 all_chunks.append(chunk_b64)
 

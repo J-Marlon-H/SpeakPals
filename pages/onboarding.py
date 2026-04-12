@@ -6,8 +6,8 @@ import streamlit as st
 import streamlit.components.v1 as components
 from dotenv import load_dotenv
 
-from pipeline import (run_pipeline_stream, MODELS, SETTINGS_DEFAULTS, character_tts_b64,
-                      VOICES_BY_LANG, VOICES, TTS_LANG_CODE)
+from pipeline import (SETTINGS_DEFAULTS, character_tts_b64)
+from tutor import Tutor
 from db import (require_auth, load_knowledge_profile, save_knowledge_profile,
                 delete_knowledge_profile, _secret)
 from profile import update_knowledge_profile
@@ -72,27 +72,43 @@ _OPENER = (
 # ── System prompt ──────────────────────────────────────────────────────────────
 _OB_SYSTEM = """\
 You are a warm, curious language learning tutor meeting {name} for the first time.
+Your job is to LISTEN and LEARN about them — not to teach, explain, or lecture.
 
-**LANGUAGE: Respond ONLY in English. Never use {target_lang} or any other language.**
+**LANGUAGE: English only. Never use {target_lang} or any other language.**
 
-**RESPONSE LENGTH: Keep your replies SHORT — one brief reaction (max one sentence) \
-then ONE question. Never more than 2 sentences total. The student should be doing \
-at least 70% of the talking. Do NOT summarise, recap, or list things you've heard.**
+**RESPONSE LENGTH: One brief, warm reaction (max one sentence) then ONE question. \
+Never more than 2 sentences total. The student should talk; you should listen.**
 
-Your goal is to learn about this person through natural conversation — explore these \
-areas organically, not as a checklist:
+You are building a personalised profile of this learner. Explore these areas through \
+natural conversation — one topic at a time, in whatever order feels natural:
 
-1. **Language level** — What do they already know? How would they rate themselves?
-2. **Learning motivation** — Why are they learning? What personal goals drive them?
-3. **Personal use context** — Where will they actually use the language in real life?
-4. **Patterns and challenges** — Any mistakes or difficulties they are already aware of?
-5. **Personal connections** — Partner, family, travel, work — what makes it meaningful?
+1. **Language level** — What do they already know in {target_lang}? Vocabulary, phrases, \
+   grammar? How would they rate themselves honestly?
+2. **Learning motivation** — Why are they learning {target_lang}? What personal story or \
+   goal is behind it? Ask for specifics, not general answers.
+3. **Personal use context** — Where and with whom will they actually use {target_lang} in \
+   real life? Work, family, travel, neighbourhood, partner?
+4. **Common errors and challenges** — What mistakes do they already notice they make? \
+   What has been hard in past language learning attempts?
+5. **Relationships and personal context** — Do they have a partner, colleagues, or family \
+   who speak {target_lang}? Any cultural connections?
 
 Conversation rules:
-- ONE question per turn, always — never combine questions
-- React briefly and warmly to what they said, then move forward
-- If they give a short answer, gently probe: "Tell me more about that."
-- Never volunteer information about yourself beyond your role
+- ONE question per turn. Never combine two questions.
+- Brief warm reaction first ("That's great context.", "Interesting."), then your question.
+- If an answer is vague, probe once: "Can you give me a specific example?"
+- When you feel you have enough on a topic, say so briefly and move on: \
+  "Got it — that's really helpful." then ask about the next area.
+- Do NOT summarise, recap, or list back what they said.
+- Do NOT give language tips, corrections, or lessons during this conversation.
+
+When you have covered the main areas OR the student signals they are done:
+- Ask: "Is there anything else important I should know about you to give you the \
+  best possible experience?"
+- If they say no (or after ~{max_turns} exchanges), close warmly in 1–2 sentences \
+  and tell them: "Feel free to press Finish Onboarding whenever you're ready."
+- End your very last message with this exact marker on its own line:
+[ONBOARDING_COMPLETE]
 
 Context:
 - Name: {name}
@@ -101,9 +117,6 @@ Context:
 - Background language: {bg_lang}
 - You opened with: "{opener_text}"
 - This is exchange number {turn_count} of approximately {max_turns}
-
-After approximately {max_turns} exchanges, wrap up in 1–2 sentences and end with:
-[ONBOARDING_COMPLETE]
 """
 
 
@@ -205,20 +218,13 @@ st.markdown("""<style>
 
 # ── User settings ──────────────────────────────────────────────────────────────
 
-name        = st.session_state.get("s_name",        SETTINGS_DEFAULTS["s_name"])
-level       = st.session_state.get("s_level",       SETTINGS_DEFAULTS["s_level"])
-bg_lang     = st.session_state.get("s_bg_lang",     SETTINGS_DEFAULTS["s_bg_lang"])
-target_lang = st.session_state.get("s_language",    SETTINGS_DEFAULTS["s_language"])
-model_label = st.session_state.get("s_model_label", SETTINGS_DEFAULTS["s_model_label"])
-model_id    = MODELS[model_label]
+tutor = Tutor.from_session(st.session_state)
 
-# ── Tutor voice — same selection as lessons so the voice is consistent ─────────
-_voice_label  = st.session_state.get("s_voice_label", SETTINGS_DEFAULTS["s_voice_label"])
-_lang_voices  = VOICES_BY_LANG.get(target_lang, VOICES)
-_ob_voice_id  = (_lang_voices[_voice_label]
-                 if _voice_label in _lang_voices
-                 else next(iter(_lang_voices.values())))
-_ob_tl_lang   = TTS_LANG_CODE.get(target_lang, "da")
+name        = tutor.name
+level       = tutor.level
+bg_lang     = tutor.bg_lang
+target_lang = tutor.target_lang
+model_id    = tutor.model_id
 
 # ── Session state ──────────────────────────────────────────────────────────────
 
@@ -256,6 +262,53 @@ def _start_proxy():
 
 _start_proxy()
 
+
+def _save_profile_now() -> None:
+    """Build / update the knowledge profile from the current ob_log and persist it.
+    Safe to call multiple times — skips if already saved or if no log exists.
+    """
+    if st.session_state.ob_profile_saved:
+        return
+    if not st.session_state.ob_log:
+        return
+    if "sb_user_id" not in st.session_state or not CLAUDE_KEY:
+        return
+
+    full_log = []
+    if st.session_state.ob_opener_text:
+        full_log.append({"who": "tutor", "text": st.session_state.ob_opener_text})
+    full_log.extend(st.session_state.ob_log)
+
+    current_profile = load_knowledge_profile(
+        st.session_state.sb_user_id,
+        st.session_state.sb_access_token,
+    )
+    updated = update_knowledge_profile(
+        current_profile,
+        name, level, target_lang, bg_lang,
+        full_log, [],
+        CLAUDE_KEY,
+        model=model_id,
+    )
+    save_knowledge_profile(
+        st.session_state.sb_user_id,
+        st.session_state.sb_access_token,
+        updated,
+    )
+    st.session_state["knowledge_profile"] = updated
+    st.session_state.ob_profile_saved = True
+
+    _sync = _infer_settings(updated)
+    if _sync:
+        st.session_state.update(_sync)
+        from db import upsert_profile
+        upsert_profile(
+            st.session_state.sb_user_id,
+            st.session_state.sb_access_token,
+            _sync,
+        )
+
+
 # ── Opener: generate TTS for Alex's opening greeting ──────────────────────────
 # Triggered on the rerun after ob_started first becomes True.
 
@@ -264,7 +317,7 @@ if st.session_state.ob_started and not st.session_state.ob_opener_loaded:
     st.session_state.ob_opener_text = opener_text
 
     if ELEVEN_KEY:
-        b64 = character_tts_b64(opener_text, _ob_voice_id, ELEVEN_KEY, lang_code="")
+        b64 = character_tts_b64(opener_text, tutor.voice_id, ELEVEN_KEY, lang_code="")
         if b64:
             st.session_state.ob_last_chunks    = [b64]
             st.session_state.ob_tutor_play_seq += 1
@@ -336,6 +389,15 @@ with st.sidebar:
                     f"{txt}</div></div>"
                 )
         st.markdown("".join(parts), unsafe_allow_html=True)
+        components.html("""<script>
+(function(){
+  function scroll(){
+    var s=window.parent.document.querySelector('[data-testid="stSidebar"]>div:first-child');
+    if(s) s.scrollTop=s.scrollHeight;
+  }
+  scroll(); setTimeout(scroll,120); setTimeout(scroll,350);
+})();
+</script>""", height=0)
 
     # Completion banner
     if st.session_state.ob_complete:
@@ -381,6 +443,7 @@ with st.sidebar:
 
     # Finish onboarding — pinned to bottom
     if st.button("✅ Finish Onboarding", key="btn_ob_home", use_container_width=True):
+        _save_profile_now()   # ensure profile is saved even if [ONBOARDING_COMPLETE] was missed
         if st.session_state.get("is_new_user"):
             st.switch_page("pages/telegram_settings.py")
         else:
@@ -451,16 +514,13 @@ if student_text and not st.session_state.ob_complete:
         all_chunks = []
         raw_text   = ""
 
-        for raw_text, chunk_b64, _ in run_pipeline_stream(
+        for raw_text, chunk_b64, _ in tutor.stream(
                 system,
                 student_text,
                 st.session_state.ob_chat,
-                _ob_voice_id,
                 CLAUDE_KEY,
                 ELEVEN_KEY,
-                model=model_id,
-                use_structured=False,
-                tl_lang_code=_ob_tl_lang):
+                use_structured=False):
             if chunk_b64:
                 all_chunks.append(chunk_b64)
 
@@ -488,45 +548,9 @@ if student_text and not st.session_state.ob_complete:
             st.session_state.ob_tutor_play_seq += 1
 
         # ── Handle completion ──────────────────────────────────────────────────
-        if onboarding_done and not st.session_state.ob_profile_saved:
-            st.session_state.ob_complete     = True
-            st.session_state.ob_profile_saved = True
-
-            if "sb_user_id" in st.session_state and CLAUDE_KEY:
-                # Build full log including the opener for the profile update
-                full_log = []
-                if st.session_state.ob_opener_text:
-                    full_log.append({"who": "tutor", "text": st.session_state.ob_opener_text})
-                full_log.extend(st.session_state.ob_log)
-
-                current_profile = load_knowledge_profile(
-                    st.session_state.sb_user_id,
-                    st.session_state.sb_access_token,
-                )
-                updated = update_knowledge_profile(
-                    current_profile,
-                    name, level, target_lang, bg_lang,
-                    full_log, [],   # no error log for onboarding
-                    CLAUDE_KEY,
-                    model=model_id,
-                )
-                save_knowledge_profile(
-                    st.session_state.sb_user_id,
-                    st.session_state.sb_access_token,
-                    updated,
-                )
-                st.session_state["knowledge_profile"] = updated
-
-                # Sync inferred settings back to session state + Supabase profile
-                _sync = _infer_settings(updated)
-                if _sync:
-                    st.session_state.update(_sync)
-                    from db import upsert_profile
-                    upsert_profile(
-                        st.session_state.sb_user_id,
-                        st.session_state.sb_access_token,
-                        _sync,
-                    )
+        if onboarding_done:
+            st.session_state.ob_complete = True
+            _save_profile_now()   # idempotent — marks ob_profile_saved itself
 
     except Exception as e:
         st.session_state.ob_thinking    = False
