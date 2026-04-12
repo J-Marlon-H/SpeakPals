@@ -259,7 +259,7 @@ else:
         _content = _val.get("content", "") if isinstance(_val, dict) else str(_val)
         _ts      = _val.get("updated_at", "") if isinstance(_val, dict) else ""
         _header  = f"**{_label}**" + (f"  ·  *{_ts[:10]}*" if _ts else "")
-        with st.expander(_header, expanded=False):
+        with st.expander(_header, expanded=True):
             st.markdown(
                 f"<div style='font:400 13px/1.6 Inter;color:#111827'>{_content or '—'}</div>",
                 unsafe_allow_html=True,

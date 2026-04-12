@@ -23,43 +23,62 @@ def _secret(key):
         return os.getenv(key)
 
 
+def _infer_settings(profile: dict) -> dict:
+    """Extract user settings that can be reliably inferred from the knowledge profile."""
+    settings = {}
+    # Level: look for explicit CEFR codes in language_level content
+    level_text = (profile.get("language_level") or {}).get("content", "").upper()
+    for lvl in ("A1", "A2", "B1", "B2"):
+        if lvl in level_text:
+            settings["s_level"] = lvl
+            break
+    # Target language: look for known languages in motivation / context
+    tl_map = {
+        "danish":                 "Danish",
+        "portuguese":             "Portuguese (Brazilian)",
+        "portuguese (brazilian)": "Portuguese (Brazilian)",
+    }
+    combined = " ".join([
+        (profile.get("learning_motivation") or {}).get("content", ""),
+        (profile.get("personal_use_context") or {}).get("content", ""),
+        (profile.get("language_level") or {}).get("content", ""),
+    ]).lower()
+    for kw, lang in tl_map.items():
+        if kw in combined:
+            settings["s_language"] = lang
+            break
+    # Background language
+    bg_map = {
+        "german":  "German",
+        "spanish": "Spanish",
+        "french":  "French",
+        "dutch":   "Dutch",
+        "swedish": "Swedish",
+        "english": "English",
+    }
+    for kw, lang in bg_map.items():
+        if f"native {kw}" in combined or f"speaks {kw}" in combined or \
+           f"background: {kw}" in combined or f"background language: {kw}" in combined or \
+           f"first language is {kw}" in combined or f"mother tongue is {kw}" in combined:
+            settings["s_bg_lang"] = lang
+            break
+    return settings
+
+
 CLAUDE_KEY = _secret("CLAUDE_API_KEY")
 ELEVEN_KEY = _secret("ELEVENLABS_API_KEY")
 
 # ── Voice & language config ────────────────────────────────────────────────────
-# Camilla/Camila voice — warm female, ElevenLabs multilingual model handles all four languages
-_OB_VOICE_ID = "4RklGmuxoAskAbGXplXN"
+# Alex voice — warm female, ElevenLabs multilingual model
+_OB_VOICE_ID   = "4RklGmuxoAskAbGXplXN"
+_OB_TTS_LANG   = "en"   # interview always in English
+_OB_MAX_TURNS  = 18     # ~8-10 minutes of conversation
 
-ONBOARDING_LANGUAGES = ["English", "German", "Danish", "Portuguese (Brazilian)"]
-
-_OB_TTS_LANG = {
-    "English":                "en",
-    "German":                 "de",
-    "Danish":                 "da",
-    "Portuguese (Brazilian)": "pt",
-}
-
-_OB_MAX_TURNS = 18  # ~8-10 minutes of conversation
-
-# ── Opening greeting per language (spoken before user says anything) ───────────
-_OPENERS = {
-    "English": (
-        "Hi {name}! I'm Alex, your SpeakPals companion. "
-        "What language are you hoping to learn?"
-    ),
-    "German": (
-        "Hallo {name}! Ich bin Alex, dein SpeakPals-Begleiter. "
-        "Welche Sprache möchtest du lernen?"
-    ),
-    "Danish": (
-        "Hej {name}! Jeg er Alex, din SpeakPals-ledsager. "
-        "Hvilket sprog håber du at lære?"
-    ),
-    "Portuguese (Brazilian)": (
-        "Oi {name}! Sou Alex, seu parceiro no SpeakPals. "
-        "Qual idioma você quer aprender?"
-    ),
-}
+# ── Opening greeting ───────────────────────────────────────────────────────────
+_OPENER = (
+    "Hi {name}! I'm Alex, your SpeakPals companion. "
+    "What language are you hoping to learn?"
+)
 
 # ── System prompt ──────────────────────────────────────────────────────────────
 _OB_SYSTEM = """\
@@ -67,7 +86,7 @@ You are Alex, a warm, curious, and deeply empathetic language learning companion
 You are meeting {name} for the very first time and having a friendly 8–12 minute \
 getting-to-know-you conversation.
 
-**You must respond ONLY in {interview_language}. Never switch languages.**
+**You must respond ONLY in English. Never switch to another language.**
 
 Your mission is to learn as much as possible about this person through natural, \
 flowing conversation so you can become the best possible language and culture \
@@ -109,11 +128,9 @@ practising together. End your very last message with this exact marker on its ow
 """
 
 
-def _build_system(name, target_lang, level, bg_lang, interview_language,
-                  turn_count, opener_text):
+def _build_system(name, target_lang, level, bg_lang, turn_count, opener_text):
     return _OB_SYSTEM.format(
         name=name,
-        interview_language=interview_language,
         target_lang=target_lang,
         level=level,
         bg_lang=bg_lang,
@@ -229,7 +246,6 @@ for k, v in [
     ("ob_tutor_play_seq", 0),
     ("ob_stop_seq",       0),
     ("ob_last_id",        None),
-    ("ob_language",       "English"),
     ("ob_started",        False),
     ("ob_opener_loaded",  False),
     ("ob_opener_text",    ""),
@@ -257,13 +273,11 @@ _start_proxy()
 # Triggered on the rerun after ob_started first becomes True.
 
 if st.session_state.ob_started and not st.session_state.ob_opener_loaded:
-    ob_lang       = st.session_state.ob_language
-    tts_lc        = _OB_TTS_LANG.get(ob_lang, "en")
-    opener_text   = _OPENERS[ob_lang].format(name=name)
+    opener_text = _OPENER.format(name=name)
     st.session_state.ob_opener_text = opener_text
 
     if ELEVEN_KEY:
-        b64 = character_tts_b64(opener_text, _OB_VOICE_ID, ELEVEN_KEY, lang_code=tts_lc)
+        b64 = character_tts_b64(opener_text, _OB_VOICE_ID, ELEVEN_KEY, lang_code=_OB_TTS_LANG)
         if b64:
             st.session_state.ob_last_chunks    = [b64]
             st.session_state.ob_tutor_play_seq += 1
@@ -279,35 +293,17 @@ if st.session_state.ob_started and not st.session_state.ob_opener_loaded:
 with st.sidebar:
     # Header
     st.markdown(
-        "<div style='padding:16px 16px 0'>"
+        "<div style='padding:16px 16px 8px'>"
         "<div style='font:800 18px/1.2 Inter,sans-serif;color:#111827;letter-spacing:-.3px'>"
         "Welcome to SpeakPals 👋</div>"
+        f"<div style='font:500 12px Inter;color:rgba(17,24,39,.5);margin-top:4px'>"
+        f"Getting to know you, {name}</div>"
         "</div>",
         unsafe_allow_html=True,
     )
-
-    # Language selector — always visible at top (locked once conversation starts)
-    st.markdown(
-        "<div style='padding:10px 12px 2px'>"
-        "<div style='font:600 10px Inter;letter-spacing:2px;color:rgba(17,24,39,.4);"
-        "text-transform:uppercase;margin-bottom:6px'>Interview language</div>"
-        "</div>",
-        unsafe_allow_html=True,
-    )
-    ob_lang_choice = st.selectbox(
-        "Interview language",
-        ONBOARDING_LANGUAGES,
-        index=ONBOARDING_LANGUAGES.index(st.session_state.ob_language),
-        label_visibility="collapsed",
-        disabled=st.session_state.ob_started,
-    )
-    if ob_lang_choice != st.session_state.ob_language and not st.session_state.ob_started:
-        st.session_state.ob_language = ob_lang_choice
-        st.rerun()
-
     st.markdown(
         "<div style='height:1px;background:linear-gradient(90deg,rgba(13,148,136,.3),"
-        "transparent);margin:6px 12px 10px'></div>",
+        "transparent);margin:0 12px 10px'></div>",
         unsafe_allow_html=True,
     )
 
@@ -315,10 +311,8 @@ with st.sidebar:
     log = st.session_state.ob_log
     if not st.session_state.ob_started:
         st.markdown(
-            "<div style='padding:16px;font-size:12px;color:rgba(17,24,39,.45);font-style:italic'>"
-            f"Tap the microphone to begin your welcome conversation in "
-            f"<strong style='color:#111827'>{st.session_state.ob_language}</strong>. "
-            f"Alex will introduce herself and guide the chat."
+            "<div style='padding:12px 16px;font-size:12px;color:rgba(17,24,39,.45);font-style:italic'>"
+            "Alex will start in a moment…"
             "</div>",
             unsafe_allow_html=True,
         )
@@ -378,7 +372,7 @@ with st.sidebar:
             unsafe_allow_html=True,
         )
 
-    # Reset all knowledge — pinned above Home
+    # Reset all knowledge — pinned above Finish
     if st.button("🗑 Reset all knowledge", key="btn_reset_knowledge", use_container_width=True):
         if "sb_user_id" in st.session_state:
             delete_knowledge_profile(
@@ -392,8 +386,8 @@ with st.sidebar:
             st.session_state.pop(k, None)
         st.rerun()
 
-    # Home — pinned to bottom
-    if st.button("🏠 Back to Home", key="btn_ob_home", use_container_width=True):
+    # Finish interview — pinned to bottom
+    if st.button("✅ Finish Interview", key="btn_ob_home", use_container_width=True):
         st.switch_page("pages/home.py")
 
 # ── Scribe token (cloud only) ──────────────────────────────────────────────────
@@ -414,9 +408,6 @@ def _scribe_token(eleven_key):
         return None
 
 # ── VAD component ──────────────────────────────────────────────────────────────
-
-ob_lang       = st.session_state.ob_language
-tts_lang_code = _OB_TTS_LANG.get(ob_lang, "en")
 
 mic_props = dict(
     lang            = "",           # auto-detect STT — user may switch languages freely
@@ -473,7 +464,6 @@ if student_text and not st.session_state.ob_complete:
 
     system = _build_system(
         name, target_lang, level, bg_lang,
-        ob_lang,
         st.session_state.ob_turn_count,
         st.session_state.ob_opener_text,
     )
@@ -491,7 +481,7 @@ if student_text and not st.session_state.ob_complete:
                 ELEVEN_KEY,
                 model=model_id,
                 use_structured=False,
-                lang_code=tts_lang_code):
+                lang_code=_OB_TTS_LANG):
             if chunk_b64:
                 all_chunks.append(chunk_b64)
 
@@ -547,6 +537,17 @@ if student_text and not st.session_state.ob_complete:
                     updated,
                 )
                 st.session_state["knowledge_profile"] = updated
+
+                # Sync inferred settings back to session state + Supabase profile
+                _sync = _infer_settings(updated)
+                if _sync:
+                    st.session_state.update(_sync)
+                    from db import upsert_profile
+                    upsert_profile(
+                        st.session_state.sb_user_id,
+                        st.session_state.sb_access_token,
+                        _sync,
+                    )
 
     except Exception as e:
         st.session_state.ob_thinking    = False
