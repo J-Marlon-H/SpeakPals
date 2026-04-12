@@ -71,39 +71,12 @@ st.markdown("""
   <div style='font:800 26px/1 Inter,sans-serif;color:#111827;letter-spacing:-.5px;
               margin-bottom:6px'>✈ Telegram & Calendar</div>
   <div style='font:400 13px Inter;color:rgba(17,24,39,.55)'>
-    Connect the SpeakPals Telegram bot and your Google Calendar
+    Link your Telegram account and connect Google Calendar
   </div>
 </div>""", unsafe_allow_html=True)
 
-# ── Telegram bot section ───────────────────────────────────────────────────────
-st.markdown("<div class='sec-label'>Telegram Bot</div>", unsafe_allow_html=True)
-
-st.markdown("<br>", unsafe_allow_html=True)
-
-st.markdown("""<div class='info-box'>
-  <b>How to use the bot</b><br><br>
-  1. Open the bot: <a href='https://t.me/SpeakPalsBot' target='_blank'
-     style='color:#0d9488;font-weight:600'>t.me/SpeakPalsBot</a><br>
-  2. Send <code>/start</code> to begin onboarding<br>
-  3. Pick a scene with <code>/scene</code> and start speaking<br><br>
-  <b>Commands</b><br>
-  <code>/start</code> — welcome &amp; profile setup<br>
-  <code>/scene</code> — pick a roleplay scene<br>
-  <code>/level</code> — change your level (A1 → B1)<br>
-  <code>/stop</code> — end lesson &amp; see corrections<br>
-  <code>/calendar</code> — connect Google Calendar<br>
-  <code>/link CODE</code> — link to your web account<br>
-  <code>/reset</code> — start over with a new profile<br><br>
-  <b>Tips</b><br>
-  • Send a <b>voice note</b> to practise speaking — it's transcribed automatically<br>
-  • Send <b>text</b> if you prefer typing<br>
-  • Use <code>/stop</code> after a scene to see what to remember
-</div>""", unsafe_allow_html=True)
-
-st.markdown("<div class='sec-div'></div>", unsafe_allow_html=True)
-
 # ── Account link section ───────────────────────────────────────────────────────
-st.markdown("<div class='sec-label'>Link Account</div>", unsafe_allow_html=True)
+st.markdown("<div class='sec-label'>Telegram</div>", unsafe_allow_html=True)
 st.markdown("<br>", unsafe_allow_html=True)
 
 sb_user_id    = st.session_state.get("sb_user_id")
@@ -151,18 +124,20 @@ else:
         </div>""", unsafe_allow_html=True)
         st.markdown("<br>", unsafe_allow_html=True)
         if st.button("Generate a new code", use_container_width=True):
-            new_code = create_link_code(sb_user_id, sb_token)
+            new_code, err = create_link_code(sb_user_id, sb_token)
             if new_code:
                 st.session_state.tg_link_code = new_code
-            st.rerun()
+                st.rerun()
+            else:
+                st.error(f"Could not generate code: {err}")
     else:
         if st.button("Generate link code", use_container_width=True):
-            code = create_link_code(sb_user_id, sb_token)
+            code, err = create_link_code(sb_user_id, sb_token)
             if code:
                 st.session_state.tg_link_code = code
                 st.rerun()
             else:
-                st.error("Could not generate code. Please try again.")
+                st.error(f"Could not generate code: {err}")
 
 st.markdown("<div class='sec-div'></div>", unsafe_allow_html=True)
 

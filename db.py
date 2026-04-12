@@ -132,17 +132,18 @@ def upsert_profile(user_id: str, access_token: str, data: dict) -> None:
 
 # ── Telegram account linking ─────────────────────────────────────────────────
 
-def create_link_code(user_id: str, access_token: str) -> str | None:
-    """Generate a 6-char link code valid for 10 minutes. Returns the code."""
+def create_link_code(user_id: str, access_token: str) -> tuple[str | None, str | None]:
+    """Generate a 6-char link code valid for 10 minutes.
+    Returns (code, None) on success or (None, error_message) on failure."""
     import secrets, string
     code = ''.join(secrets.choice(string.ascii_uppercase + string.digits) for _ in range(6))
     try:
         c = _client(access_token)
         c.table("telegram_link_codes").delete().eq("user_id", user_id).execute()
         c.table("telegram_link_codes").insert({"code": code, "user_id": user_id}).execute()
-        return code
-    except Exception:
-        return None
+        return code, None
+    except Exception as e:
+        return None, str(e)
 
 
 def consume_link_code(code: str, chat_id: int) -> str | None:
