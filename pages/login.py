@@ -90,16 +90,21 @@ with tab_register:
         reg_confirm  = st.text_input("Confirm password *", key="reg_confirm", type="password",
                                      placeholder="••••••••")
         st.markdown(
-            "<div style='font:400 11px Inter;color:rgba(17,24,39,.4);margin-top:2px'>"
-            "* Required field</div>",
+            "<div style='font:400 11px Inter;color:rgba(17,24,39,.4);margin-top:2px;"
+            "margin-bottom:12px'>* Required field</div>",
             unsafe_allow_html=True,
         )
-        st.markdown("<div style='height:4px'></div>", unsafe_allow_html=True)
         reg_submitted = st.form_submit_button("Create account", use_container_width=True)
 
     if reg_submitted:
-        if not reg_name.strip() or not reg_email or not reg_password or not reg_confirm:
-            st.error("Please fill in all fields — your name is required.")
+        if not reg_name.strip():
+            st.error("First name is required.")
+        elif not reg_email.strip():
+            st.error("Email is required.")
+        elif not reg_password:
+            st.error("Password is required.")
+        elif not reg_confirm:
+            st.error("Please confirm your password.")
         elif len(reg_password) < 6:
             st.error("Password must be at least 6 characters.")
         elif reg_password != reg_confirm:
