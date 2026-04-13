@@ -83,12 +83,17 @@ with tab_login:
 # ── Create account ────────────────────────────────────────────────────────────
 with tab_register:
     with st.form("register_form"):
-        reg_name     = st.text_input("First name", key="reg_name", placeholder="Maria")
-        reg_email    = st.text_input("Email", key="reg_email", placeholder="you@example.com")
-        reg_password = st.text_input("Password", key="reg_pw", type="password",
+        reg_name     = st.text_input("First name *", key="reg_name")
+        reg_email    = st.text_input("Email *", key="reg_email", placeholder="you@example.com")
+        reg_password = st.text_input("Password *", key="reg_pw", type="password",
                                      placeholder="At least 6 characters")
-        reg_confirm  = st.text_input("Confirm password", key="reg_confirm", type="password",
+        reg_confirm  = st.text_input("Confirm password *", key="reg_confirm", type="password",
                                      placeholder="••••••••")
+        st.markdown(
+            "<div style='font:400 11px Inter;color:rgba(17,24,39,.4);margin-top:2px'>"
+            "* Required field</div>",
+            unsafe_allow_html=True,
+        )
         st.markdown("<div style='height:4px'></div>", unsafe_allow_html=True)
         reg_submitted = st.form_submit_button("Create account", use_container_width=True)
 
