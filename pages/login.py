@@ -81,6 +81,9 @@ with tab_login:
                 st.switch_page("pages/home.py")
 
 # ── Create account ────────────────────────────────────────────────────────────
+_BG_LANGS   = ["English", "German", "Spanish", "French", "Dutch", "Swedish", "Other"]
+_CEFR_LEVELS = ["A1", "A2", "B1", "B2", "C1", "C2"]
+
 with tab_register:
     with st.form("register_form"):
         reg_name     = st.text_input("First name *", key="reg_name")
@@ -89,6 +92,38 @@ with tab_register:
                                      placeholder="At least 6 characters")
         reg_confirm  = st.text_input("Confirm password *", key="reg_confirm", type="password",
                                      placeholder="••••••••")
+        reg_bg_sel   = st.selectbox(
+            "Main language background *",
+            _BG_LANGS,
+            help=(
+                "The language you speak best — your native tongue or the language you are "
+                "most fluent in. Your tutor uses this to explain concepts in a way that "
+                "makes sense for someone with your background, and to spot typical mistakes "
+                "speakers of your language tend to make."
+            ),
+            key="reg_bg_sel",
+        )
+        reg_bg_other = st.text_input(
+            "Specify your language (if 'Other' selected above)",
+            key="reg_bg_other",
+            placeholder="e.g. Turkish, Arabic, Hindi…",
+        )
+        reg_level    = st.selectbox(
+            "Estimated language level (CEFR) *",
+            _CEFR_LEVELS,
+            help=(
+                "Your current level in the language you want to learn, on the Common "
+                "European Framework of Reference scale.\n\n"
+                "A1 — complete beginner\n"
+                "A2 — basic phrases\n"
+                "B1 — can handle simple conversations\n"
+                "B2 — comfortable in most situations\n"
+                "C1 — advanced, near-fluent\n"
+                "C2 — mastery, near-native\n\n"
+                "An educated guess is fine — your tutor will adapt."
+            ),
+            key="reg_level",
+        )
         st.markdown(
             "<div style='font:400 11px Inter;color:rgba(17,24,39,.4);margin-top:2px;"
             "margin-bottom:12px'>* Required field</div>",
@@ -97,6 +132,7 @@ with tab_register:
         reg_submitted = st.form_submit_button("Create account", use_container_width=True)
 
     if reg_submitted:
+        _bg_lang_val = reg_bg_other.strip() if reg_bg_sel == "Other" else reg_bg_sel
         if not reg_name.strip():
             st.error("First name is required.")
         elif not reg_email.strip():
@@ -105,6 +141,8 @@ with tab_register:
             st.error("Password is required.")
         elif not reg_confirm:
             st.error("Please confirm your password.")
+        elif reg_bg_sel == "Other" and not reg_bg_other.strip():
+            st.error("Please specify your language in the field above.")
         elif len(reg_password) < 6:
             st.error("Password must be at least 6 characters.")
         elif reg_password != reg_confirm:
@@ -123,10 +161,15 @@ with tab_register:
                     st.session_state.sb_user_id       = session["user_id"]
                     st.session_state.sb_email         = session["email"]
                     st.session_state["s_name"]        = reg_name.strip()
+                    st.session_state["s_bg_lang"]     = _bg_lang_val
+                    st.session_state["s_level"]       = reg_level
                     st.session_state["is_new_user"]   = True
-                    # Persist name immediately so it's available across all pages
-                    upsert_profile(session["user_id"], session["access_token"],
-                                   {"s_name": reg_name.strip()})
+                    # Persist to DB so tutors and settings see these values immediately
+                    upsert_profile(session["user_id"], session["access_token"], {
+                        "s_name":    reg_name.strip(),
+                        "s_bg_lang": _bg_lang_val,
+                        "s_level":   reg_level,
+                    })
                     st.switch_page("pages/onboarding.py")
                 else:
                     st.success(

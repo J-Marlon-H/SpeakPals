@@ -95,16 +95,48 @@ st.markdown("""
 # ── Student profile ────────────────────────────────────────────────────────────
 st.markdown("<div class='sec-label'>Student Profile</div>", unsafe_allow_html=True)
 
-name     = st.text_input("Name", value=st.session_state.get("s_name", ""))
-level    = st.selectbox("CEFR Level", ["A1", "A2", "B1", "B2"],
-                        index=["A1", "A2", "B1", "B2"].index(
-                            st.session_state.get("s_level", "A1")))
-bg_langs = ["English", "German", "Spanish", "French", "Dutch", "Swedish"]
-bg_lang  = st.selectbox("Your language background", bg_langs,
-                        index=bg_langs.index(
-                            st.session_state.get("s_bg_lang", "English")
-                            if st.session_state.get("s_bg_lang", "English") in bg_langs
-                            else "English"))
+name = st.text_input("Name", value=st.session_state.get("s_name", ""))
+
+_cefr = ["A1", "A2", "B1", "B2", "C1", "C2"]
+_saved_level = st.session_state.get("s_level", "A1")
+level = st.selectbox(
+    "CEFR Level",
+    _cefr,
+    index=_cefr.index(_saved_level) if _saved_level in _cefr else 0,
+    help=(
+        "Your current level in the language you are learning.\n\n"
+        "A1 — complete beginner\n"
+        "A2 — basic phrases\n"
+        "B1 — can handle simple conversations\n"
+        "B2 — comfortable in most situations\n"
+        "C1 — advanced, near-fluent\n"
+        "C2 — mastery, near-native"
+    ),
+)
+
+_bg_opts = ["English", "German", "Spanish", "French", "Dutch", "Swedish", "Other"]
+_saved_bg = st.session_state.get("s_bg_lang", "English")
+_bg_idx   = _bg_opts.index(_saved_bg) if _saved_bg in _bg_opts else _bg_opts.index("Other")
+_bg_sel   = st.selectbox(
+    "Main language background",
+    _bg_opts,
+    index=_bg_idx,
+    help=(
+        "The language you speak best — your native tongue or the language you are most "
+        "fluent in. Your tutor uses this to explain concepts in a way that makes sense "
+        "for someone with your background, and to spot typical mistakes speakers of your "
+        "language tend to make."
+    ),
+)
+if _bg_sel == "Other":
+    _other_val = _saved_bg if _saved_bg not in _bg_opts[:-1] else ""
+    bg_lang = st.text_input(
+        "Specify your language",
+        value=_other_val,
+        placeholder="e.g. Turkish, Arabic, Hindi…",
+    )
+else:
+    bg_lang = _bg_sel
 
 st.markdown("<div class='sec-div'></div>", unsafe_allow_html=True)
 
@@ -218,7 +250,7 @@ else:
 _CATEGORIES = [
     (
         "language_level", "📊", "CEFR Level",
-        "Your current proficiency on the A1–C2 scale — vocabulary and grammar mastered, where you struggle, and how your level is progressing.",
+        "Your current proficiency on the A1–C2 scale (Common European Framework of Reference) — vocabulary and grammar mastered, where you struggle, and how your level is progressing.",
     ),
     (
         "learning_motivation", "🎯", "Learning Motivation",
