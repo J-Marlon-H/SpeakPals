@@ -69,6 +69,21 @@ if "sb_user_id" not in st.session_state:
         # Cookie init is complete (token found-and-restored, or no cookie at all).
         st.session_state.pop("_cookie_restoring", None)
 
+# ── Load knowledge profile once per login session ────────────────────────────
+# knowledge_profile is NOT in LESSON_STATE_KEYS so it persists across lessons.
+# Load it here once so every page (lesson, free conv) can read it from session
+# state without a DB round-trip on every render.  feedback.py keeps it fresh
+# by writing the updated profile back to session state after each lesson.
+if "knowledge_profile" not in st.session_state and "sb_user_id" in st.session_state:
+    try:
+        from db import load_knowledge_profile
+        st.session_state["knowledge_profile"] = load_knowledge_profile(
+            st.session_state.sb_user_id,
+            st.session_state.sb_access_token,
+        )
+    except Exception:
+        st.session_state["knowledge_profile"] = {}
+
 pages = [
     st.Page("pages/home.py",              title="Home",         default=True),
     st.Page("pages/login.py",             title="Login",        visibility="hidden"),

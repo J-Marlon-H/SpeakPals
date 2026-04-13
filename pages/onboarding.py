@@ -283,13 +283,31 @@ def _save_profile_now() -> None:
         st.session_state.sb_user_id,
         st.session_state.sb_access_token,
     )
+
+    import requests as _req
+    _sess = _req.Session()
+    _sess.verify = False
+
     updated = update_knowledge_profile(
         current_profile,
         name, level, target_lang, bg_lang,
         full_log, [],
         CLAUDE_KEY,
         model=model_id,
+        http_session=_sess,
     )
+
+    # Only mark as saved when Claude returned a real profile.
+    # On any silent failure update_knowledge_profile returns current_profile ({}
+    # for first session), so _profile_is_real will be False and we leave
+    # ob_profile_saved=False — next button click or completion trigger will retry.
+    _profile_is_real = any(
+        isinstance(v, dict) and v.get("content", "").strip()
+        for v in updated.values()
+    )
+    if not _profile_is_real:
+        return
+
     save_knowledge_profile(
         st.session_state.sb_user_id,
         st.session_state.sb_access_token,

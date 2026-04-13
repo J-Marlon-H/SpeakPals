@@ -87,6 +87,39 @@ class Tutor:
             calendar_events   = state.get("calendar_events") or [],
         )
 
+    @classmethod
+    def from_bot_user(cls, user: dict) -> "Tutor":
+        """Build a Tutor from a Telegram bot user state dict.
+
+        Bot state uses unprefixed keys (``language``, ``level``, ``voice_label``, ...)
+        whereas ``from_session`` uses ``s_``-prefixed Streamlit session-state keys.
+        Otherwise the logic is identical so the tutor is fully consistent across both
+        surfaces.
+        """
+        from pipeline import (VOICES_BY_LANG, VOICES, TTS_LANG_CODE,
+                              MODELS, SETTINGS_DEFAULTS)
+
+        target_lang = user.get("language",    SETTINGS_DEFAULTS["s_language"])
+        voice_label = user.get("voice_label", SETTINGS_DEFAULTS["s_voice_label"])
+        # Bots store the model label the same way; default to the session-state default
+        model_label = user.get("model_label", SETTINGS_DEFAULTS["s_model_label"])
+        lang_voices = VOICES_BY_LANG.get(target_lang, VOICES)
+        voice_id    = (lang_voices[voice_label]
+                       if voice_label in lang_voices
+                       else next(iter(lang_voices.values())))
+
+        return cls(
+            name        = user.get("name",    SETTINGS_DEFAULTS["s_name"]),
+            level       = user.get("level",   SETTINGS_DEFAULTS["s_level"]),
+            bg_lang     = user.get("bg_lang", SETTINGS_DEFAULTS["s_bg_lang"]),
+            target_lang = target_lang,
+            voice_id    = voice_id,
+            tl_lang_code= TTS_LANG_CODE.get(target_lang, "da"),
+            model_id    = MODELS[model_label],
+            knowledge_profile = user.get("knowledge_profile") or {},
+            calendar_events   = user.get("calendar_events") or [],
+        )
+
     def stream(self,
                system: str,
                user_input: str,

@@ -83,6 +83,7 @@ with tab_login:
 # ── Create account ────────────────────────────────────────────────────────────
 with tab_register:
     with st.form("register_form"):
+        reg_name     = st.text_input("First name", key="reg_name", placeholder="Maria")
         reg_email    = st.text_input("Email", key="reg_email", placeholder="you@example.com")
         reg_password = st.text_input("Password", key="reg_pw", type="password",
                                      placeholder="At least 6 characters")
@@ -92,8 +93,8 @@ with tab_register:
         reg_submitted = st.form_submit_button("Create account", use_container_width=True)
 
     if reg_submitted:
-        if not reg_email or not reg_password or not reg_confirm:
-            st.error("Please fill in all fields.")
+        if not reg_name.strip() or not reg_email or not reg_password or not reg_confirm:
+            st.error("Please fill in all fields — your name is required.")
         elif len(reg_password) < 6:
             st.error("Password must be at least 6 characters.")
         elif reg_password != reg_confirm:
@@ -106,11 +107,16 @@ with tab_register:
                 # Try to auto-login immediately (works when email confirmation is disabled)
                 session, login_err = sign_in(reg_email.strip(), reg_password)
                 if session:
+                    from db import upsert_profile
                     st.session_state.sb_access_token  = session["access_token"]
                     st.session_state.sb_refresh_token = session["refresh_token"]
                     st.session_state.sb_user_id       = session["user_id"]
                     st.session_state.sb_email         = session["email"]
+                    st.session_state["s_name"]        = reg_name.strip()
                     st.session_state["is_new_user"]   = True
+                    # Persist name immediately so it's available across all pages
+                    upsert_profile(session["user_id"], session["access_token"],
+                                   {"s_name": reg_name.strip()})
                     st.switch_page("pages/onboarding.py")
                 else:
                     st.success(
