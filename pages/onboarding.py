@@ -485,7 +485,42 @@ with st.sidebar:
 
     # Finish onboarding — pinned to bottom
     if st.button("✅ Finish Onboarding", key="btn_ob_home", use_container_width=True):
-        _save_profile_now()   # ensure profile is saved even if [ONBOARDING_COMPLETE] was missed
+        # Profile is saved during [ONBOARDING_COMPLETE] processing (primary path).
+        # If not yet saved (user left early or completion save failed), do a best-effort
+        # background save so we never block navigation on an API call.
+        if not st.session_state.ob_profile_saved and st.session_state.ob_log and CLAUDE_KEY \
+                and "sb_user_id" in st.session_state:
+            import threading as _th, copy as _copy
+            _snap = dict(
+                current_profile=load_knowledge_profile(
+                    st.session_state.sb_user_id, st.session_state.sb_access_token),
+                name=name, level=level, target_lang=target_lang, bg_lang=bg_lang,
+                full_log=(
+                    [{"who": "tutor", "text": st.session_state.ob_opener_text}]
+                    if st.session_state.ob_opener_text else []
+                ) + list(st.session_state.ob_log),
+                user_id=st.session_state.sb_user_id,
+                token=st.session_state.sb_access_token,
+                claude_key=CLAUDE_KEY,
+                model_id=model_id,
+            )
+            def _bg_save(snap=_snap):
+                import requests as _req
+                _sess = _req.Session(); _sess.verify = False
+                updated = update_knowledge_profile(
+                    snap["current_profile"], snap["name"], snap["level"],
+                    snap["target_lang"], snap["bg_lang"],
+                    snap["full_log"], [], snap["claude_key"],
+                    model=snap["model_id"], http_session=_sess,
+                )
+                _real = any(
+                    isinstance(v, dict) and v.get("content", "").strip()
+                    for v in updated.values()
+                )
+                if _real:
+                    save_knowledge_profile(snap["user_id"], snap["token"], updated)
+            _th.Thread(target=_bg_save, daemon=True).start()
+
         if st.session_state.get("is_new_user"):
             st.switch_page("pages/telegram_settings.py")
         else:
