@@ -103,11 +103,14 @@ with tab_register:
             ),
             key="reg_bg_sel",
         )
-        reg_bg_other = st.text_input(
-            "Specify your language (if 'Other' selected above)",
-            key="reg_bg_other",
-            placeholder="e.g. Turkish, Arabic, Hindi…",
-        )
+        if reg_bg_sel == "Other":
+            reg_bg_other = st.text_input(
+                "Specify your language *",
+                key="reg_bg_other",
+                placeholder="e.g. Turkish, Arabic, Hindi…",
+            )
+        else:
+            reg_bg_other = ""
         reg_level    = st.selectbox(
             "Estimated language level (CEFR) *",
             _CEFR_LEVELS,

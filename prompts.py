@@ -337,7 +337,12 @@ def build_system_prompt(name: str, level: str, bg_lang: str,
             if isinstance(v, dict) and v.get("content", "").strip()
         }
         if _nonempty:
-            lines = ["\n\n## What you know about this student"]
+            lines = [
+                "\n\n## What you know about this student",
+                "(Silent background reference only — do NOT repeat, summarise, or mention "
+                "any of this in your opening message or at any other point. "
+                "Use it only to personalise your teaching and anticipate errors.)",
+            ]
             for key, val in _nonempty.items():
                 heading = key.replace("_", " ").title()
                 content = val["content"]
