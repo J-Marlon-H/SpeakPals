@@ -138,16 +138,17 @@ if "knowledge_profile" not in st.session_state:
 
 tutor = Tutor.from_session(st.session_state)
 
-# Unpack for local use — level comes from scene data, not user settings
+# Unpack for local use
 name          = tutor.name
+user_level    = tutor.level    # user's own CEFR level — shown in header
 bg_lang       = tutor.bg_lang
 target_lang   = tutor.target_lang
 tts_lang_code = tutor.tl_lang_code
 stt_lang_code = STT_LANG_CODE.get(target_lang, "da")
 
-_sel_scene  = st.session_state.get("selected_scene")
-level       = _SCENE_BY_KEY[_sel_scene]["level"] if _sel_scene in _SCENE_BY_KEY else "A1"
-lang_voices = VOICES_BY_LANG.get(target_lang, VOICES)
+_sel_scene   = st.session_state.get("selected_scene")
+scene_level  = _SCENE_BY_KEY[_sel_scene]["level"] if _sel_scene in _SCENE_BY_KEY else "A1"
+lang_voices  = VOICES_BY_LANG.get(target_lang, VOICES)
 
 # ── Session state ──────────────────────────────────────────────────────────────
 
@@ -210,7 +211,7 @@ _lang_openers = SCENE_OPENERS_BY_LANG.get(target_lang, SCENE_OPENERS_BY_LANG["Da
 opener_line   = _lang_openers.get(sk, "") if (sk and not is_free_conv) else ""
 
 system = build_system_prompt(
-    name, level, bg_lang,
+    name, scene_level, bg_lang,
     target_lang=target_lang,
     scene_description=scene_description,
     turn_count=turn_count,
@@ -247,7 +248,7 @@ with st.sidebar:
         st.markdown(
             "<div style='padding:20px 0 0 16px'>"
             "<div style='font:800 18px/1.2 Inter,sans-serif;color:#111827;letter-spacing:-.3px'>Lesson Chat</div>"
-            f"<div style='font:500 12px Inter;color:rgba(17,24,39,.55);margin-top:4px'>Scene {scene_idx_1based} · {level} · {name}</div>"
+            f"<div style='font:500 12px Inter;color:rgba(17,24,39,.55);margin-top:4px'>Scene {scene_idx_1based} · {user_level} · {name}</div>"
             "</div>",
             unsafe_allow_html=True
         )
