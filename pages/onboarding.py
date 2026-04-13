@@ -407,14 +407,16 @@ with st.sidebar:
                     f"{txt}</div></div>"
                 )
         st.markdown("".join(parts), unsafe_allow_html=True)
-        components.html("""<script>
-(function(){
-  function scroll(){
+        # Embed log length so Streamlit always treats this as new content and re-executes.
+        components.html(f"""<script>
+(function(){{
+  var _len={len(log)};  // changes each rerun, forcing re-execution
+  function scroll(){{
     var s=window.parent.document.querySelector('[data-testid="stSidebar"]>div:first-child');
     if(s) s.scrollTop=s.scrollHeight;
-  }
+  }}
   scroll(); setTimeout(scroll,120); setTimeout(scroll,350);
-})();
+}})();
 </script>""", height=0)
 
     # Completion banner
