@@ -197,7 +197,8 @@ st.markdown("""<style>
   [data-testid="stCustomComponentV1"] iframe{
     position:fixed!important;top:0!important;left:320px!important;
     height:100vh!important;width:calc(100vw - 320px)!important;
-    border:none!important;display:block!important;margin:0!important}
+    border:none!important;display:block!important;margin:0!important;
+    z-index:1!important}
   [data-stale="true"],[data-stale="true"] *{opacity:1!important;transition:none!important}
 
   /* Chat animations */
@@ -439,33 +440,33 @@ with st.sidebar:
 }})();
 </script>""", height=0)
 
-    # Completion banner
+    # Completion banner — no extra button; tutor already told the student to press Finish
     if st.session_state.ob_complete:
-        _is_new = st.session_state.get("is_new_user", False)
         st.markdown(
             "<div style='margin:10px 12px;padding:14px 16px;"
             "background:rgba(13,148,136,.1);border:1px solid rgba(13,148,136,.3);"
             "border-radius:12px;font:500 12px Inter;color:#0d9488;line-height:1.5'>"
-            + ("Great chat! Your profile is saved. Let's finish setting up your account."
-               if _is_new else
-               "Great chat! Your profile has been saved. Ready to start learning!")
-            + "</div>",
+            "Great chat! Your profile has been saved. Press Finish Onboarding below whenever you're ready."
+            "</div>",
             unsafe_allow_html=True,
         )
-        _btn_label = "⚙ Go to Settings →" if _is_new else "🚀 Start Learning →"
-        _btn_dest  = "pages/account.py"   if _is_new else "pages/home.py"
-        if st.button(_btn_label, type="primary", use_container_width=True):
-            st.switch_page(_btn_dest)
 
-    # Error
+    # Error — dismissable so the student can simply try speaking again
     if st.session_state.ob_error:
-        st.markdown(
-            f"<div style='margin:8px 12px;padding:8px 10px;"
-            f"background:rgba(220,38,38,.08);border-radius:8px;"
-            f"color:#dc2626;font-size:11px;word-break:break-word'>"
-            f"⚠ {st.session_state.ob_error}</div>",
-            unsafe_allow_html=True,
-        )
+        _ecol1, _ecol2 = st.columns([6, 1])
+        with _ecol1:
+            st.markdown(
+                "<div style='margin:8px 0;padding:8px 10px;"
+                "background:rgba(220,38,38,.08);border-radius:8px;"
+                "color:#dc2626;font-size:11px'>"
+                "⚠ Something went wrong — please try speaking again."
+                "</div>",
+                unsafe_allow_html=True,
+            )
+        with _ecol2:
+            if st.button("✕", key="btn_clear_error", help="Dismiss"):
+                st.session_state.ob_error = None
+                st.rerun()
 
     # Reset all knowledge — pinned above Finish
     if st.button("🗑 Reset all knowledge", key="btn_reset_knowledge", use_container_width=True):
@@ -479,6 +480,7 @@ with st.sidebar:
                    "ob_started", "ob_opener_loaded", "ob_opener_text", "ob_profile_saved",
                    "ob_error", "knowledge_profile", "onboarding_checked"]:
             st.session_state.pop(k, None)
+        components.html("<script>try{localStorage.removeItem('sp_mic_tip_ok')}catch(e){}</script>", height=0)
         st.rerun()
 
     # Finish onboarding — pinned to bottom
@@ -518,6 +520,53 @@ else:
         mic_props["ws_token"] = ws_token
 
 transcript_raw = mic(key="ob_mic", **mic_props)
+
+# ── Mic tip overlay — shown before first speech, dismissed via localStorage ────
+if not st.session_state.ob_started:
+    st.markdown("""
+<div id="mic-tip-wrap" style="
+    position:fixed;inset:0;z-index:10000;pointer-events:none;
+    display:flex;align-items:flex-end;justify-content:center;
+    padding-bottom:136px;padding-left:320px;
+">
+  <div id="mic-tip" style="
+    pointer-events:auto;
+    background:#111827;color:#fff;
+    border-radius:14px;padding:14px 18px 12px;
+    font:500 13px/1.5 'Inter',sans-serif;
+    max-width:216px;text-align:center;
+    box-shadow:0 8px 32px rgba(0,0,0,.35);
+    position:relative;
+  ">
+    <div style="font:700 14px 'Inter';margin-bottom:6px">🎙️ Using the mic</div>
+    <div style="font:400 12px/1.6 'Inter';opacity:.9">
+      Press the mic button to unmute,<br>then start speaking.<br>
+      It turns <span style="color:#38bdf8;font-weight:600">blue</span> while it's listening.
+    </div>
+    <button onclick="
+      document.getElementById('mic-tip-wrap').style.display='none';
+      try{localStorage.setItem('sp_mic_tip_ok','1')}catch(e){}
+    " style="
+      margin-top:12px;
+      background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.28);
+      color:#fff;border-radius:8px;padding:5px 0;
+      font:600 12px 'Inter';cursor:pointer;width:100%;
+    ">Got it ✓</button>
+    <div style="
+      position:absolute;bottom:-9px;left:50%;transform:translateX(-50%);
+      width:0;height:0;
+      border-left:9px solid transparent;border-right:9px solid transparent;
+      border-top:9px solid #111827;
+    "></div>
+  </div>
+</div>
+<script>
+(function(){
+  try{if(localStorage.getItem('sp_mic_tip_ok')){
+    var w=document.getElementById('mic-tip-wrap');if(w)w.style.display='none';
+  }}catch(e){}
+})();
+</script>""", unsafe_allow_html=True)
 
 # ── Handle VAD output ──────────────────────────────────────────────────────────
 

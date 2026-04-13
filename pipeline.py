@@ -43,8 +43,9 @@ def tts_chunk(text, voice_id, eleven_key, lang_code="da"):
     r.raise_for_status()
 
 
-# Matches single- or double-quoted spans (straight and curly quotes), max 80 chars
-_QUOTED_RE = re.compile(r'["\u2018\u2019\u201c\u201d]([^"\u2018\u2019\u201c\u201d]{1,80})["\u2018\u2019\u201c\u201d]')
+# Matches single- or double-quoted spans (straight ' " and curly quotes), max 80 chars.
+# Straight apostrophe (0x27) included so Claude outputs like Try 'Nej tak' are caught.
+_QUOTED_RE = re.compile(r"['\"\u2018\u2019\u201c\u201d]([^'\"\u2018\u2019\u201c\u201d]{1,80})['\"\u2018\u2019\u201c\u201d]")
 
 
 def tts_tutor_mixed(text: str, voice_id: str, eleven_key: str, tl_lang_code: str) -> bytes:
@@ -78,20 +79,39 @@ def tts_tutor_mixed(text: str, voice_id: str, eleven_key: str, tl_lang_code: str
 
 
 def generate_language_tip(conversation_lines: list, bg_lang: str, claude_key: str,
-                          model: str = "claude-haiku-4-5-20251001") -> str:
+                          model: str = "claude-haiku-4-5-20251001",
+                          bg_context: str = "") -> str:
     """Generate a conversation-specific language tip for a given background language.
-    Returns plain text (2-3 sentences). Raises on API error."""
+
+    bg_context — optional known facts about {bg_lang} → Danish patterns (cognates,
+    false friends, grammar traps). Used as a reference so the model grounds its tip
+    in verified patterns rather than guessing.
+
+    Returns plain text (2-3 sentences). Raises on API error.
+    """
     conv_text = "\n".join(
         f"{'Character' if e['who'] == 'character' else 'Student'}: {e['text']}"
         for e in conversation_lines
     )
+    context_block = (
+        f"\n\nKnown {bg_lang}→Danish patterns for reference (use ONLY if relevant "
+        f"to the conversation above):\n{bg_context}"
+        if bg_context else ""
+    )
     prompt = (
         f"A student whose native language is {bg_lang} just completed this short Danish conversation:\n\n"
-        f"{conv_text}\n\n"
-        f"Write a short tip (2–3 sentences max) specifically for {bg_lang} speakers, based only on "
-        f"the words that appear in this conversation. Focus on: cognates (Danish words that look or "
-        f"sound similar to {bg_lang}), false friends, or notable pronunciation differences. "
-        f"Reference specific words from the conversation. Plain text only — no markdown, no bullet points."
+        f"{conv_text}"
+        f"{context_block}\n\n"
+        f"Write a short tip (2–3 sentences max) specifically for {bg_lang} speakers.\n\n"
+        f"STRICT RULES:\n"
+        f"- Only mention patterns that are DIRECTLY VISIBLE in the conversation above.\n"
+        f"- Every word you reference MUST appear verbatim in the conversation text.\n"
+        f"- You may draw on the known patterns above only when those patterns appear in "
+        f"the actual conversation words — do not bring in patterns that are not demonstrated.\n"
+        f"- Do NOT invent cognates, false friends, or linguistic connections you cannot "
+        f"verify from the conversation or the reference above.\n"
+        f"- If there is nothing genuinely noteworthy, reply with an empty string only.\n"
+        f"Plain text only — no markdown, no bullet points."
     )
     r = get_session().post(
         "https://api.anthropic.com/v1/messages",

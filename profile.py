@@ -173,6 +173,29 @@ def update_knowledge_profile(
         for k in [k for k in updated if k not in REQUIRED_CATEGORIES]:
             del updated[k]
 
+        # ── Programmatically protect conversation_history from accidental deletion ──
+        # Claude may replace the full history with only the current session's entry
+        # despite being told to preserve all prior entries. We merge here to be safe:
+        # any dated bullet from the current_profile that is NOT in Claude's output
+        # gets prepended back.
+        _old_hist = (current_profile.get("conversation_history") or {}).get("content", "")
+        _new_hist = (updated.get("conversation_history") or {}).get("content", "")
+        if _old_hist and _old_hist.strip():
+            # Collect dated entries (lines starting with "- YYYY-MM-DD:") from old content
+            import re as _re2
+            _date_re = _re2.compile(r'^-\s*\d{4}-\d{2}-\d{2}:')
+            _old_entries = [l.strip() for l in _old_hist.splitlines()
+                            if _date_re.match(l.strip())]
+            _new_entries = [l.strip() for l in _new_hist.splitlines()
+                            if _date_re.match(l.strip())]
+            # Detect entries that are in the old profile but missing from Claude's output
+            _missing = [e for e in _old_entries if not any(
+                e[:30] in n for n in _new_entries)]
+            if _missing:
+                # Append missing old entries below the new ones (already sorted newest-first)
+                merged = _new_hist.strip() + "\n" + "\n".join(_missing)
+                updated["conversation_history"]["content"] = merged.strip()
+
         return updated
 
     except Exception as _err:
