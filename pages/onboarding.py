@@ -417,33 +417,33 @@ with st.sidebar:
 })();
 </script>""", height=0)
 
-    # Completion banner
+    # Completion banner — no extra button; tutor already told the student to press Finish
     if st.session_state.ob_complete:
-        _is_new = st.session_state.get("is_new_user", False)
         st.markdown(
             "<div style='margin:10px 12px;padding:14px 16px;"
             "background:rgba(13,148,136,.1);border:1px solid rgba(13,148,136,.3);"
             "border-radius:12px;font:500 12px Inter;color:#0d9488;line-height:1.5'>"
-            + ("Great chat! Your profile is saved. Let's finish setting up your account."
-               if _is_new else
-               "Great chat! Your profile has been saved. Ready to start learning!")
-            + "</div>",
+            "Great chat! Your profile has been saved. Press Finish Onboarding below whenever you're ready."
+            "</div>",
             unsafe_allow_html=True,
         )
-        _btn_label = "⚙ Go to Settings →" if _is_new else "🚀 Start Learning →"
-        _btn_dest  = "pages/account.py"   if _is_new else "pages/home.py"
-        if st.button(_btn_label, type="primary", use_container_width=True):
-            st.switch_page(_btn_dest)
 
-    # Error
+    # Error — dismissable so the student can simply try speaking again
     if st.session_state.ob_error:
-        st.markdown(
-            f"<div style='margin:8px 12px;padding:8px 10px;"
-            f"background:rgba(220,38,38,.08);border-radius:8px;"
-            f"color:#dc2626;font-size:11px;word-break:break-word'>"
-            f"⚠ {st.session_state.ob_error}</div>",
-            unsafe_allow_html=True,
-        )
+        _ecol1, _ecol2 = st.columns([6, 1])
+        with _ecol1:
+            st.markdown(
+                "<div style='margin:8px 0;padding:8px 10px;"
+                "background:rgba(220,38,38,.08);border-radius:8px;"
+                "color:#dc2626;font-size:11px'>"
+                "⚠ Something went wrong — please try speaking again."
+                "</div>",
+                unsafe_allow_html=True,
+            )
+        with _ecol2:
+            if st.button("✕", key="btn_clear_error", help="Dismiss"):
+                st.session_state.ob_error = None
+                st.rerun()
 
     # Reset all knowledge — pinned above Finish
     if st.button("🗑 Reset all knowledge", key="btn_reset_knowledge", use_container_width=True):

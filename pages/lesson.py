@@ -231,6 +231,11 @@ if (opener_line
     _log = st.session_state.correct_log
     if not any(e["who"] == "character" and e["text"] == opener_line for e in _log):
         _log.append({"who": "character", "text": opener_line})
+    # Also add to Claude chat history so the tutor always knows what the character
+    # just said. Without this, the first student reply has no character context.
+    if not any(m["role"] == "assistant" and m["content"] == opener_line
+               for m in st.session_state.chat):
+        st.session_state.chat.append({"role": "assistant", "content": opener_line})
     st.session_state.opener_loaded = True
 
 # ── Sidebar: conversation log ──────────────────────────────────────────────────
