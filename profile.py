@@ -175,5 +175,7 @@ def update_knowledge_profile(
 
         return updated
 
-    except Exception:
+    except Exception as _err:
+        # Store last error so callers can surface it for debugging.
+        update_knowledge_profile.last_error = str(_err)
         return current_profile

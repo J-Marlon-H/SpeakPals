@@ -96,7 +96,7 @@ st.markdown("""
 st.markdown("<div class='sec-label'>Student Profile</div>", unsafe_allow_html=True)
 
 name     = st.text_input("Name", value=st.session_state.get("s_name", ""))
-level    = st.selectbox("Level", ["A1", "A2", "B1", "B2"],
+level    = st.selectbox("CEFR Level", ["A1", "A2", "B1", "B2"],
                         index=["A1", "A2", "B1", "B2"].index(
                             st.session_state.get("s_level", "A1")))
 bg_langs = ["English", "German", "Spanish", "French", "Dutch", "Swedish"]
@@ -217,8 +217,8 @@ else:
 
 _CATEGORIES = [
     (
-        "language_level", "📊", "Language Level",
-        "Your current proficiency — vocabulary and grammar mastered, where you struggle, and how your level is progressing.",
+        "language_level", "📊", "CEFR Level",
+        "Your current proficiency on the A1–C2 scale — vocabulary and grammar mastered, where you struggle, and how your level is progressing.",
     ),
     (
         "learning_motivation", "🎯", "Learning Motivation",
