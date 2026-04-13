@@ -178,7 +178,8 @@ st.markdown("""<style>
   [data-testid="stCustomComponentV1"] iframe{
     position:fixed!important;top:0!important;left:320px!important;
     height:100vh!important;width:calc(100vw - 320px)!important;
-    border:none!important;display:block!important;margin:0!important}
+    border:none!important;display:block!important;margin:0!important;
+    z-index:1!important}
   [data-stale="true"],[data-stale="true"] *{opacity:1!important;transition:none!important}
 
   /* Chat animations */
@@ -457,6 +458,7 @@ with st.sidebar:
                    "ob_started", "ob_opener_loaded", "ob_opener_text", "ob_profile_saved",
                    "ob_error", "knowledge_profile", "onboarding_checked"]:
             st.session_state.pop(k, None)
+        components.html("<script>try{localStorage.removeItem('sp_mic_tip_ok')}catch(e){}</script>", height=0)
         st.rerun()
 
     # Finish onboarding — pinned to bottom
@@ -496,6 +498,53 @@ else:
         mic_props["ws_token"] = ws_token
 
 transcript_raw = mic(key="ob_mic", **mic_props)
+
+# ── Mic tip overlay — shown before first speech, dismissed via localStorage ────
+if not st.session_state.ob_started:
+    st.markdown("""
+<div id="mic-tip-wrap" style="
+    position:fixed;inset:0;z-index:10000;pointer-events:none;
+    display:flex;align-items:flex-end;justify-content:center;
+    padding-bottom:136px;padding-left:320px;
+">
+  <div id="mic-tip" style="
+    pointer-events:auto;
+    background:#111827;color:#fff;
+    border-radius:14px;padding:14px 18px 12px;
+    font:500 13px/1.5 'Inter',sans-serif;
+    max-width:216px;text-align:center;
+    box-shadow:0 8px 32px rgba(0,0,0,.35);
+    position:relative;
+  ">
+    <div style="font:700 14px 'Inter';margin-bottom:6px">🎙️ Using the mic</div>
+    <div style="font:400 12px/1.6 'Inter';opacity:.9">
+      Press the mic button to unmute,<br>then start speaking.<br>
+      It turns <span style="color:#38bdf8;font-weight:600">blue</span> while it's listening.
+    </div>
+    <button onclick="
+      document.getElementById('mic-tip-wrap').style.display='none';
+      try{localStorage.setItem('sp_mic_tip_ok','1')}catch(e){}
+    " style="
+      margin-top:12px;
+      background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.28);
+      color:#fff;border-radius:8px;padding:5px 0;
+      font:600 12px 'Inter';cursor:pointer;width:100%;
+    ">Got it ✓</button>
+    <div style="
+      position:absolute;bottom:-9px;left:50%;transform:translateX(-50%);
+      width:0;height:0;
+      border-left:9px solid transparent;border-right:9px solid transparent;
+      border-top:9px solid #111827;
+    "></div>
+  </div>
+</div>
+<script>
+(function(){
+  try{if(localStorage.getItem('sp_mic_tip_ok')){
+    var w=document.getElementById('mic-tip-wrap');if(w)w.style.display='none';
+  }}catch(e){}
+})();
+</script>""", unsafe_allow_html=True)
 
 # ── Handle VAD output ──────────────────────────────────────────────────────────
 
