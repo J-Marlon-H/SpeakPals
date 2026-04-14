@@ -192,14 +192,18 @@ _FLAG_SVG = {
     ),
 }
 
+_FLAG_RATIO = {"Danish": 37/28, "Portuguese (Brazilian)": 40/28}
+
 def _flag_img(lang: str, height: int = 32) -> str:
-    import base64
+    import base64, math
     svg = _FLAG_SVG.get(lang, "")
     if not svg:
         return ""
     b64 = base64.b64encode(svg.encode()).decode()
+    width = math.ceil(height * _FLAG_RATIO.get(lang, 1.5))
     return (f"<img src='data:image/svg+xml;base64,{b64}' "
-            f"height='{height}' style='vertical-align:middle;border-radius:4px;"
+            f"width='{width}' height='{height}' "
+            f"style='vertical-align:middle;border-radius:4px;"
             f"box-shadow:0 2px 8px rgba(0,0,0,.2);margin-left:10px'>")
 
 flag_img = _flag_img(language, height=30)
