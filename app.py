@@ -112,8 +112,11 @@ if "sb_user_id" not in st.session_state:
 elif _cookies is not None and "sb_refresh_token" in st.session_state:
     _current_rt = st.session_state.sb_refresh_token
     if st.session_state.get("_last_written_token") != _current_rt:
-        _cookies.set("sp_refresh_token", _current_rt)
-        st.session_state["_last_written_token"] = _current_rt
+        try:
+            _cookies.set("sp_refresh_token", _current_rt)
+            st.session_state["_last_written_token"] = _current_rt
+        except Exception:
+            pass  # CookieController not ready yet — will retry on next render
 
 # ── Load knowledge profile once per login session ────────────────────────────
 # knowledge_profile is NOT in LESSON_STATE_KEYS so it persists across lessons.
