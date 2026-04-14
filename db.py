@@ -148,6 +148,23 @@ def verify_recovery_token(token_hash: str) -> tuple[dict | None, str | None]:
         return None, str(e)
 
 
+def exchange_code_for_session(code: str) -> tuple[dict | None, str | None]:
+    """Exchange a PKCE auth code (from ?code= in the reset-link redirect) for a session.
+    Returns (session_dict, error_str)."""
+    try:
+        res = _client().auth.exchange_code_for_session({"auth_code": code})
+        if res.session and res.user:
+            return {
+                "access_token":  res.session.access_token,
+                "refresh_token": res.session.refresh_token,
+                "user_id":       res.user.id,
+                "email":         res.user.email or "",
+            }, None
+        return None, "Could not exchange code — please request a new reset link."
+    except Exception as e:
+        return None, str(e)
+
+
 def update_password(access_token: str, new_password: str, refresh_token: str = "") -> str | None:
     """Update the authenticated user's password. Returns error string or None on success."""
     try:

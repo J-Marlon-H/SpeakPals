@@ -29,6 +29,28 @@ def _start_telegram_bot():
 
 _start_telegram_bot()
 
+# ── Navigation setup (must happen before any st.switch_page call) ─────────────
+pages = [
+    st.Page("pages/home.py",              title="Home",           default=True),
+    st.Page("pages/login.py",             title="Login",          visibility="hidden"),
+    st.Page("pages/reset_password.py",    title="Reset Password", visibility="hidden"),
+    st.Page("pages/account.py",           title="Account",        visibility="hidden"),
+    st.Page("pages/telegram_settings.py", title="Telegram",       visibility="hidden"),
+    st.Page("pages/scene_select.py",      title="Scene Select",   visibility="hidden"),
+    st.Page("pages/lesson.py",            title="Lesson",         visibility="hidden"),
+    st.Page("pages/feedback.py",          title="Feedback",       visibility="hidden"),
+    st.Page("pages/onboarding.py",        title="Onboarding",     visibility="hidden"),
+]
+pg = st.navigation(pages, position="hidden")
+
+# ── Intercept password-reset redirect before session restore ───────────────────
+# Supabase redirects back with ?code= (PKCE) or ?token_hash=&type=recovery.
+# Route to the dedicated reset page. Guard pg.title to prevent looping.
+_qp = st.query_params
+if (_qp.get("code") or (_qp.get("token_hash") and _qp.get("type") == "recovery")) \
+        and pg.title != "Reset Password":
+    st.switch_page("pages/reset_password.py")
+
 # ── Cookie controller (needed for both restore-on-load and persist-after-login) ─
 # st.rerun() and st.stop() raise subclasses of Exception — they MUST stay
 # outside any try/except block or they get silently swallowed.
@@ -99,15 +121,4 @@ if "knowledge_profile" not in st.session_state and "sb_user_id" in st.session_st
     except Exception:
         st.session_state["knowledge_profile"] = {}
 
-pages = [
-    st.Page("pages/home.py",              title="Home",         default=True),
-    st.Page("pages/login.py",             title="Login",        visibility="hidden"),
-    st.Page("pages/account.py",           title="Account",      visibility="hidden"),
-    st.Page("pages/telegram_settings.py", title="Telegram",     visibility="hidden"),
-    st.Page("pages/scene_select.py",      title="Scene Select", visibility="hidden"),
-    st.Page("pages/lesson.py",            title="Lesson",       visibility="hidden"),
-    st.Page("pages/feedback.py",          title="Feedback",     visibility="hidden"),
-    st.Page("pages/onboarding.py",        title="Onboarding",   visibility="hidden"),
-]
-pg = st.navigation(pages, position="hidden")
 pg.run()
