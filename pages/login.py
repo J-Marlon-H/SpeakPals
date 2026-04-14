@@ -197,10 +197,20 @@ with tab_forgot:
         if not forgot_email.strip():
             st.error("Please enter your email address.")
         else:
+            # Build the redirect URL — prefer APP_URL secret, fall back to
+            # reading the Host header so no secret is required on Streamlit Cloud.
             try:
                 _base = st.secrets.get("APP_URL", "").rstrip("/")
             except Exception:
                 _base = ""
+            if not _base:
+                try:
+                    _host = st.context.headers.get("host", "")
+                    if _host:
+                        _local = _host.startswith("localhost") or _host.startswith("127.")
+                        _base = f"{'http' if _local else 'https'}://{_host}"
+                except Exception:
+                    pass
             _redirect = f"{_base}/reset_password" if _base else ""
             _err = send_reset_email(forgot_email.strip(), redirect_to=_redirect)
             if _err:
