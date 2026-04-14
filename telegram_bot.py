@@ -37,9 +37,7 @@ from telegram.ext import (
 )
 
 from pipeline import (
-    VERDICT_SCHEMA,
     clean_for_tts,
-    parse_claude_response,
     tts_tutor_mixed,
 )
 from prompts import build_system_prompt, get_tutor_name
@@ -342,27 +340,36 @@ def _build_context(user: dict) -> tuple[str, str, str, str]:
 
 
 def _claude_sync(system: str, user_text: str, chat: list, model: str) -> str:
-    """Call Claude and return the raw response text (no TTS).
+    """Call Claude and return the plain-text reply.
 
-    Uses a fresh session per call — the shared get_session() singleton is not
-    thread-safe when the profile-update timer fires concurrently with a message.
+    Uses a fresh session per call — no shared state with the profile-update timer.
+    No structured output: the Telegram system prompt instructs Claude to reply in
+    plain text, so we just return content[0]["text"] directly.
     """
-    sess     = requests.Session()
     messages = [{"role": m["role"], "content": m["content"]}
                 for m in chat if m["role"] in {"user", "assistant"} and m["content"]]
     messages.append({"role": "user", "content": user_text})
-    resp = sess.post(
-        "https://api.anthropic.com/v1/messages",
-        headers={"x-api-key": CLAUDE_KEY, "anthropic-version": "2023-06-01",
-                 "Content-Type": "application/json"},
-        json={"model": model, "max_tokens": 400, "temperature": 0.3,
-              "system": system, "messages": messages,
-              "output_config": {"format": {"type": "json_schema",
-                                           "schema": VERDICT_SCHEMA}}},
-        timeout=30,
-    )
+    with requests.Session() as sess:
+        resp = sess.post(
+            "https://api.anthropic.com/v1/messages",
+            headers={"x-api-key": CLAUDE_KEY, "anthropic-version": "2023-06-01",
+                     "Content-Type": "application/json"},
+            json={"model": model, "max_tokens": 600, "temperature": 0.7,
+                  "system": system, "messages": messages},
+            timeout=30,
+        )
     resp.raise_for_status()
-    return resp.json()["content"][0]["text"]
+    raw = resp.json()["content"][0]["text"].strip()
+    # Safety net: if Claude returned JSON despite the plain-text instruction, extract the text field
+    if raw.startswith("{"):
+        try:
+            import json as _j
+            obj = _j.loads(raw)
+            if isinstance(obj, dict) and obj.get("text"):
+                return str(obj["text"]).strip()
+        except Exception:
+            pass
+    return raw
 
 
 def _tts_sync(spoken_text: str, voice_id: str, lang_code: str) -> bytes:
@@ -409,17 +416,13 @@ async def _process_message(
     finally:
         typing_task.cancel()
 
-    spoken_text, _, _, is_correct, correction, _ = parse_claude_response(raw_claude)
+    spoken_text = raw_claude
 
     # Update conversation state
     user["chat"].extend([
         {"role": "user",      "content": user_text},
         {"role": "assistant", "content": spoken_text},
     ])
-    if correction:
-        user.setdefault("coaching_log", []).append(
-            {"student": user_text, "correct_form": correction}
-        )
     save_user(chat_id, user)
     # Persist chat history to Supabase so it survives app restarts
     if user.get("sb_user_id"):
@@ -434,8 +437,6 @@ async def _process_message(
     await update.effective_message.reply_text(
         f"*💡 {tutor_name}:* {spoken_text}", parse_mode="Markdown"
     )
-    if correction and not is_correct:
-        await update.effective_message.reply_text(f"_✏️ {correction}_", parse_mode="Markdown")
 
     # ── Step 3: TTS + OGG conversion (show upload indicator while waiting) ────
     await context.bot.send_chat_action(chat_id, "upload_voice")
