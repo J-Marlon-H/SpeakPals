@@ -39,7 +39,6 @@ from telegram.ext import (
 from pipeline import (
     VERDICT_SCHEMA,
     clean_for_tts,
-    get_session,
     parse_claude_response,
     tts_tutor_mixed,
 )
@@ -345,10 +344,10 @@ def _build_context(user: dict) -> tuple[str, str, str, str]:
 def _claude_sync(system: str, user_text: str, chat: list, model: str) -> str:
     """Call Claude and return the raw response text (no TTS).
 
-    Uses non-streaming mode — simpler and avoids SSE parsing fragility.
-    The bot sends the full reply at once anyway so streaming offers no benefit.
+    Uses a fresh session per call — the shared get_session() singleton is not
+    thread-safe when the profile-update timer fires concurrently with a message.
     """
-    sess     = get_session()
+    sess     = requests.Session()
     messages = [{"role": m["role"], "content": m["content"]}
                 for m in chat if m["role"] in {"user", "assistant"} and m["content"]]
     messages.append({"role": "user", "content": user_text})
