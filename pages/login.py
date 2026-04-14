@@ -256,7 +256,11 @@ with tab_forgot:
         if not forgot_email.strip():
             st.error("Please enter your email address.")
         else:
-            _err = send_reset_email(forgot_email.strip())
+            try:
+                _app_url = st.secrets.get("APP_URL", "")
+            except Exception:
+                _app_url = ""
+            _err = send_reset_email(forgot_email.strip(), redirect_to=_app_url)
             if _err:
                 st.error(f"Could not send reset email: {_err}")
             else:
