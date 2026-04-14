@@ -490,7 +490,7 @@ with st.sidebar:
         # background save so we never block navigation on an API call.
         if not st.session_state.ob_profile_saved and st.session_state.ob_log and CLAUDE_KEY \
                 and "sb_user_id" in st.session_state:
-            import threading as _th, copy as _copy
+            import threading as _th
             _snap = dict(
                 current_profile=load_knowledge_profile(
                     st.session_state.sb_user_id, st.session_state.sb_access_token),
