@@ -340,7 +340,11 @@ def _build_context(user: dict) -> tuple[str, str, str, str]:
 
 
 def _claude_sync(system: str, user_text: str, chat: list, model: str) -> str:
-    """Call Claude and return the raw response text (no TTS)."""
+    """Call Claude and return the raw response text (no TTS).
+
+    Uses non-streaming mode — simpler and avoids SSE parsing fragility.
+    The bot sends the full reply at once anyway so streaming offers no benefit.
+    """
     sess     = get_session()
     messages = [{"role": m["role"], "content": m["content"]}
                 for m in chat if m["role"] in {"user", "assistant"} and m["content"]]
@@ -349,28 +353,14 @@ def _claude_sync(system: str, user_text: str, chat: list, model: str) -> str:
         "https://api.anthropic.com/v1/messages",
         headers={"x-api-key": CLAUDE_KEY, "anthropic-version": "2023-06-01",
                  "Content-Type": "application/json"},
-        json={"model": model, "max_tokens": 220, "temperature": 0.3,
-              "stream": True, "system": system, "messages": messages,
+        json={"model": model, "max_tokens": 400, "temperature": 0.3,
+              "system": system, "messages": messages,
               "output_config": {"format": {"type": "json_schema",
                                            "schema": VERDICT_SCHEMA}}},
-        stream=True, timeout=30,
+        timeout=30,
     )
     resp.raise_for_status()
-    raw = ""
-    for line in resp.iter_lines():
-        line = line.decode() if isinstance(line, bytes) else line
-        if not line.startswith("data: "):
-            continue
-        payload = line[6:]
-        if payload.strip() in ("[DONE]", ""):
-            continue
-        try:
-            ev = json.loads(payload)
-        except Exception:
-            continue
-        if ev.get("type") == "content_block_delta":
-            raw += ev.get("delta", {}).get("text", "")
-    return raw
+    return resp.json()["content"][0]["text"]
 
 
 def _tts_sync(spoken_text: str, voice_id: str, lang_code: str) -> bytes:
