@@ -149,7 +149,9 @@ HARD RULES: max 3 sentences · no bullets · no markdown · after ~12 turns wrap
 
 _TELEGRAM_FORMAT_BLOCK = """
 
-## Telegram Channel — Formatting Rules
+## Telegram Channel — Output Format (OVERRIDES ALL PREVIOUS FORMAT INSTRUCTIONS)
+
+CRITICAL: You are in Telegram mode. Output PLAIN TEXT only — do NOT wrap your reply in JSON or any other structured format. Ignore any earlier instruction about JSON routing or ROUTING fields. Just write your reply directly.
 
 You are replying inside a Telegram chat. Every message must be readable on a phone screen.
 
