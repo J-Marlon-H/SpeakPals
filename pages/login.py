@@ -85,54 +85,55 @@ _BG_LANGS   = ["English", "German", "Spanish", "French", "Dutch", "Swedish", "Ot
 _CEFR_LEVELS = ["A1", "A2", "B1", "B2", "C1", "C2"]
 
 with tab_register:
-    with st.form("register_form"):
-        reg_name     = st.text_input("First name *", key="reg_name")
-        reg_email    = st.text_input("Email *", key="reg_email", placeholder="you@example.com")
-        reg_password = st.text_input("Password *", key="reg_pw", type="password",
-                                     placeholder="At least 6 characters")
-        reg_confirm  = st.text_input("Confirm password *", key="reg_confirm", type="password",
-                                     placeholder="••••••••")
-        reg_bg_sel   = st.selectbox(
-            "Main language background *",
-            _BG_LANGS,
-            help=(
-                "The language you speak best — your native tongue or the language you are "
-                "most fluent in. Your tutor uses this to explain concepts in a way that "
-                "makes sense for someone with your background, and to spot typical mistakes "
-                "speakers of your language tend to make."
-            ),
-            key="reg_bg_sel",
+    # Note: intentionally NOT using st.form here — forms batch widget interactions,
+    # which prevents the conditional "Other" language field from appearing reactively.
+    reg_name     = st.text_input("First name *", key="reg_name")
+    reg_email    = st.text_input("Email *", key="reg_email", placeholder="you@example.com")
+    reg_password = st.text_input("Password *", key="reg_pw", type="password",
+                                 placeholder="At least 6 characters")
+    reg_confirm  = st.text_input("Confirm password *", key="reg_confirm", type="password",
+                                 placeholder="••••••••")
+    reg_bg_sel   = st.selectbox(
+        "Main language background *",
+        _BG_LANGS,
+        help=(
+            "The language you speak best — your native tongue or the language you are "
+            "most fluent in. Your tutor uses this to explain concepts in a way that "
+            "makes sense for someone with your background, and to spot typical mistakes "
+            "speakers of your language tend to make."
+        ),
+        key="reg_bg_sel",
+    )
+    if reg_bg_sel == "Other":
+        reg_bg_other = st.text_input(
+            "Specify your language *",
+            key="reg_bg_other",
+            placeholder="e.g. Turkish, Arabic, Hindi…",
         )
-        if reg_bg_sel == "Other":
-            reg_bg_other = st.text_input(
-                "Specify your language *",
-                key="reg_bg_other",
-                placeholder="e.g. Turkish, Arabic, Hindi…",
-            )
-        else:
-            reg_bg_other = ""
-        reg_level    = st.selectbox(
-            "Estimated language level (CEFR) *",
-            _CEFR_LEVELS,
-            help=(
-                "Your current level in the language you want to learn, on the Common "
-                "European Framework of Reference scale.\n\n"
-                "A1 — complete beginner\n"
-                "A2 — basic phrases\n"
-                "B1 — can handle simple conversations\n"
-                "B2 — comfortable in most situations\n"
-                "C1 — advanced, near-fluent\n"
-                "C2 — mastery, near-native\n\n"
-                "An educated guess is fine — your tutor will adapt."
-            ),
-            key="reg_level",
-        )
-        st.markdown(
-            "<div style='font:400 11px Inter;color:rgba(17,24,39,.4);margin-top:2px;"
-            "margin-bottom:12px'>* Required field</div>",
-            unsafe_allow_html=True,
-        )
-        reg_submitted = st.form_submit_button("Create account", use_container_width=True)
+    else:
+        reg_bg_other = ""
+    reg_level    = st.selectbox(
+        "Estimated language level (CEFR) *",
+        _CEFR_LEVELS,
+        help=(
+            "Your current level in the language you want to learn, on the Common "
+            "European Framework of Reference scale.\n\n"
+            "A1 — complete beginner\n"
+            "A2 — basic phrases\n"
+            "B1 — can handle simple conversations\n"
+            "B2 — comfortable in most situations\n"
+            "C1 — advanced, near-fluent\n"
+            "C2 — mastery, near-native\n\n"
+            "An educated guess is fine — your tutor will adapt."
+        ),
+        key="reg_level",
+    )
+    st.markdown(
+        "<div style='font:400 11px Inter;color:rgba(17,24,39,.4);margin-top:2px;"
+        "margin-bottom:12px'>* Required field</div>",
+        unsafe_allow_html=True,
+    )
+    reg_submitted = st.button("Create account", use_container_width=True, key="btn_register")
 
     if reg_submitted:
         _bg_lang_val = reg_bg_other.strip() if reg_bg_sel == "Other" else reg_bg_sel

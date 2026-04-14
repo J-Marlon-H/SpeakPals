@@ -1,0 +1,168 @@
+# Language Background: French → Danish
+
+## How to use this profile
+French is a Romance language — distant from Danish grammatically and lexically. However, French
+speakers are typically strong analytical learners with solid grammar intuition, and there are more
+cognates than one would expect (via shared Latin roots and Norman French influence on both English
+and, indirectly, Danish). Move at a measured pace on pronunciation — French and Danish sound worlds
+apart, but French speakers tend to be motivated and methodical.
+
+---
+
+## A1 — Instant wins: cognates the student can use from day one
+
+Latin and Norman French roots that filtered into Danish (often via Low German or English):
+
+| French | Danish | Note |
+|--------|--------|------|
+| problème | problem | near-identical |
+| hôtel | hotel | identical |
+| hôpital | hospital | identical |
+| musique | musik | close |
+| famille | familie | close |
+| téléphone | telefon | close |
+| computer | computer | identical (English loanword in both) |
+| internet | internet | identical |
+| taxi | taxa | very close |
+| bus | bus | identical |
+| banque | bank | same root |
+| numéro | nummer | close |
+| restaurant | restaurant | identical |
+| liste | liste | identical |
+| moment | moment | identical |
+| centre | center | close |
+| normal | normal | identical |
+| nature | natur | close |
+| culture | kultur | close |
+| nation | nation | identical |
+| sport | sport | identical |
+
+### A1 Core vocabulary by topic
+
+**Greetings:**
+- Bonjour → Godmorgen / Hej
+- Salut → Hej (casual)
+- Au revoir → Hej hej / Farvel
+- Merci → Tak
+- S'il vous plaît → Vær så venlig / tak
+- Oui → Ja | Non → Nej
+
+**Numbers 1–10:** en/et, to, tre, fire, fem, seks, syv, otte, ni, ti
+
+**Colors:**
+- rouge = rød | bleu = blå | vert = grøn | jaune = gul
+- noir = sort | blanc = hvid | brun = brun | gris = grå
+
+**Family:**
+- mère = mor | père = far | sœur = søster | frère = bror
+- enfant = barn | famille = familie
+
+**Food & drink:**
+- pain = brød | lait = mælk | eau = vand | bière = øl
+- pomme = æble | poisson = fisk | viande = kød | œuf = æg
+
+---
+
+## A2 — Grammar comparisons for French speakers
+
+### What is EASIER in Danish than French:
+- **Verb conjugation:** French: je mange / tu manges / il mange / nous mangeons / vous mangez / ils mangent →
+  Danish: spiser / spiser / spiser — one form for all persons. Major simplification.
+- **No subjunctive to worry about at A2:** Danish subjunctive is archaic and rare.
+- **No complex tense splits:** No imparfait vs. passé composé distinction — Danish past is simpler.
+- **Simpler adjective agreement:** Danish adjectives don't change for gender/person in most cases.
+- **Definite article concept:** French uses a separate article (le chien). Danish has a suffix (hunden).
+  Different form, but French speakers are used to thinking about definiteness explicitly.
+
+### What is HARDER — explain these carefully:
+
+**1. Grammatical gender: en/et (not masculine/feminine)**
+French has masculine (le/un) and feminine (la/une). Danish has common (en) and neuter (et).
+The split does not map to French gender — "en mand" (man) is common, "et barn" (child) is neuter.
+Must be memorised with each noun.
+Teaching tip: always teach noun + article together.
+
+**2. Definite article as a suffix**
+French: le chien (the dog) — separate article before the noun.
+Danish: hunden (the dog) — suffix added to the end.
+- en hund (a dog) → hunden (the dog)
+- et hus (a house) → huset (the house)
+
+**3. V2 word order (verb second)**
+French: "Hier je suis allé à l'école." (subject comes first naturally)
+Danish: "I går gik jeg i skole." (verb must be second — subject inverts after any fronted element)
+This feels unnatural to French speakers. It's the same rule as German, which French speakers may know.
+
+**4. Negation position**
+French: "Je ne mange pas de viande." (ne...pas around verb)
+Danish: "Jeg spiser ikke kød." (ikke after the verb, no double negation)
+
+**5. Stød (glottal stop)**
+No equivalent in French. Describe as a brief creaky catch in the voice.
+No French word has this — closest is a glottal stop between vowels in careful Parisian speech.
+
+### A2 Key grammar structures to practise:
+- Present tense: spise → jeg spiser, du spiser, han spiser (same for all persons)
+- Past tense: spiste (regular), var (was), fik (got), gik (went)
+- Question formation: Spiser du? (verb first — inversion, like French "Manges-tu?")
+- Negation: ikke (not), aldrig (never), ingen (none)
+
+### A2 Vocabulary expansion — everyday life:
+**Transport:** bus, tog (train), cykel (bicycle), bil (car), fly (plane)
+**Shopping:** butik (shop), pris (price), billig (cheap), dyr (expensive), købe (to buy)
+**Time:** i dag (today), i morgen (tomorrow), i går (yesterday), nu (now), snart (soon)
+**Weather:** sol (sun), regn (rain), sne (snow), vind (wind), koldt (cold), varmt (warm)
+**Home:** køkken (kitchen), stue (living room), soveværelse (bedroom), badeværelse (bathroom)
+
+---
+
+## B1 — Advanced connections and nuances
+
+### Idiomatic expressions (with French equivalents):
+- "Det er lige meget" = "Ça ne fait rien" / "Peu importe" (it doesn't matter)
+- "Hvad så?" = "Et alors?" (so what / what's up)
+- "Gå op i røg" = "Partir en fumée" (go up in smoke — same idiom!)
+- "Slå to fluer med ét smæk" = "Faire d'une pierre deux coups" (kill two birds with one stone — same concept)
+- "Tage det roligt" = "Prendre les choses calmement" (take it easy)
+- "Gøre en bjørnetjeneste" = "Rendre un mauvais service" (do a disservice)
+- "Komme til sagen" = "Aller au fait" / "Entrer dans le vif du sujet" (get to the point)
+- "Koste en arm og et ben" = "Coûter les yeux de la tête" (cost a fortune)
+
+### B1 Grammar nuances:
+- **Passive voice:** Bogen læses (The book is read) vs. Bogen bliver læst (active passive)
+- **Modal verbs in past:** kunne (could/pouvait), måtte (had to/devait), ville (wanted to/voulait), skulle (was supposed to/devait)
+- **Relative clauses:** "Manden, som/der bor her..." = "L'homme qui habite ici..."
+- **Subordinate clause word order:** "Jeg ved, at han ikke kommer" — ikke comes BEFORE the verb
+  in subordinate clauses. French: "Je sais qu'il ne vient pas" — similar position concept.
+
+### B1 Register — formal vs. informal:
+- De (formal you) vs. du (informal) — same concept as vous vs. tu
+- Danish informal (du) is used even in formal professional settings — far more than French tu
+
+### False friends — warn the student immediately:
+| Danish | What it means | French false friend |
+|--------|--------------|---------------------|
+| gift | married / poison | cadeau (gift = present in French) |
+| fart | speed | pet (fart in French — flagging for awareness) |
+| have | garden | avoir (to have in French — totally different) |
+| bad | bath | mauvais (bad in French) |
+| blive | to stay / to become | (no direct false friend, but sounds vaguely like "vivre") |
+| mand | man / husband | (same concept — no false friend issue) |
+| slut | end / finish | (English false friend worth flagging) |
+| plads | space / seat / square | place (same root — actually a true friend!) |
+| station | station | station (true friend — identical!) |
+
+### Pronunciation guide for French speakers:
+- **Soft d (blødt d):** Between vowels, sounds like English "th" in "the". French speakers tend
+  to place it as a hard d — needs drilling. Example: "mad" (food) → sounds like "math".
+- **Stød (glottal stop):** No equivalent in French. Explain as a brief stop in the throat.
+  Drill words: hund, mand, sol (with stød versions). Don't stress it at A1–A2.
+- **å sound:** Similar to the French "o" in "or" / "côte" — rounded and back. Practice: å, år, gå.
+- **ø sound:** French speakers have a huge advantage — ø is identical to French "eu" in "feu" or
+  "peu". Use this immediately: "grøn sounds like French 'greun', øl like 'eul'". This is one area
+  where French speakers outperform all others.
+- **æ sound:** Similar to French "è" in "fête" or "même". Practice: læse, æble.
+- **Danish r:** Guttural, made at the back of the throat — very similar to French r. French speakers
+  often produce this correctly with little instruction. Use this as a confidence booster.
+- **Nasal vowels:** French has nasal vowels (in, un, on, an). Danish does NOT. French speakers may
+  nasalise where they shouldn't. Drill: ingen, men, han — no nasalisation.
