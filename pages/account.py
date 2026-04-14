@@ -1,7 +1,7 @@
 import streamlit as st
 from pipeline import (VOICES, VOICES_BY_LANG, MODELS, LESSON_STATE_KEYS, SCENE_CATALOG,
                       SETTINGS_DEFAULTS, SCENE_PRIMARY_VOICE)
-from db import require_auth, upsert_profile, load_profile, load_knowledge_profile, delete_knowledge_profile, get_user_email
+from db import require_auth, upsert_profile, load_profile, load_knowledge_profile, delete_knowledge_profile, get_user_email, update_password
 
 require_auth()
 
@@ -389,6 +389,41 @@ st.markdown(
     f"Signed in as <strong>{_email or '—'}</strong></div>",
     unsafe_allow_html=True
 )
+if not st.session_state.get("_show_change_pw"):
+    if st.button("Change password", use_container_width=True):
+        st.session_state["_show_change_pw"] = True
+        st.rerun()
+else:
+    with st.form("change_pw_form"):
+        new_pw     = st.text_input("New password", type="password", placeholder="At least 6 characters")
+        confirm_pw = st.text_input("Confirm new password", type="password", placeholder="••••••••")
+        _col_save, _col_cancel = st.columns(2)
+        with _col_save:
+            pw_submitted = st.form_submit_button("Update password", use_container_width=True)
+        with _col_cancel:
+            cancelled = st.form_submit_button("Cancel", use_container_width=True)
+
+    if cancelled:
+        st.session_state.pop("_show_change_pw", None)
+        st.rerun()
+    if pw_submitted:
+        if len(new_pw) < 6:
+            st.error("Password must be at least 6 characters.")
+        elif new_pw != confirm_pw:
+            st.error("Passwords don't match.")
+        else:
+            _err = update_password(
+                st.session_state.sb_access_token,
+                new_pw,
+                st.session_state.get("sb_refresh_token", ""),
+            )
+            if _err:
+                st.error(f"Could not update password: {_err}")
+            else:
+                st.session_state.pop("_show_change_pw", None)
+                st.success("Password updated.")
+                st.rerun()
+
 if st.button("Sign out", use_container_width=True):
     from db import sign_out
     sign_out(st.session_state.get("sb_access_token", ""))

@@ -121,6 +121,43 @@ def sign_out(access_token: str) -> None:
         pass
 
 
+def send_reset_email(email: str) -> str | None:
+    """Send a password-reset email via Supabase. Returns error string or None on success."""
+    try:
+        _client().auth.reset_password_for_email(email)
+        return None
+    except Exception as e:
+        return str(e)
+
+
+def verify_recovery_token(token_hash: str) -> tuple[dict | None, str | None]:
+    """Exchange a Supabase recovery token_hash (from the reset-link URL) for a session.
+    Returns (session_dict, error_str)."""
+    try:
+        res = _client().auth.verify_otp({"token_hash": token_hash, "type": "recovery"})
+        if res.session and res.user:
+            return {
+                "access_token":  res.session.access_token,
+                "refresh_token": res.session.refresh_token,
+                "user_id":       res.user.id,
+                "email":         res.user.email or "",
+            }, None
+        return None, "Recovery failed — please request a new reset link."
+    except Exception as e:
+        return None, str(e)
+
+
+def update_password(access_token: str, new_password: str, refresh_token: str = "") -> str | None:
+    """Update the authenticated user's password. Returns error string or None on success."""
+    try:
+        c = create_client(SUPABASE_URL, SUPABASE_KEY)  # type: ignore[name-defined]
+        c.auth.set_session(access_token, refresh_token)
+        c.auth.update_user({"password": new_password})
+        return None
+    except Exception as e:
+        return str(e)
+
+
 def get_user_email(access_token: str) -> str:
     """Return the email address for the authenticated user, or '' on failure."""
     try:
