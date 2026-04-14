@@ -1,5 +1,5 @@
 import streamlit as st
-from db import sign_in, sign_up, send_reset_email, verify_recovery_token, exchange_code_for_session, update_password
+from db import sign_in, sign_up, send_reset_email
 from pipeline import SETTINGS_DEFAULTS
 
 st.set_page_config(page_title="Login — SpeakPals", page_icon="🔑",
@@ -54,72 +54,6 @@ st.markdown("""
     Your AI language tutor
   </div>
 </div>""", unsafe_allow_html=True)
-
-# ── Password-reset recovery ────────────────────────────────────────────────────
-# Supabase redirects back with either:
-#   PKCE flow (newer):     ?code=xxx
-#   Token-hash flow:       ?token_hash=xxx&type=recovery
-_qp             = st.query_params
-_recovery_token = _qp.get("token_hash")
-_recovery_type  = _qp.get("type")
-_pkce_code      = _qp.get("code")
-
-if _pkce_code or (_recovery_token and _recovery_type == "recovery"):
-    st.markdown("""
-    <div style='text-align:center;padding-bottom:20px'>
-      <div style='font:700 18px Inter,sans-serif;color:#111827'>Set a new password</div>
-      <div style='font:400 13px Inter;color:rgba(17,24,39,.5);margin-top:4px'>
-        Enter a new password for your account.
-      </div>
-    </div>""", unsafe_allow_html=True)
-
-    # Exchange recovery token/code for a session once per recovery flow
-    if "recovery_session" not in st.session_state:
-        with st.spinner("Verifying reset link…"):
-            if _pkce_code:
-                _sess, _err = exchange_code_for_session(_pkce_code)
-            else:
-                _sess, _err = verify_recovery_token(_recovery_token)
-        if _sess:
-            st.session_state["recovery_session"] = _sess
-        else:
-            st.error(f"This reset link is invalid or has expired. {_err or ''}")
-            if st.button("Request a new reset link"):
-                st.query_params.clear()
-                st.rerun()
-            st.stop()
-
-    with st.form("reset_pw_form"):
-        new_pw      = st.text_input("New password", type="password", placeholder="At least 6 characters")
-        confirm_pw  = st.text_input("Confirm new password", type="password", placeholder="••••••••")
-        st.markdown("<div style='height:4px'></div>", unsafe_allow_html=True)
-        pw_submitted = st.form_submit_button("Set new password", use_container_width=True)
-
-    if pw_submitted:
-        if len(new_pw) < 6:
-            st.error("Password must be at least 6 characters.")
-        elif new_pw != confirm_pw:
-            st.error("Passwords don't match.")
-        else:
-            _recovery_sess = st.session_state["recovery_session"]
-            _err = update_password(
-                _recovery_sess["access_token"],
-                new_pw,
-                _recovery_sess.get("refresh_token", ""),
-            )
-            if _err:
-                st.error(f"Could not update password: {_err}")
-            else:
-                # Log the user in with the recovery session and clear recovery state
-                _sess = st.session_state.pop("recovery_session")
-                st.session_state.sb_access_token  = _sess["access_token"]
-                st.session_state.sb_refresh_token = _sess["refresh_token"]
-                st.session_state.sb_user_id       = _sess["user_id"]
-                st.session_state.sb_email         = _sess["email"]
-                st.query_params.clear()
-                st.success("Password updated! Redirecting…")
-                st.switch_page("pages/home.py")
-    st.stop()
 
 # ── Tabs ──────────────────────────────────────────────────────────────────────
 tab_login, tab_register, tab_forgot = st.tabs(["Sign in", "Create account", "Forgot password"])
@@ -264,10 +198,11 @@ with tab_forgot:
             st.error("Please enter your email address.")
         else:
             try:
-                _app_url = st.secrets.get("APP_URL", "")
+                _base = st.secrets.get("APP_URL", "").rstrip("/")
             except Exception:
-                _app_url = ""
-            _err = send_reset_email(forgot_email.strip(), redirect_to=_app_url)
+                _base = ""
+            _redirect = f"{_base}/reset_password" if _base else ""
+            _err = send_reset_email(forgot_email.strip(), redirect_to=_redirect)
             if _err:
                 st.error(f"Could not send reset email: {_err}")
             else:
