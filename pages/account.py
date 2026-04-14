@@ -166,7 +166,7 @@ affected = [s["title"] for s in SCENE_CATALOG if scene_primary.get(s["key"]) == 
 if affected:
     st.markdown(
         f"<div style='background:rgba(13,148,136,.07);border:1px solid rgba(13,148,136,.2);"
-        f"border-radius:10px;padding:10px 14px;margin-top:4px;font:400 12px system-ui;"
+        f"border-radius:10px;padding:10px 14px;margin-top:4px;margin-bottom:16px;font:400 12px system-ui;"
         f"color:rgba(17,24,39,.65)'>"
         f"Auto-swap: <span style='color:#0d9488'>{', '.join(affected)}</span> "
         f"will use a different character voice to avoid your tutor voice.</div>",

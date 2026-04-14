@@ -166,46 +166,52 @@ if cal_connected:
 
 elif "gcal_flow" in st.session_state:
     # ── Pending: polling for approval ─────────────────────────────────────────
-    flow     = st.session_state.gcal_flow
-    deadline = flow["deadline"]
-    remaining = int(deadline - time.time())
+    # Use a fragment so polling reruns only this section every interval seconds.
+    # The navigation buttons outside the fragment stay fully interactive.
+    @st.fragment(run_every=st.session_state.gcal_flow["interval"])
+    def _gcal_pending():
+        flow = st.session_state.get("gcal_flow")
+        if not flow:
+            st.rerun()
+            return
 
-    if remaining <= 0:
-        del st.session_state.gcal_flow
-        st.error("The code expired. Please try again.")
-        st.rerun()
-
-    st.markdown("<div class='status-badge status-pending'>⏳ Waiting for approval…</div>",
-                unsafe_allow_html=True)
-    st.markdown("<br>", unsafe_allow_html=True)
-    st.markdown(f"""<div class='info-box'>
-      <b>1.</b> Open this link on your phone or computer:<br>
-      <a href='{flow["verification_url"]}' target='_blank'
-         style='color:#0d9488;font-weight:600'>{flow["verification_url"]}</a><br><br>
-      <b>2.</b> Enter this code:
-      <div class='code-block'>{flow["user_code"]}</div>
-      <b>3.</b> Sign in with Google and click <b>Allow</b><br><br>
-      <span style='color:#6b7280;font-size:12px'>Code expires in {remaining // 60}m {remaining % 60}s</span>
-    </div>""", unsafe_allow_html=True)
-
-    # Poll once per rerun
-    try:
-        token = gcal.try_poll_once(flow["device_code"])
-        if token:
-            gcal.save_token(user_key, token)
+        remaining = int(flow["deadline"] - time.time())
+        if remaining <= 0:
             del st.session_state.gcal_flow
-            st.success("✅ Google Calendar connected!")
+            st.error("The code expired. Please try again.")
             st.rerun()
-        else:
-            # Sleep the poll interval then rerun to check again
-            time.sleep(flow["interval"])
+            return
+
+        st.markdown("<div class='status-badge status-pending'>⏳ Waiting for approval…</div>",
+                    unsafe_allow_html=True)
+        st.markdown("<br>", unsafe_allow_html=True)
+        st.markdown(f"""<div class='info-box'>
+          <b>1.</b> Open this link on your phone or computer:<br>
+          <a href='{flow["verification_url"]}' target='_blank'
+             style='color:#0d9488;font-weight:600'>{flow["verification_url"]}</a><br><br>
+          <b>2.</b> Enter this code:
+          <div class='code-block'>{flow["user_code"]}</div>
+          <b>3.</b> Sign in with Google and click <b>Allow</b><br><br>
+          <span style='color:#6b7280;font-size:12px'>Code expires in {remaining // 60}m {remaining % 60}s</span>
+        </div>""", unsafe_allow_html=True)
+
+        try:
+            token = gcal.try_poll_once(flow["device_code"])
+            if token:
+                gcal.save_token(user_key, token)
+                del st.session_state.gcal_flow
+                st.success("✅ Google Calendar connected!")
+                st.rerun()
+        except PermissionError:
+            del st.session_state.gcal_flow
+            st.error("❌ Access denied. Please try again.")
             st.rerun()
-    except PermissionError:
-        del st.session_state.gcal_flow
-        st.error("❌ Access denied. Please try again.")
-    except ValueError:
-        del st.session_state.gcal_flow
-        st.error("⏰ Code expired. Please try again.")
+        except ValueError:
+            del st.session_state.gcal_flow
+            st.error("⏰ Code expired. Please try again.")
+            st.rerun()
+
+    _gcal_pending()
 
 else:
     # ── Not connected ──────────────────────────────────────────────────────────
