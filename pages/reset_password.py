@@ -46,29 +46,29 @@ st.markdown("""
 
 # ── Handle Supabase implicit-flow hash fragments ──────────────────────────────
 # Supabase implicit flow puts tokens in the URL hash (#access_token=…&type=recovery).
-# Python/Streamlit cannot read hash fragments, so we inject JS (inside a component
-# iframe) that detects them and reloads the page with those values as regular
-# query params instead.  When no hash is found the JS adds ?_checked=1 so Python
-# knows the check ran and can show the "invalid link" error.
+# Python cannot read hash fragments, so this JS (in a component iframe) detects them
+# and reloads the page with those values as regular query params instead.
+#
+# CRITICAL: if Python-readable params (code / token_hash / access_token) are already
+# in the query string, the script exits immediately — it MUST NOT replace the URL
+# while Python is in the middle of handling a successful token exchange.
 _cv1.html("""<script>
 (function () {
   try {
-    var par  = window.parent;
-    var hash = par.location.hash;
-    if (hash && hash.length > 1) {
-      var p = new URLSearchParams(hash.substring(1));
-      if (p.get('access_token') || p.get('token_hash')) {
-        par.location.replace(par.location.pathname + '?' + hash.substring(1));
-        return;
+    var par = window.parent;
+    var sp  = new URLSearchParams(par.location.search);
+    // Useful params already present — Python will handle them; don't touch the URL
+    if (sp.get('code') || sp.get('token_hash') || sp.get('access_token')) return;
+    // Check the hash for implicit-flow tokens
+    var h = par.location.hash;
+    if (h && h.length > 1) {
+      var hp = new URLSearchParams(h.substring(1));
+      if (hp.get('access_token') || hp.get('token_hash')) {
+        par.location.replace(par.location.pathname + '?' + h.substring(1));
       }
     }
-    // No useful hash found — add ?_checked=1 so Python stops waiting
-    if (!par.location.search.includes('_checked')) {
-      par.location.replace(par.location.pathname + '?_checked=1');
-    }
-  } catch (e) {
-    // Sandboxed iframe — can't reach parent; Python will show the error directly
-  }
+    // No hash tokens found — do nothing; Python will show the error
+  } catch (e) {}
 })();
 </script>""", height=0)
 
@@ -82,7 +82,6 @@ if "reset_session" not in st.session_state:
     _type         = _qp.get("type") or ("recovery" if _token_hash else "")
     _access_token = _qp.get("access_token")   # implicit flow: moved from hash by JS above
     _refresh_tok  = _qp.get("refresh_token") or ""
-    _checked      = bool(_qp.get("_checked")) # JS confirmed no hash params
 
     if _code:
         with st.spinner("Verifying reset link…"):
@@ -91,15 +90,11 @@ if "reset_session" not in st.session_state:
         with st.spinner("Verifying reset link…"):
             _sess, _err = verify_recovery_token(_token_hash)
     elif _access_token:
-        # Tokens arrived via URL hash (implicit flow) and were moved to query params by JS
-        _sess, _err = session_from_tokens(_access_token, _refresh_tok)
-    elif _checked:
-        # JS ran and confirmed there are no hash params either — genuinely bad link
-        _sess, _err = None, "No reset token found."
+        # Tokens arrived via URL hash (implicit flow), moved to query params by JS
+        with st.spinner("Verifying reset link…"):
+            _sess, _err = session_from_tokens(_access_token, _refresh_tok)
     else:
-        # JS hasn't run yet (first render) — show a spinner and let JS redirect
-        st.info("Verifying reset link…")
-        st.stop()
+        _sess, _err = None, "No reset token found."
 
     if _sess:
         st.session_state["reset_session"] = _sess
