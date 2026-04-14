@@ -133,4 +133,12 @@ if "knowledge_profile" not in st.session_state and "sb_user_id" in st.session_st
     except Exception:
         st.session_state["knowledge_profile"] = {}
 
+# ── Suppress page rendering while the cookie component is initialising ────────
+# CookieController needs one browser round-trip to send back existing cookie
+# values. During that trip _cookie_restoring=True is set and a rerun is queued.
+# Blocking pg.run() here means no page content flashes on that first pass —
+# the user sees a blank frame for ~1 render cycle instead of the full page twice.
+if st.session_state.get("_cookie_restoring"):
+    st.stop()
+
 pg.run()
