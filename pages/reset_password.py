@@ -44,44 +44,47 @@ st.markdown("""
   </div>
 </div>""", unsafe_allow_html=True)
 
-# ── Handle Supabase implicit-flow hash fragments ──────────────────────────────
-# Supabase implicit flow puts tokens in the URL hash (#access_token=…&type=recovery).
-# Python cannot read hash fragments, so this JS (in a component iframe) detects them
-# and reloads the page with those values as regular query params instead.
-#
-# CRITICAL: if Python-readable params (code / token_hash / access_token) are already
-# in the query string, the script exits immediately — it MUST NOT replace the URL
-# while Python is in the middle of handling a successful token exchange.
-_cv1.html("""<script>
+# ── Exchange the recovery code/token for a session (once) ────────────────────
+if "reset_session" not in st.session_state:
+
+    # Inject JS *inside* this block so it only runs while we still need a token.
+    # Once reset_session is established the whole block (and the component) is
+    # skipped — the JS can never fire on a success rerun and clobber the URL.
+    #
+    # What the JS does:
+    #  • If Python-readable params (code / token_hash / access_token / _invalid)
+    #    are already in the query string → exit; Python has what it needs.
+    #  • If the URL hash contains implicit-flow tokens → move them to query params
+    #    and reload (window.parent.location.replace).
+    #  • If nothing useful is anywhere → add ?_invalid=1 so Python stops waiting.
+    _cv1.html("""<script>
 (function () {
   try {
     var par = window.parent;
     var sp  = new URLSearchParams(par.location.search);
-    // Useful params already present — Python will handle them; don't touch the URL
-    if (sp.get('code') || sp.get('token_hash') || sp.get('access_token')) return;
-    // Check the hash for implicit-flow tokens
+    if (sp.get('code') || sp.get('token_hash') ||
+        sp.get('access_token') || sp.get('_invalid')) return;
     var h = par.location.hash;
     if (h && h.length > 1) {
       var hp = new URLSearchParams(h.substring(1));
       if (hp.get('access_token') || hp.get('token_hash')) {
         par.location.replace(par.location.pathname + '?' + h.substring(1));
+        return;
       }
     }
-    // No hash tokens found — do nothing; Python will show the error
+    // Nothing found anywhere — mark as invalid so Python shows the error
+    par.location.replace(par.location.pathname + '?_invalid=1');
   } catch (e) {}
 })();
 </script>""", height=0)
 
-# ── Exchange the recovery code/token for a session (once) ────────────────────
-# app.py may have stashed the code in session_state before switching pages
-# (st.switch_page drops query params from the URL).
-if "reset_session" not in st.session_state:
     _qp           = st.query_params
     _code         = _qp.get("code") or st.session_state.pop("_reset_code", None)
     _token_hash   = _qp.get("token_hash") or st.session_state.pop("_reset_token_hash", None)
     _type         = _qp.get("type") or ("recovery" if _token_hash else "")
-    _access_token = _qp.get("access_token")   # implicit flow: moved from hash by JS above
+    _access_token = _qp.get("access_token")   # implicit flow: moved from hash by JS
     _refresh_tok  = _qp.get("refresh_token") or ""
+    _invalid      = bool(_qp.get("_invalid")) # JS confirmed nothing useful exists
 
     if _code:
         with st.spinner("Verifying reset link…"):
@@ -90,11 +93,20 @@ if "reset_session" not in st.session_state:
         with st.spinner("Verifying reset link…"):
             _sess, _err = verify_recovery_token(_token_hash)
     elif _access_token:
-        # Tokens arrived via URL hash (implicit flow), moved to query params by JS
+        # Tokens came via URL hash (implicit flow), moved to query params by JS above
         with st.spinner("Verifying reset link…"):
             _sess, _err = session_from_tokens(_access_token, _refresh_tok)
-    else:
+    elif _invalid:
+        # JS confirmed there is nothing in the hash either
         _sess, _err = None, "No reset token found."
+    else:
+        # JS hasn't finished yet (first render before iframe executes) — wait
+        st.markdown(
+            "<div style='text-align:center;color:rgba(17,24,39,.45);font:400 13px Inter'>"
+            "Verifying reset link…</div>",
+            unsafe_allow_html=True,
+        )
+        st.stop()
 
     if _sess:
         st.session_state["reset_session"] = _sess
