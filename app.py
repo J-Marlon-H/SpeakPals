@@ -63,12 +63,21 @@ if (_reset_code or (_reset_tok and _reset_type == "recovery")) \
 # ── Cookie controller (needed for both restore-on-load and persist-after-login) ─
 # st.rerun() and st.stop() raise subclasses of Exception — they MUST stay
 # outside any try/except block or they get silently swallowed.
+#
+# Skip CookieController entirely on the login page. The component triggers
+# multiple reruns on init (ready signal + data), which causes a double flash
+# on the login form. Cookie restoration always happens on the page that loads
+# *before* the login redirect (home → require_auth → login), so login never
+# needs the controller for restoration. After a successful login the user is
+# switched away from this page, so cookie persistence is handled by app.py on
+# the destination page.
 _cookies = None
-try:
-    from streamlit_cookies_controller import CookieController
-    _cookies = CookieController(key="sp_ctrl")
-except Exception:
-    pass
+if pg.title != "Login":
+    try:
+        from streamlit_cookies_controller import CookieController
+        _cookies = CookieController(key="sp_ctrl")
+    except Exception:
+        pass
 
 # ── Session restore from cookie ───────────────────────────────────────────────
 # Cookie components need one render cycle to initialize before data is readable.

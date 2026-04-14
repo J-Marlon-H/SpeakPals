@@ -5,10 +5,11 @@ from pipeline import SETTINGS_DEFAULTS
 st.set_page_config(page_title="Login — SpeakPals", page_icon="🔑",
                    layout="centered", initial_sidebar_state="collapsed")
 
-# Don't render while the cookie component is initialising — mirrors the
-# require_auth() pattern on protected pages and prevents the double flash.
-if st.session_state.get("_cookie_restoring"):
-    st.stop()
+# CookieController is not rendered on the login page (see app.py), so there
+# are no spurious reruns and no double flash. If the user already has an active
+# session (e.g. navigated here manually), send them to home immediately.
+if "sb_user_id" in st.session_state:
+    st.switch_page("pages/home.py")
 
 st.markdown("""<style>
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
