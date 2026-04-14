@@ -29,36 +29,41 @@ def _start_telegram_bot():
 
 _start_telegram_bot()
 
+# ── Cookie controller (needed for both restore-on-load and persist-after-login) ─
+# st.rerun() and st.stop() raise subclasses of Exception — they MUST stay
+# outside any try/except block or they get silently swallowed.
+_cookies = None
+try:
+    from streamlit_cookies_controller import CookieController
+    _cookies = CookieController(key="sp_ctrl")
+except Exception:
+    pass
+
 # ── Session restore from cookie ───────────────────────────────────────────────
 # Cookie components need one render cycle to initialize before data is readable.
 # We do a single controlled rerun the first time, then read on the second pass.
 if "sb_user_id" not in st.session_state:
-    # st.rerun() and st.stop() raise subclasses of Exception — they MUST stay
-    # outside any try/except block or they get silently swallowed.
     _stored_token = None
     _session_restored = False
-    _cookie_controller_ok = False
-    try:
-        from streamlit_cookies_controller import CookieController
-        from db import refresh_session
-        _cookies = CookieController(key="sp_ctrl")
-        _cookie_controller_ok = True
-        _stored_token = _cookies.get("sp_refresh_token")
-        if _stored_token:
-            _sess, _err = refresh_session(_stored_token)
-            if _sess:
-                st.session_state.sb_access_token  = _sess["access_token"]
-                st.session_state.sb_refresh_token = _sess["refresh_token"]
-                st.session_state.sb_user_id       = _sess["user_id"]
-                st.session_state.sb_email         = _sess["email"]
-                _cookies.set("sp_refresh_token", _sess["refresh_token"])
-                _session_restored = True
-    except Exception:
-        pass
+
+    if _cookies is not None:
+        try:
+            from db import refresh_session
+            _stored_token = _cookies.get("sp_refresh_token")
+            if _stored_token:
+                _sess, _err = refresh_session(_stored_token)
+                if _sess:
+                    st.session_state.sb_access_token  = _sess["access_token"]
+                    st.session_state.sb_refresh_token = _sess["refresh_token"]
+                    st.session_state.sb_user_id       = _sess["user_id"]
+                    st.session_state.sb_email         = _sess["email"]
+                    _session_restored = True
+        except Exception:
+            pass
 
     if _session_restored:
         st.rerun()
-    elif _cookie_controller_ok and _stored_token is None and not st.session_state.get("_cookie_init_done"):
+    elif _cookies is not None and _stored_token is None and not st.session_state.get("_cookie_init_done"):
         # First render — component hasn't sent back cookie data yet.
         # Set a flag so require_auth() waits (via st.stop()) instead of
         # redirecting to login. Only set when the component actually loaded;
@@ -68,6 +73,16 @@ if "sb_user_id" not in st.session_state:
     else:
         # Cookie init is complete (token found-and-restored, or no cookie at all).
         st.session_state.pop("_cookie_restoring", None)
+
+# ── Persist refresh token to cookie after login (or after token rotation) ─────
+# The login/onboarding pages set sb_refresh_token in session state but can't
+# write cookies directly. app.py runs on every render so we catch it here.
+# _last_written_token guards against re-writing the same value every render.
+elif _cookies is not None and "sb_refresh_token" in st.session_state:
+    _current_rt = st.session_state.sb_refresh_token
+    if st.session_state.get("_last_written_token") != _current_rt:
+        _cookies.set("sp_refresh_token", _current_rt)
+        st.session_state["_last_written_token"] = _current_rt
 
 # ── Load knowledge profile once per login session ────────────────────────────
 # knowledge_profile is NOT in LESSON_STATE_KEYS so it persists across lessons.
