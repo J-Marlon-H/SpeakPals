@@ -165,6 +165,25 @@ def exchange_code_for_session(code: str) -> tuple[dict | None, str | None]:
         return None, str(e)
 
 
+def session_from_tokens(access_token: str, refresh_token: str = "") -> tuple[dict | None, str | None]:
+    """Build a session dict from an existing access_token + refresh_token.
+    Used when Supabase implicit flow delivers tokens via the URL hash fragment."""
+    try:
+        import base64 as _b64
+        payload = access_token.split(".")[1]
+        # Fix base64 padding
+        payload += "=" * (-len(payload) % 4)
+        claims = _json.loads(_b64.urlsafe_b64decode(payload))
+        return {
+            "access_token":  access_token,
+            "refresh_token": refresh_token,
+            "user_id":       claims.get("sub", ""),
+            "email":         claims.get("email", ""),
+        }, None
+    except Exception as exc:
+        return None, str(exc)
+
+
 def update_password(access_token: str, new_password: str, refresh_token: str = "") -> str | None:
     """Update the authenticated user's password. Returns error string or None on success."""
     try:
