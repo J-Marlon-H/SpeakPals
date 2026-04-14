@@ -94,8 +94,12 @@ if _recovery_token and _recovery_type == "recovery":
         elif new_pw != confirm_pw:
             st.error("Passwords don't match.")
         else:
-            _access = st.session_state["recovery_session"]["access_token"]
-            _err = update_password(_access, new_pw)
+            _recovery_sess = st.session_state["recovery_session"]
+            _err = update_password(
+                _recovery_sess["access_token"],
+                new_pw,
+                _recovery_sess.get("refresh_token", ""),
+            )
             if _err:
                 st.error(f"Could not update password: {_err}")
             else:

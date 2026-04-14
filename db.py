@@ -147,10 +147,12 @@ def verify_recovery_token(token_hash: str) -> tuple[dict | None, str | None]:
         return None, str(e)
 
 
-def update_password(access_token: str, new_password: str) -> str | None:
+def update_password(access_token: str, new_password: str, refresh_token: str = "") -> str | None:
     """Update the authenticated user's password. Returns error string or None on success."""
     try:
-        _client(access_token).auth.update_user({"password": new_password})
+        c = create_client(SUPABASE_URL, SUPABASE_KEY)  # type: ignore[name-defined]
+        c.auth.set_session(access_token, refresh_token)
+        c.auth.update_user({"password": new_password})
         return None
     except Exception as e:
         return str(e)

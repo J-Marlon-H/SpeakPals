@@ -412,7 +412,11 @@ else:
         elif new_pw != confirm_pw:
             st.error("Passwords don't match.")
         else:
-            _err = update_password(st.session_state.sb_access_token, new_pw)
+            _err = update_password(
+                st.session_state.sb_access_token,
+                new_pw,
+                st.session_state.get("sb_refresh_token", ""),
+            )
             if _err:
                 st.error(f"Could not update password: {_err}")
             else:
