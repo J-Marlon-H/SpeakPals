@@ -183,11 +183,11 @@ def save_user(chat_id: int, state: dict) -> None:
 
 
 def load_user_synced(chat_id: int) -> dict:
-    """Load user state, pulling fresh settings from Supabase if the account is linked."""
+    """Load user state, pulling fresh settings and chat history from Supabase if linked."""
     user = load_user(chat_id)
     if user.get("sb_user_id"):
         try:
-            from db import get_telegram_profile, load_knowledge_profile_for_bot
+            from db import get_telegram_profile, load_knowledge_profile_for_bot, load_bot_chat_history
             profile = get_telegram_profile(chat_id)
             if profile:
                 for key in _PROFILE_KEYS:
@@ -196,6 +196,9 @@ def load_user_synced(chat_id: int) -> dict:
             kp = load_knowledge_profile_for_bot(chat_id)
             if kp:
                 user["knowledge_profile"] = kp
+            history = load_bot_chat_history(chat_id)
+            if history:
+                user["chat"] = history
             save_user(chat_id, user)
         except Exception:
             pass
@@ -419,6 +422,13 @@ async def _process_message(
             {"student": user_text, "correct_form": correction}
         )
     save_user(chat_id, user)
+    # Persist chat history to Supabase so it survives app restarts
+    if user.get("sb_user_id"):
+        try:
+            from db import save_bot_chat_history
+            save_bot_chat_history(chat_id, user["chat"])
+        except Exception:
+            pass
 
     # ── Step 2: Send text reply immediately ───────────────────────────────────
     tutor_name = get_tutor_name(user["language"])

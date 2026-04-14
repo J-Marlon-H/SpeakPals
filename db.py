@@ -411,6 +411,57 @@ def load_knowledge_profile_for_bot(chat_id: int) -> dict:
         return {}
 
 
+def save_bot_chat_history(chat_id: int, messages: list) -> None:
+    """Persist the bot's conversation history for a linked user (no JWT needed).
+
+    Uses the save_bot_chat_history RPC (SECURITY DEFINER).
+    Only saves the last 40 messages to keep the payload small.
+
+    Required SQL (run once in Supabase SQL editor):
+
+        ALTER TABLE users ADD COLUMN IF NOT EXISTS bot_chat_history JSONB DEFAULT '[]'::jsonb;
+
+        CREATE OR REPLACE FUNCTION save_bot_chat_history(p_chat_id BIGINT, p_messages JSONB)
+        RETURNS VOID LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+        BEGIN
+          UPDATE users SET bot_chat_history = p_messages WHERE telegram_chat_id = p_chat_id;
+        END; $$;
+    """
+    try:
+        trimmed = messages[-40:] if len(messages) > 40 else messages
+        _client().rpc("save_bot_chat_history",
+                      {"p_chat_id": chat_id,
+                       "p_messages": _json.dumps(trimmed, ensure_ascii=False)}).execute()
+    except Exception:
+        pass
+
+
+def load_bot_chat_history(chat_id: int) -> list:
+    """Load the bot's conversation history for a linked user (no JWT needed).
+
+    Uses the load_bot_chat_history RPC (SECURITY DEFINER).
+    Returns [] if not linked or no history yet.
+
+    Required SQL (run once in Supabase SQL editor):
+
+        CREATE OR REPLACE FUNCTION load_bot_chat_history(p_chat_id BIGINT)
+        RETURNS JSONB LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+        DECLARE v_messages JSONB;
+        BEGIN
+          SELECT bot_chat_history INTO v_messages FROM users WHERE telegram_chat_id = p_chat_id;
+          RETURN COALESCE(v_messages, '[]'::jsonb);
+        END; $$;
+    """
+    try:
+        res = _client().rpc("load_bot_chat_history", {"p_chat_id": chat_id}).execute()
+        data = res.data
+        if not data:
+            return []
+        return data if isinstance(data, list) else _json.loads(data)
+    except Exception:
+        return []
+
+
 def delete_knowledge_profile(user_id: str, access_token: str) -> None:
     """Delete the user's knowledge profile row entirely."""
     try:
