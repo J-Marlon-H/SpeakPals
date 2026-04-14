@@ -1,5 +1,5 @@
 import streamlit as st
-from db import sign_in, sign_up, send_reset_email, verify_recovery_token, update_password
+from db import sign_in, sign_up, send_reset_email, verify_recovery_token, exchange_code_for_session, update_password
 from pipeline import SETTINGS_DEFAULTS
 
 st.set_page_config(page_title="Login — SpeakPals", page_icon="🔑",
@@ -55,12 +55,16 @@ st.markdown("""
   </div>
 </div>""", unsafe_allow_html=True)
 
-# ── Password-reset recovery (Supabase redirects here with ?token_hash=&type=recovery) ─
+# ── Password-reset recovery ────────────────────────────────────────────────────
+# Supabase redirects back with either:
+#   PKCE flow (newer):     ?code=xxx
+#   Token-hash flow:       ?token_hash=xxx&type=recovery
 _qp             = st.query_params
 _recovery_token = _qp.get("token_hash")
 _recovery_type  = _qp.get("type")
+_pkce_code      = _qp.get("code")
 
-if _recovery_token and _recovery_type == "recovery":
+if _pkce_code or (_recovery_token and _recovery_type == "recovery"):
     st.markdown("""
     <div style='text-align:center;padding-bottom:20px'>
       <div style='font:700 18px Inter,sans-serif;color:#111827'>Set a new password</div>
@@ -69,10 +73,13 @@ if _recovery_token and _recovery_type == "recovery":
       </div>
     </div>""", unsafe_allow_html=True)
 
-    # Exchange recovery token for a session once per recovery flow
+    # Exchange recovery token/code for a session once per recovery flow
     if "recovery_session" not in st.session_state:
         with st.spinner("Verifying reset link…"):
-            _sess, _err = verify_recovery_token(_recovery_token)
+            if _pkce_code:
+                _sess, _err = exchange_code_for_session(_pkce_code)
+            else:
+                _sess, _err = verify_recovery_token(_recovery_token)
         if _sess:
             st.session_state["recovery_session"] = _sess
         else:
