@@ -5,6 +5,11 @@ from pipeline import SETTINGS_DEFAULTS
 st.set_page_config(page_title="Login — SpeakPals", page_icon="🔑",
                    layout="centered", initial_sidebar_state="collapsed")
 
+# Don't render while the cookie component is initialising — mirrors the
+# require_auth() pattern on protected pages and prevents the double flash.
+if st.session_state.get("_cookie_restoring"):
+    st.stop()
+
 st.markdown("""<style>
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
   html,body{font-family:'Inter',sans-serif!important}

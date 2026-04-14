@@ -93,6 +93,7 @@ if "sb_user_id" not in st.session_state:
             pass
 
     if _session_restored:
+        st.session_state.pop("_cookie_restoring", None)  # clear before rerun so it never lingers
         st.rerun()
     elif _cookies is not None and _stored_token is None and not st.session_state.get("_cookie_init_done"):
         # First render — component hasn't sent back cookie data yet.
@@ -132,13 +133,5 @@ if "knowledge_profile" not in st.session_state and "sb_user_id" in st.session_st
         )
     except Exception:
         st.session_state["knowledge_profile"] = {}
-
-# ── Suppress page rendering while the cookie component is initialising ────────
-# CookieController needs one browser round-trip to send back existing cookie
-# values. During that trip _cookie_restoring=True is set and a rerun is queued.
-# Blocking pg.run() here means no page content flashes on that first pass —
-# the user sees a blank frame for ~1 render cycle instead of the full page twice.
-if st.session_state.get("_cookie_restoring"):
-    st.stop()
 
 pg.run()
