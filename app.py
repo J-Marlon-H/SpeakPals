@@ -46,9 +46,18 @@ pg = st.navigation(pages, position="hidden")
 # ── Intercept password-reset redirect before session restore ───────────────────
 # Supabase redirects back with ?code= (PKCE) or ?token_hash=&type=recovery.
 # Route to the dedicated reset page. Guard pg.title to prevent looping.
+# NOTE: st.switch_page changes the URL and drops query params, so we stash the
+# code/token_hash in session state so reset_password.py can still read them.
 _qp = st.query_params
-if (_qp.get("code") or (_qp.get("token_hash") and _qp.get("type") == "recovery")) \
+_reset_code = _qp.get("code")
+_reset_tok  = _qp.get("token_hash")
+_reset_type = _qp.get("type")
+if (_reset_code or (_reset_tok and _reset_type == "recovery")) \
         and pg.title != "Reset Password":
+    if _reset_code:
+        st.session_state["_reset_code"] = _reset_code
+    if _reset_tok:
+        st.session_state["_reset_token_hash"] = _reset_tok
     st.switch_page("pages/reset_password.py")
 
 # ── Cookie controller (needed for both restore-on-load and persist-after-login) ─

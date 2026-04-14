@@ -44,11 +44,13 @@ st.markdown("""
 </div>""", unsafe_allow_html=True)
 
 # ── Exchange the recovery code/token for a session (once) ────────────────────
+# app.py may have stashed the code in session_state before switching pages
+# (st.switch_page drops query params from the URL).
 if "reset_session" not in st.session_state:
     _qp          = st.query_params
-    _code        = _qp.get("code")
-    _token_hash  = _qp.get("token_hash")
-    _type        = _qp.get("type")
+    _code        = _qp.get("code") or st.session_state.pop("_reset_code", None)
+    _token_hash  = _qp.get("token_hash") or st.session_state.pop("_reset_token_hash", None)
+    _type        = _qp.get("type") or ("recovery" if _token_hash else "")
 
     if _code:
         with st.spinner("Verifying reset link…"):
