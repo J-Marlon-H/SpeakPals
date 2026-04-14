@@ -1,5 +1,5 @@
 import streamlit as st
-from db import sign_in, sign_up
+from db import sign_in, sign_up, send_reset_email, verify_recovery_token, update_password
 from pipeline import SETTINGS_DEFAULTS
 
 st.set_page_config(page_title="Login — SpeakPals", page_icon="🔑",
@@ -55,8 +55,63 @@ st.markdown("""
   </div>
 </div>""", unsafe_allow_html=True)
 
+# ── Password-reset recovery (Supabase redirects here with ?token_hash=&type=recovery) ─
+_qp             = st.query_params
+_recovery_token = _qp.get("token_hash")
+_recovery_type  = _qp.get("type")
+
+if _recovery_token and _recovery_type == "recovery":
+    st.markdown("""
+    <div style='text-align:center;padding-bottom:20px'>
+      <div style='font:700 18px Inter,sans-serif;color:#111827'>Set a new password</div>
+      <div style='font:400 13px Inter;color:rgba(17,24,39,.5);margin-top:4px'>
+        Enter a new password for your account.
+      </div>
+    </div>""", unsafe_allow_html=True)
+
+    # Exchange recovery token for a session once per recovery flow
+    if "recovery_session" not in st.session_state:
+        with st.spinner("Verifying reset link…"):
+            _sess, _err = verify_recovery_token(_recovery_token)
+        if _sess:
+            st.session_state["recovery_session"] = _sess
+        else:
+            st.error(f"This reset link is invalid or has expired. {_err or ''}")
+            if st.button("Request a new reset link"):
+                st.query_params.clear()
+                st.rerun()
+            st.stop()
+
+    with st.form("reset_pw_form"):
+        new_pw      = st.text_input("New password", type="password", placeholder="At least 6 characters")
+        confirm_pw  = st.text_input("Confirm new password", type="password", placeholder="••••••••")
+        st.markdown("<div style='height:4px'></div>", unsafe_allow_html=True)
+        pw_submitted = st.form_submit_button("Set new password", use_container_width=True)
+
+    if pw_submitted:
+        if len(new_pw) < 6:
+            st.error("Password must be at least 6 characters.")
+        elif new_pw != confirm_pw:
+            st.error("Passwords don't match.")
+        else:
+            _access = st.session_state["recovery_session"]["access_token"]
+            _err = update_password(_access, new_pw)
+            if _err:
+                st.error(f"Could not update password: {_err}")
+            else:
+                # Log the user in with the recovery session and clear recovery state
+                _sess = st.session_state.pop("recovery_session")
+                st.session_state.sb_access_token  = _sess["access_token"]
+                st.session_state.sb_refresh_token = _sess["refresh_token"]
+                st.session_state.sb_user_id       = _sess["user_id"]
+                st.session_state.sb_email         = _sess["email"]
+                st.query_params.clear()
+                st.success("Password updated! Redirecting…")
+                st.switch_page("pages/home.py")
+    st.stop()
+
 # ── Tabs ──────────────────────────────────────────────────────────────────────
-tab_login, tab_register = st.tabs(["Sign in", "Create account"])
+tab_login, tab_register, tab_forgot = st.tabs(["Sign in", "Create account", "Forgot password"])
 
 # ── Sign in ───────────────────────────────────────────────────────────────────
 with tab_login:
@@ -180,3 +235,25 @@ with tab_register:
                         "Account created! Check your email for a confirmation link, "
                         "then sign in."
                     )
+
+# ── Forgot password ───────────────────────────────────────────────────────────
+with tab_forgot:
+    st.markdown(
+        "<div style='font:400 13px Inter;color:rgba(17,24,39,.55);margin-bottom:16px'>"
+        "We'll send a reset link to your email address.</div>",
+        unsafe_allow_html=True,
+    )
+    with st.form("forgot_form"):
+        forgot_email = st.text_input("Email", key="forgot_email", placeholder="you@example.com")
+        st.markdown("<div style='height:4px'></div>", unsafe_allow_html=True)
+        forgot_submitted = st.form_submit_button("Send reset link", use_container_width=True)
+
+    if forgot_submitted:
+        if not forgot_email.strip():
+            st.error("Please enter your email address.")
+        else:
+            _err = send_reset_email(forgot_email.strip())
+            if _err:
+                st.error(f"Could not send reset email: {_err}")
+            else:
+                st.success("Check your inbox — a reset link is on its way.")
