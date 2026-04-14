@@ -121,10 +121,11 @@ def sign_out(access_token: str) -> None:
         pass
 
 
-def send_reset_email(email: str) -> str | None:
+def send_reset_email(email: str, redirect_to: str = "") -> str | None:
     """Send a password-reset email via Supabase. Returns error string or None on success."""
     try:
-        _client().auth.reset_password_for_email(email)
+        options = {"redirect_to": redirect_to} if redirect_to else {}
+        _client().auth.reset_password_for_email(email, options=options)
         return None
     except Exception as e:
         return str(e)
