@@ -51,8 +51,10 @@ from pipeline import (
     get_session,
     parse_claude_response,
     tts_chunk,
+    tts_tutor_mixed,
 )
-from prompts import build_system_prompt, get_tutor_name
+from prompts import build_system_prompt, build_cal_scene_prompt, get_tutor_name
+from tutor import Tutor
 import gcal
 
 # ── Setup ─────────────────────────────────────────────────────────────────────
@@ -84,6 +86,63 @@ USERS_DIR.mkdir(exist_ok=True)
 
 _executor = ThreadPoolExecutor(max_workers=4)
 
+# ── Inactivity-based profile update ──────────────────────────────────────────
+# After PROFILE_UPDATE_DELAY seconds of silence, update the knowledge profile.
+PROFILE_UPDATE_DELAY = 120  # 2 minutes
+
+# Pending asyncio tasks keyed by chat_id — cancelled when a new message arrives
+_profile_tasks: dict[int, asyncio.Task] = {}
+
+
+def _build_profile_log(user: dict) -> list[dict]:
+    """Convert the bot chat history into the format expected by update_knowledge_profile."""
+    log = []
+    for m in user.get("chat", []):
+        if m.get("role") == "user":
+            log.append({"who": "student", "text": m.get("content", "")})
+        elif m.get("role") == "assistant":
+            log.append({"who": "tutor",   "text": m.get("content", "")})
+    return log
+
+
+def _run_profile_update(chat_id: int) -> None:
+    """Blocking: update knowledge profile from latest chat and persist to Supabase."""
+    from profile import update_knowledge_profile
+    from db import save_knowledge_profile_for_bot
+    user = load_user(chat_id)
+    conv_log = _build_profile_log(user)
+    if not conv_log or not user.get("sb_user_id"):
+        return
+    updated = update_knowledge_profile(
+        user.get("knowledge_profile") or {},
+        user.get("name", ""), user.get("level", "A1"),
+        user.get("language", "Danish"), user.get("bg_lang", "English"),
+        conv_log, user.get("coaching_log", []),
+        CLAUDE_KEY,
+    )
+    if updated:
+        user["knowledge_profile"] = updated
+        save_user(chat_id, user)
+        save_knowledge_profile_for_bot(chat_id, updated)
+        log.info("Knowledge profile updated for chat %s", chat_id)
+
+
+async def _schedule_profile_update(chat_id: int) -> None:
+    """Wait for inactivity then save the knowledge profile in the background."""
+    await asyncio.sleep(PROFILE_UPDATE_DELAY)
+    loop = asyncio.get_running_loop()
+    await loop.run_in_executor(_executor, lambda: _run_profile_update(chat_id))
+    _profile_tasks.pop(chat_id, None)
+
+
+def _reset_profile_timer(chat_id: int) -> None:
+    """Cancel any pending profile update and start a fresh countdown."""
+    existing = _profile_tasks.pop(chat_id, None)
+    if existing:
+        existing.cancel()
+    task = asyncio.create_task(_schedule_profile_update(chat_id))
+    _profile_tasks[chat_id] = task
+
 # Scribe v1 REST API needs an explicit language code to avoid misidentifying
 # similar languages (e.g. Danish → Swedish). Different from STT_LANG_CODE
 # which is used by the Streamlit app's Scribe v2 Realtime WebSocket stream.
@@ -98,18 +157,19 @@ FFMPEG = shutil.which("ffmpeg") or "/opt/homebrew/bin/ffmpeg"
 # ── User state ────────────────────────────────────────────────────────────────
 
 DEFAULT_STATE: dict = {
-    "name":         None,
-    "level":        "A1",
-    "bg_lang":      "English",
-    "language":     "Danish",
-    "voice_label":  "Mathias — male baritone",
-    "scene_key":    None,
-    "chat":         [],
-    "turn_count":   0,
-    "correct_log":  [],
-    "coaching_log": [],
-    "setup_step":   "name",   # None = fully set up
-    "sb_user_id":   None,     # set when linked to a web account
+    "name":              None,
+    "level":             "A1",
+    "bg_lang":           "English",
+    "language":          "Danish",
+    "voice_label":       "Mathias — male baritone",
+    "scene_key":         None,
+    "chat":              [],
+    "turn_count":        0,
+    "correct_log":       [],
+    "coaching_log":      [],
+    "setup_step":        "name",   # None = fully set up
+    "sb_user_id":        None,     # set when linked to a web account
+    "knowledge_profile": {},       # JSON profile synced from Supabase
 }
 
 # Mapping from Supabase column names to bot state keys (they match, listed for clarity)
@@ -144,13 +204,16 @@ def load_user_synced(chat_id: int) -> dict:
     user = load_user(chat_id)
     if user.get("sb_user_id"):
         try:
-            from db import get_telegram_profile
+            from db import get_telegram_profile, load_knowledge_profile_for_bot
             profile = get_telegram_profile(chat_id)
             if profile:
                 for key in _PROFILE_KEYS:
                     if profile.get(key):
                         user[key] = profile[key]
-                save_user(chat_id, user)
+            kp = load_knowledge_profile_for_bot(chat_id)
+            if kp:
+                user["knowledge_profile"] = kp
+            save_user(chat_id, user)
         except Exception:
             pass
     return user
@@ -348,7 +411,13 @@ async def cmd_stop(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         parse_mode="Markdown",
     )
 
-    # Clear lesson state, keep profile
+    # Trigger immediate profile update then clear lesson state
+    loop = asyncio.get_running_loop()
+    await loop.run_in_executor(_executor, lambda: _run_profile_update(chat_id))
+    existing = _profile_tasks.pop(chat_id, None)
+    if existing:
+        existing.cancel()
+
     user.update({"chat": [], "turn_count": 0, "correct_log": [],
                  "coaching_log": [], "scene_key": None})
     save_user(chat_id, user)
@@ -424,12 +493,16 @@ async def cmd_link(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user = load_user(chat_id)
     user["sb_user_id"] = user_id
     try:
+        from db import load_knowledge_profile_for_bot
         profile = get_telegram_profile(chat_id)
         if profile:
             for key in _PROFILE_KEYS:
                 if profile.get(key):
                     user[key] = profile[key]
             user["setup_step"] = None  # skip onboarding if profile is complete
+        kp = load_knowledge_profile_for_bot(chat_id)
+        if kp:
+            user["knowledge_profile"] = kp
     except Exception:
         pass
     save_user(chat_id, user)
@@ -710,18 +783,7 @@ async def callback_handler(
 
 def _generate_scene_sync(event_title: str, date_label: str, language: str) -> dict:
     """Call Claude to generate a scene dict from a calendar event."""
-    prompt = (
-        f"A language learner is practising {language}. "
-        f"They have an upcoming event: '{event_title}' on {date_label}. "
-        "Generate a short roleplay scene they can practise to prepare for it.\n\n"
-        "Respond with ONLY a JSON object on one line with these fields:\n"
-        '  "title": short scene title (max 5 words)\n'
-        '  "desc": one sentence describing what the student practises\n'
-        '  "char_name": name/role of the character (e.g. "Colleague", "Doctor", "Host")\n'
-        '  "scene_description": 1–2 sentence scene-setting description for the AI tutor '
-        "(describe the setting and character's role/mood — this becomes the system prompt scene)\n\n"
-        "Keep it realistic and directly relevant to the event."
-    )
+    prompt = build_cal_scene_prompt(event_title, date_label, language)
     sess = get_session()
     resp = sess.post(
         "https://api.anthropic.com/v1/messages",
@@ -745,24 +807,29 @@ def _generate_scene_sync(event_title: str, date_label: str, language: str) -> di
 
 def _build_context(user: dict, chat_id: int) -> tuple[str, str, str, str, str]:
     """Return (system_prompt, voice_id, char_voice_id, lang_code, model)."""
+    tutor = Tutor.from_bot_user(user)
+
     if user.get("scene_key") == "custom" and user.get("custom_scene"):
         scene_description = user["custom_scene"].get("scene_description", "")
     else:
         scene = next((s for s in SCENE_CATALOG if s["key"] == user.get("scene_key")), None)
         scene_description = scene["scene_description"] if scene else ""
+
     events = gcal.get_upcoming_events(str(chat_id))
     system = build_system_prompt(
-        user["name"], user["level"], user["bg_lang"],
-        target_lang=user["language"],
+        tutor.name, tutor.level, tutor.bg_lang,
+        target_lang=tutor.target_lang,
         scene_description=scene_description,
         turn_count=user.get("turn_count", 0),
+        knowledge_profile=tutor.knowledge_profile or None,
         calendar_events=events or None,
+        telegram=True,
     )
-    lang_voices   = VOICES_BY_LANG.get(user["language"], {})
-    voice_id      = lang_voices.get(user["voice_label"]) or next(iter(lang_voices.values()))
-    char_voice_id = next((v for v in lang_voices.values() if v != voice_id), voice_id)
-    lang_code     = TTS_LANG_CODE.get(user["language"], "da")
-    return system, voice_id, char_voice_id, lang_code, "claude-haiku-4-5-20251001"
+
+    lang_voices   = VOICES_BY_LANG.get(tutor.target_lang, {})
+    char_voice_id = next((v for v in lang_voices.values() if v != tutor.voice_id), tutor.voice_id)
+
+    return system, tutor.voice_id, char_voice_id, tutor.tl_lang_code, tutor.model_id
 
 
 def _claude_sync(system: str, user_text: str, chat: list, model: str) -> str:
@@ -801,24 +868,21 @@ def _claude_sync(system: str, user_text: str, chat: list, model: str) -> str:
 
 def _tts_sync(spoken_text: str, speaker: str,
               voice_id: str, char_voice_id: str, lang_code: str) -> bytes:
-    """Generate TTS using a low-bitrate format for faster transfer and conversion."""
-    tts_voice = char_voice_id if speaker == "character" else voice_id
-    tts_lang  = lang_code     if speaker == "character" else "en"
-    from pipeline import TTS_MODEL
-    r = get_session().post(
-        f"https://api.elevenlabs.io/v1/text-to-speech/{tts_voice}/stream"
-        f"?output_format=mp3_22050_32",
-        headers={"xi-api-key": ELEVEN_KEY, "Content-Type": "application/json"},
-        json={
-            "text": clean_for_tts(spoken_text),
-            "model_id": TTS_MODEL.get(tts_lang, "eleven_turbo_v2_5"),
-            "language_code": tts_lang,
-            "voice_settings": {"stability": 0.4, "similarity_boost": 0.75, "speed": 0.92},
-        },
-        stream=True, timeout=30,
-    )
-    r.raise_for_status()
-    return b"".join(r.iter_content(4096))
+    """Generate TTS audio bytes (MP3) for the given speaker.
+
+    Character lines are sent with the target-language code so ElevenLabs pronounces
+    them correctly.  Tutor lines go through tts_tutor_mixed which handles English
+    text that may contain embedded target-language phrases in quotes — the same
+    approach used by the Streamlit app.
+    """
+    if speaker == "character":
+        # Full target-language utterance — use lang_code directly
+        return tts_chunk(clean_for_tts(spoken_text), char_voice_id, ELEVEN_KEY,
+                         lang_code=lang_code)
+    else:
+        # Tutor line: English prose that may include quoted Danish/Portuguese phrases
+        return tts_tutor_mixed(clean_for_tts(spoken_text), voice_id, ELEVEN_KEY,
+                               tl_lang_code=lang_code)
 
 
 async def _process_message(
@@ -907,6 +971,9 @@ async def _process_message(
         await update.effective_message.reply_text(
             "🎉 Scene complete! Use /stop to review corrections, or /scene for a new one."
         )
+
+    # Start/reset the inactivity timer — profile is saved after 2 min of silence
+    _reset_profile_timer(chat_id)
 
 
 # ── Message handlers ──────────────────────────────────────────────────────────

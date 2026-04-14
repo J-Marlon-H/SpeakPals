@@ -6,7 +6,8 @@ import streamlit as st
 import streamlit.components.v1 as components
 from dotenv import load_dotenv
 
-from pipeline import (run_pipeline_stream, MODELS, SETTINGS_DEFAULTS, character_tts_b64)
+from pipeline import (SETTINGS_DEFAULTS, character_tts_b64)
+from tutor import Tutor
 from db import (require_auth, load_knowledge_profile, save_knowledge_profile,
                 delete_knowledge_profile, _secret)
 from profile import update_knowledge_profile
@@ -60,53 +61,80 @@ def _infer_settings(profile: dict) -> dict:
 CLAUDE_KEY = _secret("CLAUDE_API_KEY")
 ELEVEN_KEY = _secret("ELEVENLABS_API_KEY")
 
-# ── Voice & language config ────────────────────────────────────────────────────
-# Onboarding tutor voice — warm female, ElevenLabs multilingual model
-_OB_VOICE_ID   = "4RklGmuxoAskAbGXplXN"
-_OB_TTS_LANG   = "en"   # interview always in English
 _OB_MAX_TURNS  = 18     # ~8-10 minutes of conversation
 
 # ── Opening greeting ───────────────────────────────────────────────────────────
+# Acknowledges what we already know from sign-up so the first question goes
+# straight to motivation rather than re-asking basics.
 _OPENER = (
-    "Hi {name}! I'm your SpeakPals tutor. "
-    "What language are you hoping to learn?"
+    "Hi {name}! I'm your SpeakPals tutor — great to meet you. "
+    "I can see you're learning {target_lang} starting from {level} level "
+    "with {bg_lang} as your background, so I already have a head start. "
+    "To make our sessions as useful as possible I'd love to learn a bit more about you. "
+    "What's drawing you to {target_lang}?"
 )
 
 # ── System prompt ──────────────────────────────────────────────────────────────
 _OB_SYSTEM = """\
-You are a warm, curious language learning tutor meeting {name} for the first time.
+You are a warm, genuinely curious language learning tutor meeting {name} for the first time.
+Your only job right now is to LISTEN and build a rich picture of who they are — not to teach.
 
-**LANGUAGE: Respond ONLY in English. Never use {target_lang} or any other language.**
+**LANGUAGE: English only. Never use {target_lang} or any other language.**
 
-**RESPONSE LENGTH: Keep your replies SHORT — one brief reaction (max one sentence) \
-then ONE question. Never more than 2 sentences total. The student should be doing \
-at least 70% of the talking. Do NOT summarise, recap, or list things you've heard.**
+**RESPONSE LENGTH: One short warm reaction (max one sentence) + ONE question. \
+Two sentences maximum. The student talks; you listen.**
 
-Your goal is to learn about this person through natural conversation — explore these \
-areas organically, not as a checklist:
-
-1. **Language level** — What do they already know? How would they rate themselves?
-2. **Learning motivation** — Why are they learning? What personal goals drive them?
-3. **Personal use context** — Where will they actually use the language in real life?
-4. **Patterns and challenges** — Any mistakes or difficulties they are already aware of?
-5. **Personal connections** — Partner, family, travel, work — what makes it meaningful?
-
-Conversation rules:
-- ONE question per turn, always — never combine questions
-- React briefly and warmly to what they said, then move forward
-- If they give a short answer, gently probe: "Tell me more about that."
-- Never volunteer information about yourself beyond your role
-
-Context:
+## What you already know — do NOT ask about these again
 - Name: {name}
-- Language they are learning: {target_lang}
-- Current level: {level}
+- Learning: {target_lang}
+- Self-reported level: {level}
 - Background language: {bg_lang}
-- You opened with: "{opener_text}"
-- This is exchange number {turn_count} of approximately {max_turns}
 
-After approximately {max_turns} exchanges, wrap up in 1–2 sentences and end with:
+## Topics to explore — work through as many as feel natural, one at a time
+Cover different angles. Do not circle back to a topic you've already touched.
+
+1. **Motivation & personal story** — The specific "why" behind learning {target_lang}. \
+   Push past generic answers ("I like the culture") to the real story.
+2. **Real-life use situations** — Exact moments where they'll need {target_lang}: \
+   a neighbourhood, a workplace, a partner's family dinner, a trip planned. Concrete details.
+3. **People in their life** — Partner, friends, colleagues, family who speak {target_lang}? \
+   Any relationships where the language matters?
+4. **Previous learning attempts** — Have they tried before? What worked, what didn't? \
+   Apps, classes, immersion, self-study?
+5. **Where they get stuck** — What feels hardest — pronunciation, grammar, vocabulary, \
+   confidence to speak? Any patterns they've noticed in themselves?
+6. **Daily life & schedule** — When and how do they picture practising? Work schedule, \
+   commute, lifestyle clues that shape how sessions should feel.
+7. **Cultural interests** — Food, music, films, humour, history, travel — anything they \
+   are drawn to in {target_lang} culture that lessons could tap into.
+8. **Milestone goal** — What would make them feel proud? A specific sentence, a \
+   conversation, a trip, a work meeting — a concrete milestone to aim for.
+9. **Learning style** — Do they prefer structure or free conversation? Corrections \
+   in the moment or after? What has felt enjoyable vs. frustrating in the past?
+
+## Pacing rules
+- ONE question per turn. Never bundle two questions into one turn.
+- Brief warm reaction first, then your question.
+- If an answer is vague, probe once with a specific follow-up before moving on.
+- When you have enough on a topic, acknowledge it briefly and shift: \
+  "Got it — really useful." then move to a fresh angle.
+- Vary your openers. Do not repeat the same reaction phrase twice.
+
+## Wrap-up — from turn {nudge_turn} onwards
+Once you have covered at least 6–7 topics OR reached turn {nudge_turn}, start wrapping up:
+- Ask: "Is there anything else you'd like me to know before we start — \
+  anything that would help me tailor things for you?"
+- If they say no, or give a very short answer, close warmly in 1–2 sentences \
+  and say: "Feel free to press Finish Onboarding whenever you're ready."
+- End that final message with this exact marker on its own line:
 [ONBOARDING_COMPLETE]
+
+Do NOT wait until the absolute maximum turns. If the student signals readiness earlier, \
+wrap up sooner. The marker must appear in your last message.
+
+## Current state
+Exchange number: {turn_count} of maximum {max_turns}
+You opened with: "{opener_text}"
 """
 
 
@@ -118,6 +146,7 @@ def _build_system(name, target_lang, level, bg_lang, turn_count, opener_text):
         bg_lang=bg_lang,
         opener_text=opener_text,
         turn_count=turn_count,
+        nudge_turn=8,
         max_turns=_OB_MAX_TURNS,
     )
 
@@ -168,7 +197,8 @@ st.markdown("""<style>
   [data-testid="stCustomComponentV1"] iframe{
     position:fixed!important;top:0!important;left:320px!important;
     height:100vh!important;width:calc(100vw - 320px)!important;
-    border:none!important;display:block!important;margin:0!important}
+    border:none!important;display:block!important;margin:0!important;
+    z-index:1!important}
   [data-stale="true"],[data-stale="true"] *{opacity:1!important;transition:none!important}
 
   /* Chat animations */
@@ -208,12 +238,13 @@ st.markdown("""<style>
 
 # ── User settings ──────────────────────────────────────────────────────────────
 
-name        = st.session_state.get("s_name",        SETTINGS_DEFAULTS["s_name"])
-level       = st.session_state.get("s_level",       SETTINGS_DEFAULTS["s_level"])
-bg_lang     = st.session_state.get("s_bg_lang",     SETTINGS_DEFAULTS["s_bg_lang"])
-target_lang = st.session_state.get("s_language",    SETTINGS_DEFAULTS["s_language"])
-model_label = st.session_state.get("s_model_label", SETTINGS_DEFAULTS["s_model_label"])
-model_id    = MODELS[model_label]
+tutor = Tutor.from_session(st.session_state)
+
+name        = tutor.name
+level       = tutor.level
+bg_lang     = tutor.bg_lang
+target_lang = tutor.target_lang
+model_id    = tutor.model_id
 
 # ── Session state ──────────────────────────────────────────────────────────────
 
@@ -251,15 +282,81 @@ def _start_proxy():
 
 _start_proxy()
 
+
+def _save_profile_now() -> None:
+    """Build / update the knowledge profile from the current ob_log and persist it.
+    Safe to call multiple times — skips if already saved or if no log exists.
+    """
+    if st.session_state.ob_profile_saved:
+        return
+    if not st.session_state.ob_log:
+        return
+    if "sb_user_id" not in st.session_state or not CLAUDE_KEY:
+        return
+
+    full_log = []
+    if st.session_state.ob_opener_text:
+        full_log.append({"who": "tutor", "text": st.session_state.ob_opener_text})
+    full_log.extend(st.session_state.ob_log)
+
+    current_profile = load_knowledge_profile(
+        st.session_state.sb_user_id,
+        st.session_state.sb_access_token,
+    )
+
+    import requests as _req
+    _sess = _req.Session()
+    _sess.verify = False
+
+    updated = update_knowledge_profile(
+        current_profile,
+        name, level, target_lang, bg_lang,
+        full_log, [],
+        CLAUDE_KEY,
+        model=model_id,
+        http_session=_sess,
+    )
+
+    # Only mark as saved when Claude returned a real profile.
+    # On any silent failure update_knowledge_profile returns current_profile ({}
+    # for first session), so _profile_is_real will be False and we leave
+    # ob_profile_saved=False — next button click or completion trigger will retry.
+    _profile_is_real = any(
+        isinstance(v, dict) and v.get("content", "").strip()
+        for v in updated.values()
+    )
+    if not _profile_is_real:
+        return
+
+    save_knowledge_profile(
+        st.session_state.sb_user_id,
+        st.session_state.sb_access_token,
+        updated,
+    )
+    st.session_state["knowledge_profile"] = updated
+    st.session_state.ob_profile_saved = True
+
+    _sync = _infer_settings(updated)
+    if _sync:
+        st.session_state.update(_sync)
+        from db import upsert_profile
+        upsert_profile(
+            st.session_state.sb_user_id,
+            st.session_state.sb_access_token,
+            _sync,
+        )
+
+
 # ── Opener: generate TTS for Alex's opening greeting ──────────────────────────
 # Triggered on the rerun after ob_started first becomes True.
 
 if st.session_state.ob_started and not st.session_state.ob_opener_loaded:
-    opener_text = _OPENER.format(name=name)
+    opener_text = _OPENER.format(name=name, target_lang=target_lang,
+                                  level=level, bg_lang=bg_lang)
     st.session_state.ob_opener_text = opener_text
 
     if ELEVEN_KEY:
-        b64 = character_tts_b64(opener_text, _OB_VOICE_ID, ELEVEN_KEY, lang_code=_OB_TTS_LANG)
+        b64 = character_tts_b64(opener_text, tutor.voice_id, ELEVEN_KEY, lang_code="")
         if b64:
             st.session_state.ob_last_chunks    = [b64]
             st.session_state.ob_tutor_play_seq += 1
@@ -331,34 +428,45 @@ with st.sidebar:
                     f"{txt}</div></div>"
                 )
         st.markdown("".join(parts), unsafe_allow_html=True)
+        # Embed log length so Streamlit always treats this as new content and re-executes.
+        components.html(f"""<script>
+(function(){{
+  var _len={len(log)};  // changes each rerun, forcing re-execution
+  function scroll(){{
+    var s=window.parent.document.querySelector('[data-testid="stSidebar"]>div:first-child');
+    if(s) s.scrollTop=s.scrollHeight;
+  }}
+  scroll(); setTimeout(scroll,120); setTimeout(scroll,350);
+}})();
+</script>""", height=0)
 
-    # Completion banner
+    # Completion banner — no extra button; tutor already told the student to press Finish
     if st.session_state.ob_complete:
-        _is_new = st.session_state.get("is_new_user", False)
         st.markdown(
             "<div style='margin:10px 12px;padding:14px 16px;"
             "background:rgba(13,148,136,.1);border:1px solid rgba(13,148,136,.3);"
             "border-radius:12px;font:500 12px Inter;color:#0d9488;line-height:1.5'>"
-            + ("Great chat! Your profile is saved. Let's finish setting up your account."
-               if _is_new else
-               "Great chat! Your profile has been saved. Ready to start learning!")
-            + "</div>",
+            "Great chat! Your profile has been saved. Press Finish Onboarding below whenever you're ready."
+            "</div>",
             unsafe_allow_html=True,
         )
-        _btn_label = "⚙ Go to Settings →" if _is_new else "🚀 Start Learning →"
-        _btn_dest  = "pages/account.py"   if _is_new else "pages/home.py"
-        if st.button(_btn_label, type="primary", use_container_width=True):
-            st.switch_page(_btn_dest)
 
-    # Error
+    # Error — dismissable so the student can simply try speaking again
     if st.session_state.ob_error:
-        st.markdown(
-            f"<div style='margin:8px 12px;padding:8px 10px;"
-            f"background:rgba(220,38,38,.08);border-radius:8px;"
-            f"color:#dc2626;font-size:11px;word-break:break-word'>"
-            f"⚠ {st.session_state.ob_error}</div>",
-            unsafe_allow_html=True,
-        )
+        _ecol1, _ecol2 = st.columns([6, 1])
+        with _ecol1:
+            st.markdown(
+                "<div style='margin:8px 0;padding:8px 10px;"
+                "background:rgba(220,38,38,.08);border-radius:8px;"
+                "color:#dc2626;font-size:11px'>"
+                "⚠ Something went wrong — please try speaking again."
+                "</div>",
+                unsafe_allow_html=True,
+            )
+        with _ecol2:
+            if st.button("✕", key="btn_clear_error", help="Dismiss"):
+                st.session_state.ob_error = None
+                st.rerun()
 
     # Reset all knowledge — pinned above Finish
     if st.button("🗑 Reset all knowledge", key="btn_reset_knowledge", use_container_width=True):
@@ -372,10 +480,47 @@ with st.sidebar:
                    "ob_started", "ob_opener_loaded", "ob_opener_text", "ob_profile_saved",
                    "ob_error", "knowledge_profile", "onboarding_checked"]:
             st.session_state.pop(k, None)
+        components.html("<script>try{localStorage.removeItem('sp_mic_tip_ok')}catch(e){}</script>", height=0)
         st.rerun()
 
     # Finish onboarding — pinned to bottom
     if st.button("✅ Finish Onboarding", key="btn_ob_home", use_container_width=True):
+        # Profile is saved during [ONBOARDING_COMPLETE] processing (primary path).
+        # If not yet saved (user left early or completion save failed), do a best-effort
+        # background save so we never block navigation on an API call.
+        if not st.session_state.ob_profile_saved and st.session_state.ob_log and CLAUDE_KEY \
+                and "sb_user_id" in st.session_state:
+            import threading as _th
+            _snap = dict(
+                current_profile=load_knowledge_profile(
+                    st.session_state.sb_user_id, st.session_state.sb_access_token),
+                name=name, level=level, target_lang=target_lang, bg_lang=bg_lang,
+                full_log=(
+                    [{"who": "tutor", "text": st.session_state.ob_opener_text}]
+                    if st.session_state.ob_opener_text else []
+                ) + list(st.session_state.ob_log),
+                user_id=st.session_state.sb_user_id,
+                token=st.session_state.sb_access_token,
+                claude_key=CLAUDE_KEY,
+                model_id=model_id,
+            )
+            def _bg_save(snap=_snap):
+                import requests as _req
+                _sess = _req.Session(); _sess.verify = False
+                updated = update_knowledge_profile(
+                    snap["current_profile"], snap["name"], snap["level"],
+                    snap["target_lang"], snap["bg_lang"],
+                    snap["full_log"], [], snap["claude_key"],
+                    model=snap["model_id"], http_session=_sess,
+                )
+                _real = any(
+                    isinstance(v, dict) and v.get("content", "").strip()
+                    for v in updated.values()
+                )
+                if _real:
+                    save_knowledge_profile(snap["user_id"], snap["token"], updated)
+            _th.Thread(target=_bg_save, daemon=True).start()
+
         if st.session_state.get("is_new_user"):
             st.switch_page("pages/telegram_settings.py")
         else:
@@ -410,6 +555,53 @@ else:
         mic_props["ws_token"] = ws_token
 
 transcript_raw = mic(key="ob_mic", **mic_props)
+
+# ── Mic tip overlay — shown before first speech, dismissed via localStorage ────
+if not st.session_state.ob_started:
+    st.markdown("""
+<div id="mic-tip-wrap" style="
+    position:fixed;inset:0;z-index:10000;pointer-events:none;
+    display:flex;align-items:flex-end;justify-content:center;
+    padding-bottom:136px;padding-left:320px;
+">
+  <div id="mic-tip" style="
+    pointer-events:auto;
+    background:#111827;color:#fff;
+    border-radius:14px;padding:14px 18px 12px;
+    font:500 13px/1.5 'Inter',sans-serif;
+    max-width:216px;text-align:center;
+    box-shadow:0 8px 32px rgba(0,0,0,.35);
+    position:relative;
+  ">
+    <div style="font:700 14px 'Inter';margin-bottom:6px">🎙️ Using the mic</div>
+    <div style="font:400 12px/1.6 'Inter';opacity:.9">
+      Press the mic button to unmute,<br>then start speaking.<br>
+      It turns <span style="color:#38bdf8;font-weight:600">blue</span> while it's listening.
+    </div>
+    <button onclick="
+      document.getElementById('mic-tip-wrap').style.display='none';
+      try{localStorage.setItem('sp_mic_tip_ok','1')}catch(e){}
+    " style="
+      margin-top:12px;
+      background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.28);
+      color:#fff;border-radius:8px;padding:5px 0;
+      font:600 12px 'Inter';cursor:pointer;width:100%;
+    ">Got it ✓</button>
+    <div style="
+      position:absolute;bottom:-9px;left:50%;transform:translateX(-50%);
+      width:0;height:0;
+      border-left:9px solid transparent;border-right:9px solid transparent;
+      border-top:9px solid #111827;
+    "></div>
+  </div>
+</div>
+<script>
+(function(){
+  try{if(localStorage.getItem('sp_mic_tip_ok')){
+    var w=document.getElementById('mic-tip-wrap');if(w)w.style.display='none';
+  }}catch(e){}
+})();
+</script>""", unsafe_allow_html=True)
 
 # ── Handle VAD output ──────────────────────────────────────────────────────────
 
@@ -446,16 +638,13 @@ if student_text and not st.session_state.ob_complete:
         all_chunks = []
         raw_text   = ""
 
-        for raw_text, chunk_b64, _ in run_pipeline_stream(
+        for raw_text, chunk_b64, _ in tutor.stream(
                 system,
                 student_text,
                 st.session_state.ob_chat,
-                _OB_VOICE_ID,
                 CLAUDE_KEY,
                 ELEVEN_KEY,
-                model=model_id,
-                use_structured=False,
-                lang_code=_OB_TTS_LANG):
+                use_structured=False):
             if chunk_b64:
                 all_chunks.append(chunk_b64)
 
@@ -483,45 +672,9 @@ if student_text and not st.session_state.ob_complete:
             st.session_state.ob_tutor_play_seq += 1
 
         # ── Handle completion ──────────────────────────────────────────────────
-        if onboarding_done and not st.session_state.ob_profile_saved:
-            st.session_state.ob_complete     = True
-            st.session_state.ob_profile_saved = True
-
-            if "sb_user_id" in st.session_state and CLAUDE_KEY:
-                # Build full log including the opener for the profile update
-                full_log = []
-                if st.session_state.ob_opener_text:
-                    full_log.append({"who": "tutor", "text": st.session_state.ob_opener_text})
-                full_log.extend(st.session_state.ob_log)
-
-                current_profile = load_knowledge_profile(
-                    st.session_state.sb_user_id,
-                    st.session_state.sb_access_token,
-                )
-                updated = update_knowledge_profile(
-                    current_profile,
-                    name, level, target_lang, bg_lang,
-                    full_log, [],   # no error log for onboarding
-                    CLAUDE_KEY,
-                    model=model_id,
-                )
-                save_knowledge_profile(
-                    st.session_state.sb_user_id,
-                    st.session_state.sb_access_token,
-                    updated,
-                )
-                st.session_state["knowledge_profile"] = updated
-
-                # Sync inferred settings back to session state + Supabase profile
-                _sync = _infer_settings(updated)
-                if _sync:
-                    st.session_state.update(_sync)
-                    from db import upsert_profile
-                    upsert_profile(
-                        st.session_state.sb_user_id,
-                        st.session_state.sb_access_token,
-                        _sync,
-                    )
+        if onboarding_done:
+            st.session_state.ob_complete = True
+            _save_profile_now()   # idempotent — marks ob_profile_saved itself
 
     except Exception as e:
         st.session_state.ob_thinking    = False

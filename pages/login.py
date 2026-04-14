@@ -1,9 +1,15 @@
 import streamlit as st
-from db import sign_in, sign_up
+from db import sign_in, sign_up, send_reset_email
 from pipeline import SETTINGS_DEFAULTS
 
 st.set_page_config(page_title="Login — SpeakPals", page_icon="🔑",
                    layout="centered", initial_sidebar_state="collapsed")
+
+# CookieController is not rendered on the login page (see app.py), so there
+# are no spurious reruns and no double flash. If the user already has an active
+# session (e.g. navigated here manually), send them to home immediately.
+if "sb_user_id" in st.session_state:
+    st.switch_page("pages/home.py")
 
 st.markdown("""<style>
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
@@ -56,7 +62,7 @@ st.markdown("""
 </div>""", unsafe_allow_html=True)
 
 # ── Tabs ──────────────────────────────────────────────────────────────────────
-tab_login, tab_register = st.tabs(["Sign in", "Create account"])
+tab_login, tab_register, tab_forgot = st.tabs(["Sign in", "Create account", "Forgot password"])
 
 # ── Sign in ───────────────────────────────────────────────────────────────────
 with tab_login:
@@ -81,19 +87,72 @@ with tab_login:
                 st.switch_page("pages/home.py")
 
 # ── Create account ────────────────────────────────────────────────────────────
+_BG_LANGS   = ["English", "German", "Spanish", "French", "Dutch", "Swedish", "Other"]
+_CEFR_LEVELS = ["A1", "A2", "B1", "B2", "C1", "C2"]
+
 with tab_register:
-    with st.form("register_form"):
-        reg_email    = st.text_input("Email", key="reg_email", placeholder="you@example.com")
-        reg_password = st.text_input("Password", key="reg_pw", type="password",
-                                     placeholder="At least 6 characters")
-        reg_confirm  = st.text_input("Confirm password", key="reg_confirm", type="password",
-                                     placeholder="••••••••")
-        st.markdown("<div style='height:4px'></div>", unsafe_allow_html=True)
-        reg_submitted = st.form_submit_button("Create account", use_container_width=True)
+    # Note: intentionally NOT using st.form here — forms batch widget interactions,
+    # which prevents the conditional "Other" language field from appearing reactively.
+    reg_name     = st.text_input("First name *", key="reg_name")
+    reg_email    = st.text_input("Email *", key="reg_email", placeholder="you@example.com")
+    reg_password = st.text_input("Password *", key="reg_pw", type="password",
+                                 placeholder="At least 6 characters")
+    reg_confirm  = st.text_input("Confirm password *", key="reg_confirm", type="password",
+                                 placeholder="••••••••")
+    reg_bg_sel   = st.selectbox(
+        "Main language background *",
+        _BG_LANGS,
+        help=(
+            "The language you speak best — your native tongue or the language you are "
+            "most fluent in. Your tutor uses this to explain concepts in a way that "
+            "makes sense for someone with your background, and to spot typical mistakes "
+            "speakers of your language tend to make."
+        ),
+        key="reg_bg_sel",
+    )
+    if reg_bg_sel == "Other":
+        reg_bg_other = st.text_input(
+            "Specify your language *",
+            key="reg_bg_other",
+            placeholder="e.g. Turkish, Arabic, Hindi…",
+        )
+    else:
+        reg_bg_other = ""
+    reg_level    = st.selectbox(
+        "Estimated language level (CEFR) *",
+        _CEFR_LEVELS,
+        help=(
+            "Your current level in the language you want to learn, on the Common "
+            "European Framework of Reference scale.\n\n"
+            "A1 — complete beginner\n"
+            "A2 — basic phrases\n"
+            "B1 — can handle simple conversations\n"
+            "B2 — comfortable in most situations\n"
+            "C1 — advanced, near-fluent\n"
+            "C2 — mastery, near-native\n\n"
+            "An educated guess is fine — your tutor will adapt."
+        ),
+        key="reg_level",
+    )
+    st.markdown(
+        "<div style='font:400 11px Inter;color:rgba(17,24,39,.4);margin-top:2px;"
+        "margin-bottom:12px'>* Required field</div>",
+        unsafe_allow_html=True,
+    )
+    reg_submitted = st.button("Create account", use_container_width=True, key="btn_register")
 
     if reg_submitted:
-        if not reg_email or not reg_password or not reg_confirm:
-            st.error("Please fill in all fields.")
+        _bg_lang_val = reg_bg_other.strip() if reg_bg_sel == "Other" else reg_bg_sel
+        if not reg_name.strip():
+            st.error("First name is required.")
+        elif not reg_email.strip():
+            st.error("Email is required.")
+        elif not reg_password:
+            st.error("Password is required.")
+        elif not reg_confirm:
+            st.error("Please confirm your password.")
+        elif reg_bg_sel == "Other" and not reg_bg_other.strip():
+            st.error("Please specify your language in the field above.")
         elif len(reg_password) < 6:
             st.error("Password must be at least 6 characters.")
         elif reg_password != reg_confirm:
@@ -106,14 +165,61 @@ with tab_register:
                 # Try to auto-login immediately (works when email confirmation is disabled)
                 session, login_err = sign_in(reg_email.strip(), reg_password)
                 if session:
+                    from db import upsert_profile
                     st.session_state.sb_access_token  = session["access_token"]
                     st.session_state.sb_refresh_token = session["refresh_token"]
                     st.session_state.sb_user_id       = session["user_id"]
                     st.session_state.sb_email         = session["email"]
+                    st.session_state["s_name"]        = reg_name.strip()
+                    st.session_state["s_bg_lang"]     = _bg_lang_val
+                    st.session_state["s_level"]       = reg_level
                     st.session_state["is_new_user"]   = True
+                    # Persist to DB so tutors and settings see these values immediately
+                    upsert_profile(session["user_id"], session["access_token"], {
+                        "s_name":    reg_name.strip(),
+                        "s_bg_lang": _bg_lang_val,
+                        "s_level":   reg_level,
+                    })
                     st.switch_page("pages/onboarding.py")
                 else:
                     st.success(
                         "Account created! Check your email for a confirmation link, "
                         "then sign in."
                     )
+
+# ── Forgot password ───────────────────────────────────────────────────────────
+with tab_forgot:
+    st.markdown(
+        "<div style='font:400 13px Inter;color:rgba(17,24,39,.55);margin-bottom:16px'>"
+        "We'll send a reset link to your email address.</div>",
+        unsafe_allow_html=True,
+    )
+    with st.form("forgot_form"):
+        forgot_email = st.text_input("Email", key="forgot_email", placeholder="you@example.com")
+        st.markdown("<div style='height:4px'></div>", unsafe_allow_html=True)
+        forgot_submitted = st.form_submit_button("Send reset link", use_container_width=True)
+
+    if forgot_submitted:
+        if not forgot_email.strip():
+            st.error("Please enter your email address.")
+        else:
+            # Build the redirect URL — prefer APP_URL secret, fall back to
+            # reading the Host header so no secret is required on Streamlit Cloud.
+            try:
+                _base = st.secrets.get("APP_URL", "").rstrip("/")
+            except Exception:
+                _base = ""
+            if not _base:
+                try:
+                    _host = st.context.headers.get("host", "")
+                    if _host:
+                        _local = _host.startswith("localhost") or _host.startswith("127.")
+                        _base = f"{'http' if _local else 'https'}://{_host}"
+                except Exception:
+                    pass
+            _redirect = f"{_base}/reset_password" if _base else ""
+            _err = send_reset_email(forgot_email.strip(), redirect_to=_redirect)
+            if _err:
+                st.error(f"Could not send reset email: {_err}")
+            else:
+                st.success("Check your inbox — a reset link is on its way.")

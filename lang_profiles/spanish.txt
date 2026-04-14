@@ -1,0 +1,162 @@
+# Language Background: Spanish → Danish
+
+## How to use this profile
+Spanish and Danish share almost no direct vocabulary — they come from entirely different branches
+(Romance vs. North Germanic). However, Spanish speakers bring real strengths: strong phonetic
+awareness, good intuition for grammatical gender, and a culture of expressive communication.
+Build on these. Expect the pronunciation gaps and the V2 word order to be the hardest walls.
+
+---
+
+## A1 — Instant wins: cognates the student can use from day one
+
+These words share Latin roots that reached both Spanish and Danish (often via English/French):
+
+| Spanish | Danish | Note |
+|---------|--------|------|
+| problema | problem | nearly identical |
+| hotel | hotel | identical |
+| hospital | hospital | identical |
+| música | musik | recognisable |
+| familia | familie | close |
+| teléfono | telefon | close |
+| computadora | computer | recognisable |
+| internet | internet | identical |
+| taxi | taxa | very close |
+| bus | bus | identical |
+| banco | bank | same root |
+| número | nummer | close |
+| animal | dyr (animal) | note: Danish word differs; but animal = animal is used too |
+| natural | naturlig | same root |
+| possible | mulig | note: differs, but "possible" = "mulig" |
+| normal | normal | identical |
+| restaurante | restaurant | near-identical |
+| lista | liste | close |
+| momento | moment | close |
+| color | farve | note: differs — farve is the Danish word |
+| centro | center | close |
+
+### A1 Core vocabulary by topic
+
+**Greetings:**
+- Hola → Hej (sounds like "hi")
+- Buenos días → Godmorgen
+- Adiós → Hej hej / Farvel
+- Gracias → Tak
+- Por favor → Vær så venlig / tak
+- Sí → Ja | No → Nej
+
+**Numbers 1–10:** en/et, to, tre, fire, fem, seks, syv, otte, ni, ti
+
+**Colors:**
+- rojo = rød | azul = blå | verde = grøn | amarillo = gul
+- negro = sort | blanco = hvid | marrón = brun | gris = grå
+
+**Family:**
+- madre = mor | padre = far | hermana = søster | hermano = bror
+- hijo/a = barn | familia = familie
+
+**Food & drink:**
+- pan = brød | leche = mælk | agua = vand | cerveza = øl
+- manzana = æble | pescado = fisk | carne = kød | huevo = æg
+
+---
+
+## A2 — Grammar comparisons for Spanish speakers
+
+### What is EASIER in Danish than Spanish:
+- **Verb conjugation:** Spanish: como / comes / come / comemos / coméis / comen →
+  Danish: spiser / spiser / spiser — same form for all persons. Relief for Spanish speakers.
+- **No subjunctive mood at A2:** Danish subjunctive is rare; don't worry about it early.
+- **No complex verb tenses:** Danish past is simple (spiste) vs. Spanish preterite/imperfect split.
+- **No gendered adjectives:** Danish adjectives don't change form for gender/person.
+
+### What is HARDER — explain these carefully:
+
+**1. Grammatical gender: en/et (not masculine/feminine)**
+Spanish has masculine (el/un) and feminine (la/una). Danish has common (en) and neuter (et).
+The split does not follow the same pattern — "en mand" (a man) is common, "et barn" (a child) is neuter.
+The article must be memorised with each noun.
+Teaching tip: always teach noun + article as a pair.
+
+**2. Definite article as a suffix**
+Spanish uses a separate article: el perro (the dog). Danish attaches it to the end:
+- en hund (a dog) → hunden (the dog)
+- et hus (a house) → huset (the house)
+Teaching tip: practise "a dog / the dog" pairs from day one.
+
+**3. V2 word order (verb second)**
+Spanish is flexible with SVO: "Ayer fui al colegio" is natural.
+Danish requires the verb second: "I går gik jeg i skole." (verb must come second in the sentence)
+This is the most persistent error for Spanish speakers — they put the subject first instinctively.
+
+**4. Negation position**
+Spanish: "No como carne." (no before verb)
+Danish: "Jeg spiser ikke kød." (ikke after the verb)
+
+**5. Stød (glottal stop)**
+No equivalent in Spanish. A creaky break in the voice that changes word meaning.
+"Hund" (dog) vs. "hun" (she) — distinguished partly by stød. Train the ear early; speaking
+approximation is acceptable at A2.
+
+### A2 Key grammar structures to practise:
+- Present tense: spise → jeg spiser, du spiser, han spiser (same for all persons)
+- Past tense: spiste (regular), var (was), fik (got), gik (went)
+- Question formation: Spiser du? (verb first — same inversion logic as Spanish ¿Comes tú?)
+- Negation: ikke (not), aldrig (never), ingen (none)
+
+### A2 Vocabulary expansion — everyday life:
+**Transport:** bus, tog (train), cykel (bicycle), bil (car), fly (plane)
+**Shopping:** butik (shop), pris (price), billig (cheap), dyr (expensive), købe (to buy)
+**Time:** i dag (today), i morgen (tomorrow), i går (yesterday), nu (now), snart (soon)
+**Weather:** sol (sun), regn (rain), sne (snow), vind (wind), koldt (cold), varmt (warm)
+**Home:** køkken (kitchen), stue (living room), soveværelse (bedroom), badeværelse (bathroom)
+
+---
+
+## B1 — Advanced connections and nuances
+
+### Idiomatic expressions (with Spanish equivalents):
+- "Det er lige meget" = "Da igual" (it doesn't matter)
+- "Hvad så?" = "¿Y qué?" / "¿Qué tal?" (so what / what's up)
+- "Gå op i røg" = "Irse al traste" (go up in smoke — similar concept)
+- "Slå to fluer med ét smæk" = "Matar dos pájaros de un tiro" (kill two birds — identical concept!)
+- "Tage det roligt" = "Tomárselo con calma" (take it easy)
+- "Koste en arm og et ben" = "Costar un ojo de la cara" (cost a fortune — same concept, different body parts)
+- "Gøre en bjørnetjeneste" = "Hacer un flaco favor" (do a disservice)
+- "Komme til sagen" = "Ir al grano" (get to the point)
+
+### B1 Grammar nuances:
+- **Passive voice:** Bogen læses (The book is read) vs. Bogen bliver læst (active passive)
+- **Modal verbs in past:** kunne (could), måtte (had to), ville (wanted to), skulle (was supposed to)
+- **Relative clauses:** "Manden, som/der bor her..." (el hombre que vive aquí)
+- **Subordinate clause word order:** "Jeg ved, at han ikke kommer" — ikke comes BEFORE the verb in subordinate clauses (opposite of main clause order)
+
+### B1 Register — formal vs. informal:
+- De (formal you) vs. du (informal) — similar concept to usted vs. tú
+- Danish informal register is extremely common even in professional settings — Danes use du universally
+
+### False friends — warn the student immediately:
+| Danish | What it means | Spanish false friend |
+|--------|--------------|---------------------|
+| gift | married / poison | regalo (gift = present in Spanish) |
+| fart | speed | pedo (fart in Spanish) |
+| mand | man / husband | man (same, actually fine) |
+| have | garden | haber/tener (have in Spanish) |
+| bad | bath | malo (bad in Spanish) |
+| blive | to stay / to become | vivir (sounds loosely like) |
+| eller | or | ella (she in Spanish — sounds close) |
+| slut | end / finish | slut (English false friend worth flagging) |
+
+### Pronunciation guide for Spanish speakers:
+- **Soft d (blødt d):** Between vowels, sounds like a very soft English "th" in "the". Similar to
+  Spanish intervocalic "d" in "nada" — Spanish speakers often get this right instinctively. Use this!
+- **Stød (glottal stop):** No equivalent in Spanish. Describe it as a brief catch in the throat.
+  Drill: hund, mand, sol with stød variants.
+- **å sound:** Spanish speakers: say the "o" in "sol" but with rounded lips pushed further forward.
+  Practice: å, år, gå, stå, kål.
+- **ø sound:** No equivalent in Spanish. Say the "e" in "mesa" while rounding your lips as if saying "o".
+  Practice: grøn, øl, søster, størrelse.
+- **æ sound:** Similar to the "e" in "mesa" but longer and more open. Practice: læse, æble.
+- **Danish r:** Not rolled like Spanish r. It's a soft, guttural sound made at the back of the throat.
+  Spanish speakers must unlearn the roll — it sounds wrong in Danish.

@@ -260,7 +260,9 @@ if (correct_log or coaching_log) and not st.session_state.get("current_session_i
 
         # Run tip + vocab extraction + profile update in parallel
         with ThreadPoolExecutor(max_workers=3) as ex:
-            fut_tip     = ex.submit(generate_language_tip, all_lines, _bg_lang, CLAUDE_KEY)
+            _bg_ctx = BG_LANG_TIPS.get(_target_lang, {}).get(_bg_lang, ("", ""))[1]
+            fut_tip = ex.submit(generate_language_tip, all_lines, _bg_lang, CLAUDE_KEY,
+                                bg_context=_bg_ctx)
             fut_vocab   = ex.submit(extract_vocabulary, all_lines, _bg_lang, _level, CLAUDE_KEY)
             fut_profile = ex.submit(
                 update_knowledge_profile,
@@ -328,6 +330,8 @@ if (correct_log or coaching_log) and not st.session_state.get("current_session_i
                 st.session_state.sb_access_token,
                 _updated_profile,
             )
+            # Keep session state fresh so the next lesson sees the updated profile
+            st.session_state["knowledge_profile"] = _updated_profile
         save_session(
             st.session_state.sb_user_id,
             st.session_state.sb_access_token,
