@@ -21,8 +21,7 @@ st.set_page_config(page_title="Settings — SpeakPals", page_icon="⚙", layout=
                    initial_sidebar_state="collapsed")
 
 st.markdown("""<style>
-  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
-  html,body{font-family:'Inter',sans-serif!important}
+  html,body{font-family:system-ui,-apple-system,BlinkMacSystemFont,Roboto,sans-serif!important}
   #MainMenu,footer,[data-testid="stToolbar"]{visibility:hidden}
   [data-testid="stHeader"],header,.stAppHeader{display:none!important}
   [data-testid="collapsedControl"],[data-testid="stSidebarCollapseButton"],
@@ -64,7 +63,7 @@ st.markdown("""<style>
   div[data-testid="stVerticalBlock"]{gap:0.5rem!important}
 
   .sec-div{height:1px;background:rgba(17,24,39,.1);margin:22px 0 18px}
-  .sec-label{font:700 10px 'Inter',sans-serif;letter-spacing:2px;
+  .sec-label{font:700 10px system-ui,-apple-system,BlinkMacSystemFont,Roboto,sans-serif;letter-spacing:2px;
     color:rgba(17,24,39,.4);text-transform:uppercase;margin:0 0 10px}
 
   /* Profile expander cards */
@@ -76,7 +75,7 @@ st.markdown("""<style>
     box-shadow:0 3px 12px rgba(13,148,136,.12)!important;
     border-color:rgba(13,148,136,.25)!important}
   [data-testid="stExpander"] summary{
-    padding:14px 16px!important;font:600 13px Inter,sans-serif!important;color:#111827!important}
+    padding:14px 16px!important;font:600 13px system-ui,-apple-system,BlinkMacSystemFont,Roboto,sans-serif!important;color:#111827!important}
   [data-testid="stExpander"] summary:hover{background:rgba(13,148,136,.04)!important}
   [data-testid="stExpanderDetails"]{
     padding:0 16px 16px!important;border-top:1px solid rgba(17,24,39,.07)!important}
@@ -85,9 +84,9 @@ st.markdown("""<style>
 # ── Page header ────────────────────────────────────────────────────────────────
 st.markdown("""
 <div style='padding:4px 0 28px'>
-  <div style='font:800 26px/1 Inter,sans-serif;color:#111827;letter-spacing:-.5px;
+  <div style='font:800 26px/1 system-ui,-apple-system,BlinkMacSystemFont,Roboto,sans-serif;color:#111827;letter-spacing:-.5px;
               margin-bottom:6px'>⚙ Settings</div>
-  <div style='font:400 13px Inter;color:rgba(17,24,39,.55)'>
+  <div style='font:400 13px system-ui;color:rgba(17,24,39,.55)'>
     Personalise your SpeakPals experience
   </div>
 </div>""", unsafe_allow_html=True)
@@ -167,7 +166,7 @@ affected = [s["title"] for s in SCENE_CATALOG if scene_primary.get(s["key"]) == 
 if affected:
     st.markdown(
         f"<div style='background:rgba(13,148,136,.07);border:1px solid rgba(13,148,136,.2);"
-        f"border-radius:10px;padding:10px 14px;margin-top:4px;font:400 12px Inter;"
+        f"border-radius:10px;padding:10px 14px;margin-top:4px;font:400 12px system-ui;"
         f"color:rgba(17,24,39,.65)'>"
         f"Auto-swap: <span style='color:#0d9488'>{', '.join(affected)}</span> "
         f"will use a different character voice to avoid your tutor voice.</div>",
@@ -192,10 +191,10 @@ if _is_new_user:
 <div style='background:linear-gradient(135deg,rgba(13,148,136,.1),rgba(13,148,136,.04));
             border:1px solid rgba(13,148,136,.3);border-radius:14px;
             padding:16px 18px;margin-bottom:16px'>
-  <div style='font:700 13px Inter;color:#0d9488;margin-bottom:6px'>
+  <div style='font:700 13px system-ui;color:#0d9488;margin-bottom:6px'>
     👋 One more step — connect your tools
   </div>
-  <div style='font:400 13px/1.65 Inter;color:rgba(17,24,39,.65)'>
+  <div style='font:400 13px/1.65 system-ui;color:rgba(17,24,39,.65)'>
     Link your <strong>Telegram</strong> to get lessons on the go, and connect
     <strong>Google Calendar</strong> so your tutor can build conversations around your upcoming
     events. Both are optional — but they make SpeakPals much more personal.
@@ -203,7 +202,7 @@ if _is_new_user:
 </div>""", unsafe_allow_html=True)
 else:
     st.markdown(
-        "<div style='font:400 12px/1.6 Inter;color:rgba(17,24,39,.5);margin-bottom:12px'>"
+        "<div style='font:400 12px/1.6 system-ui;color:rgba(17,24,39,.5);margin-bottom:12px'>"
         "Connect Telegram for lessons on the go, and Google Calendar so your tutor can "
         "build conversations around your real life.</div>",
         unsafe_allow_html=True
@@ -221,10 +220,10 @@ st.markdown("""
 <div style='background:linear-gradient(135deg,rgba(13,148,136,.08),rgba(13,148,136,.03));
             border:1px solid rgba(13,148,136,.22);border-radius:14px;
             padding:16px 18px;margin-bottom:14px'>
-  <div style='font:700 13px Inter;color:#0d9488;margin-bottom:6px'>
+  <div style='font:700 13px system-ui;color:#0d9488;margin-bottom:6px'>
     🧠 Your tutor remembers you
   </div>
-  <div style='font:400 13px/1.65 Inter;color:rgba(17,24,39,.65)'>
+  <div style='font:400 13px/1.65 system-ui;color:rgba(17,24,39,.65)'>
     Every session, SpeakPals builds a richer picture of who you are and how you learn.
     Below is <strong>everything we store about you</strong> — fully transparent, always up to date.
   </div>
@@ -234,7 +233,7 @@ st.markdown("""
             border-radius:12px;padding:12px 16px;margin-bottom:20px;
             display:flex;gap:10px;align-items:flex-start'>
   <span style='font-size:16px;flex-shrink:0'>🔒</span>
-  <div style='font:400 12px/1.6 Inter;color:rgba(17,24,39,.65)'>
+  <div style='font:400 12px/1.6 system-ui;color:rgba(17,24,39,.65)'>
     <strong style='color:#92400e'>Your data stays yours.</strong>
     This profile is stored securely and used exclusively to personalise your experience
     inside SpeakPals. It is never shared with third parties, never sold, and never used
@@ -296,7 +295,7 @@ for _key, _icon, _label, _desc in _CATEGORIES:
 
     with st.expander(f"{_icon} **{_label}** &nbsp; {_dot} *{_status}*", expanded=False):
         st.markdown(
-            f"<div style='font:400 12px/1.6 Inter;color:rgba(17,24,39,.5);"
+            f"<div style='font:400 12px/1.6 system-ui;color:rgba(17,24,39,.5);"
             f"margin:4px 0 10px;font-style:italic'>{_desc}</div>",
             unsafe_allow_html=True,
         )
@@ -304,7 +303,7 @@ for _key, _icon, _label, _desc in _CATEGORIES:
             st.markdown(_content)   # renders bullet lists, bold, etc. natively
         else:
             st.markdown(
-                "<div style='font:400 13px Inter;color:rgba(17,24,39,.35);"
+                "<div style='font:400 13px system-ui;color:rgba(17,24,39,.35);"
                 "font-style:italic;padding:4px 0'>"
                 "Nothing recorded yet — this fills up as you practise and chat with your tutor."
                 "</div>",
@@ -315,7 +314,7 @@ _known_keys = {c[0] for c in _CATEGORIES}
 _custom     = {k: v for k, v in _kp.items() if k not in _known_keys}
 if _custom:
     st.markdown(
-        "<div style='font:700 10px Inter;letter-spacing:2px;text-transform:uppercase;"
+        "<div style='font:700 10px system-ui;letter-spacing:2px;text-transform:uppercase;"
         "color:rgba(17,24,39,.3);margin:18px 0 8px'>Also noted by your tutor</div>",
         unsafe_allow_html=True,
     )
@@ -338,8 +337,8 @@ else:
     st.markdown("""
 <div style='background:rgba(220,38,38,.07);border:1px solid rgba(220,38,38,.25);
             border-radius:12px;padding:14px 16px;margin-bottom:12px'>
-  <div style='font:700 13px Inter;color:#dc2626;margin-bottom:4px'>⚠ Are you sure?</div>
-  <div style='font:400 12px/1.6 Inter;color:rgba(17,24,39,.6)'>
+  <div style='font:700 13px system-ui;color:#dc2626;margin-bottom:4px'>⚠ Are you sure?</div>
+  <div style='font:400 12px/1.6 system-ui;color:rgba(17,24,39,.6)'>
     This will permanently delete everything SpeakPals knows about you —
     your learning history, personal context, and all tutor observations.
     Your account and lesson settings are not affected.
@@ -385,7 +384,7 @@ if not _email and "sb_access_token" in st.session_state:
         st.session_state["sb_email"] = _email
 
 st.markdown(
-    f"<div style='font:400 12px Inter;color:rgba(17,24,39,.5);margin-bottom:10px'>"
+    f"<div style='font:400 12px system-ui;color:rgba(17,24,39,.5);margin-bottom:10px'>"
     f"Signed in as <strong>{_email or '—'}</strong></div>",
     unsafe_allow_html=True
 )

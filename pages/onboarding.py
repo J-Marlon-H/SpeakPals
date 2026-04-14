@@ -168,8 +168,7 @@ Object.keys(localStorage).forEach(function(k){
 </script>""", height=0)
 
 st.markdown("""<style>
-  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
-  html,body{font-family:'Inter',sans-serif!important}
+  html,body{font-family:system-ui,-apple-system,BlinkMacSystemFont,Roboto,sans-serif!important}
   #MainMenu,footer,[data-testid="stToolbar"]{visibility:hidden}
   [data-testid="collapsedControl"],[data-testid="stSidebarCollapseButton"],
   [data-testid="stSidebarNav"]{display:none!important}
@@ -373,9 +372,9 @@ with st.sidebar:
     # Header
     st.markdown(
         "<div style='padding:16px 16px 8px'>"
-        "<div style='font:800 18px/1.2 Inter,sans-serif;color:#111827;letter-spacing:-.3px'>"
+        "<div style='font:800 18px/1.2 system-ui,-apple-system,BlinkMacSystemFont,Roboto,sans-serif;color:#111827;letter-spacing:-.3px'>"
         "Welcome to SpeakPals 👋</div>"
-        f"<div style='font:500 12px Inter;color:rgba(17,24,39,.5);margin-top:4px'>"
+        f"<div style='font:500 12px system-ui;color:rgba(17,24,39,.5);margin-top:4px'>"
         f"Getting to know you, {name}</div>"
         "</div>",
         unsafe_allow_html=True,
@@ -413,7 +412,7 @@ with st.sidebar:
                     f"<div style='background:#ffffff;border:1px solid #e5e5e5;"
                     f"border-radius:12px 12px 12px 3px;padding:10px 12px;font-size:13px;"
                     f"line-height:1.5;color:#111827;word-break:break-word;{anim}'>"
-                    f"<span style='font:600 10px Inter;color:#9ca3af;display:block;"
+                    f"<span style='font:600 10px system-ui;color:#9ca3af;display:block;"
                     f"margin-bottom:4px;letter-spacing:.5px;text-transform:uppercase'>Tutor</span>"
                     f"{txt}</div></div>"
                 )
@@ -423,7 +422,7 @@ with st.sidebar:
                     f"<div style='background:rgba(13,148,136,.1);border:1px solid rgba(13,148,136,.2);"
                     f"border-radius:12px 12px 3px 12px;padding:10px 12px;font-size:13px;"
                     f"line-height:1.5;color:#0f3d39;word-break:break-word;{anim}'>"
-                    f"<span style='font:600 10px Inter;color:#0d9488;display:block;"
+                    f"<span style='font:600 10px system-ui;color:#0d9488;display:block;"
                     f"margin-bottom:4px;letter-spacing:.5px;text-transform:uppercase'>You</span>"
                     f"{txt}</div></div>"
                 )
@@ -445,7 +444,7 @@ with st.sidebar:
         st.markdown(
             "<div style='margin:10px 12px;padding:14px 16px;"
             "background:rgba(13,148,136,.1);border:1px solid rgba(13,148,136,.3);"
-            "border-radius:12px;font:500 12px Inter;color:#0d9488;line-height:1.5'>"
+            "border-radius:12px;font:500 12px system-ui;color:#0d9488;line-height:1.5'>"
             "Great chat! Your profile has been saved. Press Finish Onboarding below whenever you're ready."
             "</div>",
             unsafe_allow_html=True,
@@ -568,13 +567,13 @@ if not st.session_state.ob_started:
     pointer-events:auto;
     background:#111827;color:#fff;
     border-radius:14px;padding:14px 18px 12px;
-    font:500 13px/1.5 'Inter',sans-serif;
+    font:500 13px/1.5 system-ui,-apple-system,BlinkMacSystemFont,Roboto,sans-serif;
     max-width:216px;text-align:center;
     box-shadow:0 8px 32px rgba(0,0,0,.35);
     position:relative;
   ">
-    <div style="font:700 14px 'Inter';margin-bottom:6px">🎙️ Using the mic</div>
-    <div style="font:400 12px/1.6 'Inter';opacity:.9">
+    <div style="font:700 14px system-ui,-apple-system,BlinkMacSystemFont,Roboto,sans-serif;margin-bottom:6px">🎙️ Using the mic</div>
+    <div style="font:400 12px/1.6 system-ui,-apple-system,BlinkMacSystemFont,Roboto,sans-serif;opacity:.9">
       Press the mic button to unmute,<br>then start speaking.<br>
       It turns <span style="color:#38bdf8;font-weight:600">blue</span> while it's listening.
     </div>
@@ -585,7 +584,7 @@ if not st.session_state.ob_started:
       margin-top:12px;
       background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.28);
       color:#fff;border-radius:8px;padding:5px 0;
-      font:600 12px 'Inter';cursor:pointer;width:100%;
+      font:600 12px system-ui,-apple-system,BlinkMacSystemFont,Roboto,sans-serif;cursor:pointer;width:100%;
     ">Got it ✓</button>
     <div style="
       position:absolute;bottom:-9px;left:50%;transform:translateX(-50%);

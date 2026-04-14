@@ -12,8 +12,7 @@ st.set_page_config(page_title="Telegram — SpeakPals", page_icon="✈",
                    layout="centered", initial_sidebar_state="collapsed")
 
 st.markdown("""<style>
-  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
-  html,body{font-family:'Inter',sans-serif!important}
+  html,body{font-family:system-ui,-apple-system,BlinkMacSystemFont,Roboto,sans-serif!important}
   #MainMenu,footer,[data-testid="stToolbar"]{visibility:hidden}
   [data-testid="stHeader"],header,.stAppHeader{display:none!important}
   [data-testid="collapsedControl"],[data-testid="stSidebarCollapseButton"],
@@ -43,7 +42,7 @@ st.markdown("""<style>
 
   div[data-testid="stVerticalBlock"]{gap:0.5rem!important}
   .sec-div{height:1px;background:rgba(17,24,39,.1);margin:22px 0 18px}
-  .sec-label{font:700 10px 'Inter',sans-serif;letter-spacing:2px;
+  .sec-label{font:700 10px system-ui,-apple-system,BlinkMacSystemFont,Roboto,sans-serif;letter-spacing:2px;
     color:rgba(17,24,39,.4);text-transform:uppercase;margin:0 0 10px}
 
   .status-badge{
@@ -68,9 +67,9 @@ st.markdown("""<style>
 # ── Header ────────────────────────────────────────────────────────────────────
 st.markdown("""
 <div style='padding:4px 0 28px'>
-  <div style='font:800 26px/1 Inter,sans-serif;color:#111827;letter-spacing:-.5px;
+  <div style='font:800 26px/1 system-ui,-apple-system,BlinkMacSystemFont,Roboto,sans-serif;color:#111827;letter-spacing:-.5px;
               margin-bottom:6px'>✈ Telegram & Calendar</div>
-  <div style='font:400 13px Inter;color:rgba(17,24,39,.55)'>
+  <div style='font:400 13px system-ui;color:rgba(17,24,39,.55)'>
     Link your Telegram account and connect Google Calendar
   </div>
 </div>""", unsafe_allow_html=True)
@@ -89,7 +88,7 @@ if linked_chat:
         unsafe_allow_html=True,
     )
     st.markdown(
-        f"<div style='font:400 12px Inter;color:rgba(17,24,39,.5);margin:8px 0 12px'>"
+        f"<div style='font:400 12px system-ui;color:rgba(17,24,39,.5);margin:8px 0 12px'>"
         f"Chat ID: <code style='background:#f1f5f9;padding:1px 5px;border-radius:4px'>"
         f"{linked_chat}</code> — your settings sync from this account to the bot.</div>",
         unsafe_allow_html=True,

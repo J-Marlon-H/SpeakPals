@@ -67,8 +67,7 @@ _tutor_bg_rule = (
 )
 
 st.markdown(f"""<style>
-  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
-  html,body{{font-family:'Inter',sans-serif!important}}
+  html,body{{font-family:system-ui,-apple-system,BlinkMacSystemFont,Roboto,sans-serif!important}}
   #MainMenu,footer,[data-testid="stToolbar"]{{visibility:hidden}}
   [data-testid="stHeader"],header,.stAppHeader{{display:none!important}}
   [data-testid="collapsedControl"],[data-testid="stSidebarCollapseButton"],
@@ -77,9 +76,9 @@ st.markdown(f"""<style>
   .block-container{{padding:2.5rem 3rem!important;max-width:1120px!important;margin:auto}}
 
   .section-head{{
-    font:700 11px/1 'Inter',sans-serif;letter-spacing:2px;
+    font:700 13px/1 system-ui,-apple-system,BlinkMacSystemFont,Roboto,sans-serif;letter-spacing:1.5px;
     text-transform:uppercase;color:rgba(17,24,39,.4);
-    margin:28px 0 12px;padding-bottom:8px;
+    margin:48px 0 20px;padding-bottom:8px;
     border-bottom:1px solid rgba(17,24,39,.1)}}
   .section-head.current{{color:#0d9488;border-bottom-color:rgba(13,148,136,.3)}}
 
@@ -95,7 +94,7 @@ st.markdown(f"""<style>
 
   label,.stButton button{{color:#111827!important}}
   .stButton button{{
-    border-radius:12px!important;font-weight:600!important;font-size:13px!important;
+    border-radius:12px!important;font-weight:600!important;font-size:15px!important;
     background:rgba(13,148,136,.12)!important;
     border:1px solid rgba(13,148,136,.3)!important;color:#0d9488!important;
     transition:background .2s,border-color .2s}}
@@ -126,12 +125,12 @@ st.markdown(f"""<style>
     border-radius:0 0 18px 18px!important;
     text-align:left!important;pointer-events:none!important;margin:0!important}}
   {_selP2} {{
-    font:800 17px/1.2 'Inter',sans-serif!important;
+    font:800 19px/1.2 system-ui,-apple-system,BlinkMacSystemFont,Roboto,sans-serif!important;
     color:#fff!important;text-align:left!important;margin:0!important}}
 
   .scene-desc{{
-    font:400 12px 'Inter',sans-serif;color:rgba(17,24,39,.5);
-    margin-top:7px;padding:0 2px;line-height:1.5}}
+    font:400 14px system-ui,-apple-system,BlinkMacSystemFont,Roboto,sans-serif;color:rgba(17,24,39,.5);
+    margin-top:7px;margin-bottom:28px;padding:0 2px;line-height:1.5}}
 
   /* ── Tutor card button — same style as lesson scene cards ──────────────── */
   .st-key-btn_tutor_chat button {{
@@ -159,7 +158,7 @@ st.markdown(f"""<style>
     border-radius:0 0 18px 18px!important;
     text-align:left!important;pointer-events:none!important;margin:0!important}}
   .st-key-btn_tutor_chat button p {{
-    font:800 17px/1.2 'Inter',sans-serif!important;
+    font:800 19px/1.2 system-ui,-apple-system,BlinkMacSystemFont,Roboto,sans-serif!important;
     color:#fff!important;text-align:left!important;margin:0!important}}
 
   /* Per-scene heights + background images */
@@ -210,10 +209,10 @@ col_hdr, col_fb, col_acct = st.columns([5, 1, 1])
 with col_hdr:
     st.markdown(f"""
 <div style='padding:8px 0 4px'>
-  <div style='font:800 30px/1.1 Inter,sans-serif;color:#111827;letter-spacing:-.5px;display:flex;align-items:center;gap:0'>
+  <div style='font:800 34px/1.1 system-ui,-apple-system,BlinkMacSystemFont,Roboto,sans-serif;color:#111827;letter-spacing:-.5px;display:flex;align-items:center;gap:0'>
     Hej, {name}! 👋{flag_img}
   </div>
-  <div style='font:400 14px Inter;color:rgba(17,24,39,.6);margin-top:6px'>
+  <div style='font:400 14px system-ui;color:rgba(17,24,39,.6);margin-top:6px'>
     Your level: <span style='color:#0d9488;font-weight:600'>{level} — {LEVEL_LABELS.get(level,"")}</span>
     &nbsp;·&nbsp; Practise {language} with {tutor_name}
   </div>
@@ -234,25 +233,28 @@ col_scenes, col_tutor = st.columns([3, 1], gap="large")
 
 # ── LEFT: Lesson scene cards ───────────────────────────────────────────────────
 with col_scenes:
-    st.markdown(
-        "<div style='font:700 11px/1 Inter,sans-serif;letter-spacing:2px;"
-        "text-transform:uppercase;color:rgba(17,24,39,.4);margin:28px 0 4px;"
-        "padding-bottom:8px;border-bottom:1px solid rgba(17,24,39,.1)'>"
-        "Recommended Lessons</div>",
-        unsafe_allow_html=True,
-    )
     LEVEL_ORDER = ["A1", "A2", "B1", "B2"]
+    # User's level first, then the rest in order
     levels_with_scenes = [lvl for lvl in LEVEL_ORDER
                           if any(s["level"] == lvl for s in _LESSON_SCENES)]
+    ordered_levels = (
+        [level] + [lvl for lvl in levels_with_scenes if lvl != level]
+        if level in levels_with_scenes else levels_with_scenes
+    )
 
-    for lvl in levels_with_scenes:
+    for lvl in ordered_levels:
         scenes = [s for s in _LESSON_SCENES if s["level"] == lvl]
-        is_cur = lvl == level
-        st.markdown(
-            f"<div class='section-head{'current' if is_cur else ''}'>"
-            f"{lvl} · {LEVEL_LABELS.get(lvl, lvl)}{' — Your level' if is_cur else ''}</div>",
-            unsafe_allow_html=True,
+        is_recommended = lvl == level
+        label = (
+            f"{lvl} · {LEVEL_LABELS.get(lvl, lvl)} &nbsp;"
+            f"<span style='background:#0d9488;color:#fff;font-size:10px;font-weight:700;"
+            f"letter-spacing:.5px;padding:2px 7px;border-radius:20px;vertical-align:middle'>"
+            f"Recommended</span>"
+            if is_recommended else
+            f"{lvl} · {LEVEL_LABELS.get(lvl, lvl)}"
         )
+        head_style = "section-head current" if is_recommended else "section-head"
+        st.markdown(f"<div class='{head_style}'>{label}</div>", unsafe_allow_html=True)
         cols = st.columns(min(len(scenes), 3), gap="large")
         for col, scene in zip(cols, scenes):
             with col:
@@ -270,7 +272,7 @@ with col_scenes:
 with col_tutor:
     st.markdown(
         "<div style='margin-top:28px'>"
-        "<div style='font:700 11px/1 Inter,sans-serif;letter-spacing:2px;"
+        "<div style='font:700 11px/1 system-ui,-apple-system,BlinkMacSystemFont,Roboto,sans-serif;letter-spacing:2px;"
         "text-transform:uppercase;color:rgba(17,24,39,.4);margin-bottom:12px;"
         "padding-bottom:8px;border-bottom:1px solid rgba(17,24,39,.1)'>"
         "Your Tutor</div>"
