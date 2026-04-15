@@ -1,6 +1,8 @@
 import streamlit as st
 from pipeline import (VOICES, VOICES_BY_LANG, MODELS, LESSON_STATE_KEYS, SCENE_CATALOG,
-                      SETTINGS_DEFAULTS, SCENE_PRIMARY_VOICE, LANG_PROFILE_KEY)
+                      SETTINGS_DEFAULTS, SCENE_PRIMARY_VOICE)
+
+_LANG_PROFILE_KEY = {"Danish": "danish", "Portuguese (Brazilian)": "portuguese_brazilian"}
 from db import (require_auth, upsert_profile, load_profile, load_knowledge_profile,
                 delete_knowledge_profile, get_user_email, update_password)
 
@@ -245,7 +247,7 @@ else:
 
 # Which language the user currently has selected (drives the profile tab shown)
 _selected_lang = st.session_state.get("s_language", "Danish")
-_lang_key      = LANG_PROFILE_KEY.get(_selected_lang, "danish")
+_lang_key      = _LANG_PROFILE_KEY.get(_selected_lang, "danish")
 _lang_section  = _kp.get(_lang_key, {})
 _shared        = _kp.get("shared", {})
 

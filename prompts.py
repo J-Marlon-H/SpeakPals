@@ -2,10 +2,10 @@ from __future__ import annotations
 import pathlib
 import re as _re
 import datetime as _dt
-from pipeline import LANG_PROFILE_KEY as _LANG_PROFILE_KEY
 
 
 _NESTED_KEYS = {"shared", "danish", "portuguese_brazilian"}
+_LANG_PROFILE_KEY = {"Danish": "danish", "Portuguese (Brazilian)": "portuguese_brazilian"}
 
 
 def _active_profile(full_profile: dict, target_lang: str) -> dict:
