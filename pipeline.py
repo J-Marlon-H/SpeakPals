@@ -403,31 +403,47 @@ def run_pipeline_stream(system, user_input, history, voice_id, claude_key, eleve
             "format": {"type": "json_schema", "schema": VERDICT_SCHEMA}
         }
 
-    resp = sess.post(
-        "https://api.anthropic.com/v1/messages",
-        headers={"x-api-key": claude_key, "anthropic-version": "2023-06-01",
-                 "Content-Type": "application/json"},
-        json=body,
-        stream=True, timeout=30,
-    )
-    resp.raise_for_status()
-
+    _max_attempts = 3
     raw_claude = ""
-    for raw in resp.iter_lines():
-        if not raw:
-            continue
-        line = raw.decode() if isinstance(raw, bytes) else raw
-        if not line.startswith("data: "):
-            continue
-        payload = line[6:]
-        if payload.strip() in ("[DONE]", ""):
-            continue
-        try:
-            ev = json.loads(payload)
-        except Exception:
-            continue
-        if ev.get("type") == "content_block_delta":
-            raw_claude += ev.get("delta", {}).get("text", "")
+    for _ in range(_max_attempts):
+        resp = sess.post(
+            "https://api.anthropic.com/v1/messages",
+            headers={"x-api-key": claude_key, "anthropic-version": "2023-06-01",
+                     "Content-Type": "application/json"},
+            json=body,
+            stream=True, timeout=30,
+        )
+        resp.raise_for_status()
+
+        raw_claude = ""
+        for raw in resp.iter_lines():
+            if not raw:
+                continue
+            line = raw.decode() if isinstance(raw, bytes) else raw
+            if not line.startswith("data: "):
+                continue
+            payload = line[6:]
+            if payload.strip() in ("[DONE]", ""):
+                continue
+            try:
+                ev = json.loads(payload)
+            except Exception:
+                continue
+            if ev.get("type") == "content_block_delta":
+                raw_claude += ev.get("delta", {}).get("text", "")
+
+        # If structured, validate JSON — retry on malformed response
+        if use_structured:
+            stripped = raw_claude.strip()
+            if not stripped or stripped in ("{", "}", "null"):
+                continue  # retry
+            try:
+                _parsed = json.loads(stripped)
+                if not _parsed.get("text", "").strip():
+                    continue  # retry on empty text
+            except Exception:
+                continue  # retry on parse failure
+        break  # success
 
     # Extract spoken text and speaker — use JSON fields if structured, else full text
     tts_text = None

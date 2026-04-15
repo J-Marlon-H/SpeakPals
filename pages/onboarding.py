@@ -8,8 +8,7 @@ from dotenv import load_dotenv
 
 from pipeline import (SETTINGS_DEFAULTS, character_tts_b64)
 from tutor import Tutor
-from db import (require_auth, load_knowledge_profile, save_knowledge_profile,
-                delete_knowledge_profile, _secret)
+from db import (require_auth, load_knowledge_profile, save_knowledge_profile, _secret)
 from profile import update_knowledge_profile
 from vad_helper import mic
 
@@ -84,7 +83,7 @@ Your only job right now is to LISTEN and build a rich picture of who they are �
 **RESPONSE LENGTH: One short warm reaction (max one sentence) + ONE question. \
 Two sentences maximum. The student talks; you listen.**
 
-## What you already know — do NOT ask about these again
+## What you already know — do NOT ask about these again and do not repeat at the begining of the conversation
 - Name: {name}
 - Learning: {target_lang}
 - Self-reported level: {level}
@@ -216,17 +215,6 @@ st.markdown("""<style>
     background:#f5f5f5!important;border-top:1px solid #e5e5e5!important;
     z-index:100!important}
 
-  /* Pin Reset button just above Home */
-  [data-testid="stSidebar"] .st-key-btn_reset_knowledge{
-    position:fixed!important;bottom:62px!important;left:0!important;
-    width:320px!important;padding:6px 16px 4px!important;
-    background:#f5f5f5!important;z-index:99!important}
-  [data-testid="stSidebar"] .st-key-btn_reset_knowledge button{
-    background:rgba(220,38,38,.07)!important;
-    border:1px solid rgba(220,38,38,.2)!important;
-    color:#dc2626!important}
-  [data-testid="stSidebar"] .st-key-btn_reset_knowledge button:hover{
-    background:rgba(220,38,38,.14)!important}
 
   /* Language selectbox */
   [data-testid="stSidebar"] .stSelectbox > div > div{
@@ -466,21 +454,6 @@ with st.sidebar:
             if st.button("✕", key="btn_clear_error", help="Dismiss"):
                 st.session_state.ob_error = None
                 st.rerun()
-
-    # Reset all knowledge — pinned above Finish
-    if st.button("🗑 Reset all knowledge", key="btn_reset_knowledge", use_container_width=True):
-        if "sb_user_id" in st.session_state:
-            delete_knowledge_profile(
-                st.session_state.sb_user_id,
-                st.session_state.sb_access_token,
-            )
-        for k in ["ob_chat", "ob_log", "ob_turn_count", "ob_complete", "ob_pending",
-                   "ob_thinking", "ob_last_chunks", "ob_tutor_play_seq", "ob_last_id",
-                   "ob_started", "ob_opener_loaded", "ob_opener_text", "ob_profile_saved",
-                   "ob_error", "knowledge_profile", "onboarding_checked"]:
-            st.session_state.pop(k, None)
-        components.html("<script>try{localStorage.removeItem('sp_mic_tip_ok')}catch(e){}</script>", height=0)
-        st.rerun()
 
     # Finish onboarding — pinned to bottom
     if st.button("✅ Finish Onboarding", key="btn_ob_home", use_container_width=True):

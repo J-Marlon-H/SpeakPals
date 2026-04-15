@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8">
+<style>html,body{margin:0;padding:0;overflow:hidden;background:transparent}</style>
+</head><body><script>
+// ── Streamlit plumbing ────────────────────────────────────────────────────────
+function sendToStreamlit(val) {
+  window.parent.postMessage({isStreamlitMessage:true,type:"streamlit:setComponentValue",value:val},"*");
+}
+window.parent.postMessage({isStreamlitMessage:true,type:"streamlit:componentReady",apiVersion:1},"*");
+window.parent.postMessage({isStreamlitMessage:true,type:"streamlit:setFrameHeight",height:0},"*");
+
+// ── IDs ───────────────────────────────────────────────────────────────────────
+var STYLE_ID = '__fb_style';
+var ROOT_ID  = '__fb_root';
+
+// ── CSS injected once into parent <head> ──────────────────────────────────────
+var CSS = [
+  '#__fb_btn{',
+    'position:fixed;left:16px;bottom:22px;z-index:2147483646;',
+    'width:44px;height:44px;border-radius:50%;',
+    'background:rgba(17,24,39,.08);border:1px solid rgba(17,24,39,.14);',
+    'color:rgba(17,24,39,.38);font:700 14px/1 system-ui,-apple-system,BlinkMacSystemFont,Roboto,sans-serif;',
+    'cursor:pointer;display:flex;align-items:center;justify-content:center;',
+    'transition:background .18s,color .18s;box-shadow:none;',
+  '}',
+  '#__fb_btn:hover{background:rgba(17,24,39,.14);color:rgba(17,24,39,.62);}',
+
+  '#__fb_panel{',
+    'position:fixed;left:16px;bottom:76px;z-index:2147483645;',
+    'width:288px;',
+    'background:#fff;border:1px solid rgba(17,24,39,.10);border-radius:16px;',
+    'box-shadow:0 12px 36px rgba(0,0,0,.14),0 3px 10px rgba(0,0,0,.06);',
+    'overflow:hidden;pointer-events:none;opacity:0;',
+    'transform:translateY(8px) scale(.97);',
+    'transition:opacity .18s ease,transform .22s cubic-bezier(.34,1.56,.64,1);',
+    'font-family:system-ui,-apple-system,BlinkMacSystemFont,Roboto,sans-serif;',
+  '}',
+  '#__fb_panel.open{pointer-events:auto;opacity:1;transform:translateY(0) scale(1);}',
+
+  '#__fb_form{padding:16px 16px 14px;}',
+  '#__fb_title{font:600 12px/1 system-ui,-apple-system,sans-serif;color:#111827;margin-bottom:3px;}',
+  '#__fb_sub{font:400 11px/1.4 system-ui,-apple-system,sans-serif;color:rgba(17,24,39,.45);margin-bottom:10px;}',
+  '#__fb_textarea{',
+    'width:100%;box-sizing:border-box;height:82px;',
+    'font:400 13px/1.5 system-ui,-apple-system,sans-serif;color:#111827;',
+    'background:#f9fafb;border:1px solid #e5e5e5;border-radius:8px;',
+    'padding:8px 10px;resize:none;outline:none;',
+    'transition:border-color .14s,box-shadow .14s;',
+  '}',
+  '#__fb_textarea:focus{border-color:#0d9488;box-shadow:0 0 0 3px rgba(13,148,136,.10);}',
+  '#__fb_textarea::placeholder{color:rgba(17,24,39,.32);}',
+  '#__fb_btns{display:flex;gap:8px;margin-top:9px;}',
+  '#__fb_send{',
+    'flex:1;height:32px;background:#0d9488;color:#fff;border:none;',
+    'border-radius:8px;font:600 12px system-ui,-apple-system,sans-serif;',
+    'cursor:pointer;transition:background .14s;',
+  '}',
+  '#__fb_send:hover{background:#0f766e;}',
+  '#__fb_cancel{',
+    'flex:1;height:32px;background:transparent;color:rgba(17,24,39,.45);',
+    'border:1px solid rgba(17,24,39,.13);border-radius:8px;',
+    'font:500 12px system-ui,-apple-system,sans-serif;cursor:pointer;',
+    'transition:background .14s;',
+  '}',
+  '#__fb_cancel:hover{background:rgba(17,24,39,.05);}',
+
+  '#__fb_success{',
+    'display:flex;flex-direction:column;align-items:center;gap:8px;',
+    'padding:26px 16px 22px;text-align:center;',
+  '}',
+  '#__fb_check_ring{',
+    'width:46px;height:46px;border-radius:50%;',
+    'background:rgba(13,148,136,.10);',
+    'display:flex;align-items:center;justify-content:center;',
+    'animation:fb_check_pop .45s cubic-bezier(.34,1.56,.64,1) both;',
+  '}',
+  '@keyframes fb_check_pop{',
+    '0%{transform:scale(0) rotate(-20deg);opacity:0}',
+    '55%{transform:scale(1.22) rotate(6deg);opacity:1}',
+    '100%{transform:scale(1) rotate(0deg);opacity:1}',
+  '}',
+  '#__fb_sent_title{font:600 13px system-ui,-apple-system,sans-serif;color:#111827;}',
+  '#__fb_sent_sub{font:400 11px system-ui,-apple-system,sans-serif;color:rgba(17,24,39,.45);}',
+].join('');
+
+// ── HTML injected into parent <body> ─────────────────────────────────────────
+var HTML = (
+  '<button id="__fb_btn" title="Feedback">F</button>' +
+  '<div id="__fb_panel">' +
+    '<div id="__fb_form">' +
+      '<div id="__fb_title">Share feedback</div>' +
+      '<div id="__fb_sub">Bugs, ideas, impressions&#160;— anything helps.</div>' +
+      '<textarea id="__fb_textarea" placeholder="Type here\u2026"></textarea>' +
+      '<div id="__fb_btns">' +
+        '<button id="__fb_send">Send</button>' +
+        '<button id="__fb_cancel">Cancel</button>' +
+      '</div>' +
+    '</div>' +
+    '<div id="__fb_success" style="display:none">' +
+      '<div id="__fb_check_ring">' +
+        '<svg width="20" height="20" viewBox="0 0 24 24" fill="none"' +
+        ' stroke="#0d9488" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">' +
+        '<polyline points="20 6 9 17 4 12"/></svg>' +
+      '</div>' +
+      '<div id="__fb_sent_title">Feedback sent!</div>' +
+      '<div id="__fb_sent_sub">Thanks&#160;&#8212; it helps a lot.</div>' +
+    '</div>' +
+  '</div>'
+);
+
+// ── Inject / refresh ──────────────────────────────────────────────────────────
+function setup() {
+  var doc = window.parent.document;
+
+  // Styles — inject once
+  if (!doc.getElementById(STYLE_ID)) {
+    var s = doc.createElement('style');
+    s.id = STYLE_ID;
+    s.textContent = CSS;
+    doc.head.appendChild(s);
+  }
+
+  // Remember open state before replacing root
+  var prev       = doc.getElementById(ROOT_ID);
+  var wasOpen    = prev && doc.getElementById('__fb_panel') &&
+                   doc.getElementById('__fb_panel').classList.contains('open');
+
+  // Replace root
+  var root = doc.createElement('div');
+  root.id  = ROOT_ID;
+  root.innerHTML = HTML;
+  if (prev) { prev.replaceWith(root); } else { doc.body.appendChild(root); }
+
+  // Re-fetch elements (they were just recreated)
+  var btn      = doc.getElementById('__fb_btn');
+  var panel    = doc.getElementById('__fb_panel');
+  var textarea = doc.getElementById('__fb_textarea');
+  var form     = doc.getElementById('__fb_form');
+  var success  = doc.getElementById('__fb_success');
+
+  if (wasOpen) { panel.classList.add('open'); textarea.focus(); }
+
+  // ── Handlers ───────────────────────────────────────────────────────────────
+  btn.addEventListener('click', function() {
+    if (panel.classList.contains('open')) {
+      panel.classList.remove('open');
+    } else {
+      textarea.value = '';
+      panel.classList.add('open');
+      setTimeout(function() { textarea.focus(); }, 80);
+    }
+  });
+
+  doc.getElementById('__fb_cancel').addEventListener('click', function() {
+    panel.classList.remove('open');
+  });
+
+  doc.getElementById('__fb_send').addEventListener('click', function() {
+    var text = textarea.value.trim();
+    if (!text) { textarea.focus(); return; }
+
+    // Instant success UI — no waiting for Python
+    form.style.display    = 'none';
+    success.style.display = 'flex';
+
+    // Notify Python (triggers one background rerun to save)
+    sendToStreamlit({action:'feedback', text: text});
+
+    // Auto-close + reset after 1.6 s
+    setTimeout(function() {
+      panel.classList.remove('open');
+      setTimeout(function() {
+        form.style.display    = '';
+        success.style.display = 'none';
+        textarea.value        = '';
+      }, 280);
+    }, 1600);
+  });
+}
+
+// ── Init + re-render ─────────────────────────────────────────────────────────
+window.addEventListener("message", function(e) {
+  if (!e.data || e.data.type !== "streamlit:render") return;
+  setup();
+  window.parent.postMessage({isStreamlitMessage:true,type:"streamlit:setFrameHeight",height:0},"*");
+});
+</script></body></html>

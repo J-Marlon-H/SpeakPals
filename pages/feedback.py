@@ -196,7 +196,14 @@ coaching_log = st.session_state.get("coaching_log", [])
 
 _loading_slot = st.empty()
 
-if (correct_log or coaching_log) and not st.session_state.get("current_session_id"):
+import hashlib as _hashlib
+_log_hash = _hashlib.md5(str(correct_log + coaching_log).encode()).hexdigest()[:12]
+_already_done = (
+    st.session_state.get("current_session_id") or
+    st.session_state.get("_analyzed_hash") == _log_hash
+)
+
+if (correct_log or coaching_log) and not _already_done:
     _loading_slot.markdown("""
     <style>
       @keyframes _sp_spin  { to { transform: rotate(360deg); } }
@@ -315,6 +322,7 @@ if (correct_log or coaching_log) and not st.session_state.get("current_session_i
         "vocab":        vocab,
     }
     st.session_state["current_session_id"] = _ts
+    st.session_state["_analyzed_hash"]     = _log_hash
     st.session_state["session_history"].insert(0, _new_session)
     # Persist to Supabase (vocab audio blobs are stripped — too large for DB)
     _db_row = {k: v for k, v in _new_session.items() if k != "id"}

@@ -3,6 +3,7 @@ from pipeline import SCENE_CATALOG, LESSON_STATE_KEYS, SETTINGS_DEFAULTS
 from scene_images import img_b64 as _img_b64
 from db import require_auth, load_profile, load_knowledge_profile
 from prompts import get_tutor_name
+from feedback_widget import render_feedback_widget
 
 require_auth()
 
@@ -299,3 +300,5 @@ with col_tutor:
         "Free conversation with your tutor — topics guided by your goals and memory</div>",
         unsafe_allow_html=True,
     )
+
+render_feedback_widget()

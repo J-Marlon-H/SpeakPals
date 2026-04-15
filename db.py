@@ -366,6 +366,44 @@ def save_knowledge_profile(user_id: str, access_token: str, profile: dict) -> No
         pass
 
 
+def save_feedback(user_id: str, access_token: str, text: str) -> None:
+    """Append a feedback entry to user_knowledge_profiles.feedback (JSONB array)."""
+    import datetime as _dt
+    try:
+        client = _client(access_token)
+        res = (client
+               .table("user_knowledge_profiles")
+               .select("feedback")
+               .eq("user_id", user_id)
+               .maybe_single()
+               .execute())
+        existing: list = []
+        if res and res.data:
+            f = res.data.get("feedback")
+            if isinstance(f, list):
+                existing = list(f)
+            elif isinstance(f, str) and f:
+                try:
+                    existing = _json.loads(f)
+                    if not isinstance(existing, list):
+                        existing = []
+                except Exception:
+                    existing = []
+        existing.append({
+            "text":       text,
+            "created_at": _dt.datetime.utcnow().isoformat() + "Z",
+        })
+        (client
+         .table("user_knowledge_profiles")
+         .upsert({
+             "user_id":  user_id,
+             "feedback": existing,
+         })
+         .execute())
+    except Exception:
+        pass
+
+
 def save_knowledge_profile_for_bot(chat_id: int, profile: dict) -> None:
     """Upsert a user's knowledge profile from the Telegram bot (no user JWT needed).
 

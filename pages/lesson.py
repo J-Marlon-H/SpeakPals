@@ -9,6 +9,7 @@ from pipeline import (VOICES, VOICES_BY_LANG, VOICE_GENDER,
                       SCENE_CATALOG, SETTINGS_DEFAULTS, STT_LANG_CODE,
                       parse_claude_response, character_tts_b64,
                       SCENE_OPENERS_BY_LANG, SCENE_CHAR_GENDER)
+from feedback_widget import render_feedback_widget
 from prompts import build_system_prompt, get_tutor_name
 from tutor import Tutor
 from ws_proxy import start_in_thread, PROXY_PORT, scribe_token as _scribe_token
@@ -83,12 +84,15 @@ st.markdown("""<style>
   [data-testid="stVerticalBlock"]{gap:0!important;padding:0!important}
   section[data-testid="stMain"]{padding:0!important;overflow:hidden}
   [data-testid="stCustomComponentV1"]{padding:0!important;margin:0!important}
-  /* Force iframe to fill the full main area */
-  [data-testid="stCustomComponentV1"]{height:100vh!important;overflow:hidden!important}
-  [data-testid="stCustomComponentV1"] iframe{
+  /* Force VAD iframe (main area only) to fill the full viewport */
+  section[data-testid="stMain"] [data-testid="stCustomComponentV1"]{height:100vh!important;overflow:hidden!important}
+  section[data-testid="stMain"] [data-testid="stCustomComponentV1"] iframe{
     position:fixed!important;top:0!important;left:320px!important;
     height:100vh!important;width:calc(100vw - 320px)!important;
     border:none!important;display:block!important;margin:0!important}
+  /* Sidebar custom components (scroll helper, feedback widget) — invisible, zero space */
+  [data-testid="stSidebar"] [data-testid="stCustomComponentV1"]{height:0!important;overflow:hidden!important;padding:0!important;margin:0!important;min-height:0!important}
+  [data-testid="stSidebar"] [data-testid="stCustomComponentV1"] iframe{height:0!important;width:0!important;position:absolute!important;pointer-events:none!important;border:none!important}
   /* Prevent Streamlit from fading/dimming content during reruns */
   [data-stale="true"],[data-stale="true"] *{opacity:1!important;transition:none!important}
   /* Chat message slide-in animation */
@@ -105,6 +109,9 @@ st.markdown("""<style>
     width:320px!important;padding:10px 16px 14px!important;
     background:#f5f5f5!important;border-top:1px solid #e5e5e5!important;
     z-index:100!important}
+  /* Raise feedback button above the pinned Back-to-Home bar (~60px) */
+  #__fb_btn{bottom:82px!important}
+  #__fb_panel{bottom:136px!important}
 </style>""", unsafe_allow_html=True)
 
 # ── Read settings — seed session_state from file if not already set ────────────
@@ -177,6 +184,8 @@ current_scene     = scene_list[st.session_state.scene_idx] if scene_list else No
 scene_description = current_scene["description"] if current_scene else ""
 _scene_src_raw    = current_scene["src"] if current_scene else ""
 is_free_conv      = current_scene.get("free_conv", False) if current_scene else False
+# stt_lang_code stays as "" (Scribe auto-detect) for all modes — handles English and
+# Danish words in the same utterance. VAD AudioContext fixes prevent echo-biasing.
 scene_idx_1based  = st.session_state.scene_idx + 1
 
 # Convert local images to base64; FAL URLs pass through as-is
@@ -305,14 +314,17 @@ with st.sidebar:
                     f"{txt}</div></div>"
                 )
         st.markdown("".join(parts), unsafe_allow_html=True)
-        components.html("""<script>
-(function(){
-  function scroll(){
+        components.html(f"""<script>
+(function(){{
+  var _len={len(st.session_state.correct_log) + len(st.session_state.coaching_log)};
+  function scroll(){{
     var s=window.parent.document.querySelector('[data-testid="stSidebar"]>div:first-child');
     if(s) s.scrollTop=s.scrollHeight;
-  }
-  scroll(); setTimeout(scroll,120); setTimeout(scroll,350);
-})();
+    var m=window.parent.document.querySelectorAll('[data-testid="stVerticalBlock"]');
+    if(m.length) m[m.length-1].scrollIntoView({{behavior:'smooth',block:'end'}});
+  }}
+  scroll(); setTimeout(scroll,120); setTimeout(scroll,400);
+}})();
 </script>""", height=0)
         # Replay button rendered separately after the chat block
         if last_char_i is not None and st.session_state.char_audio:
@@ -343,6 +355,10 @@ with st.sidebar:
         st.markdown("<div style='height:1px;background:rgba(17,24,39,.1);margin:8px 12px'></div>", unsafe_allow_html=True)
         if st.button("Finish Lesson", type="primary", use_container_width=True):
             st.switch_page("pages/feedback.py")
+
+    # Feedback widget — rendered in sidebar so it doesn't create a stCustomComponentV1
+    # in the main area (which would conflict with the full-screen VAD iframe CSS)
+    render_feedback_widget()
 
     # Back to Home — always last → pinned to bottom by CSS (.st-key-btn_home)
     if st.button("🏠 Back to Home", key="btn_home", use_container_width=True):

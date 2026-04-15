@@ -143,13 +143,15 @@ st.markdown("<div class='sec-div'></div>", unsafe_allow_html=True)
 st.markdown("<div class='sec-label'>Preferences</div>", unsafe_allow_html=True)
 
 languages = ["Danish", "Portuguese (Brazilian)"]
+_LANG_LABELS = {"Portuguese (Brazilian)": "Portuguese (Brazilian) - beta"}
 language  = st.selectbox(
     "Language to learn",
     languages,
     index=languages.index(
         st.session_state.get("s_language", "Danish")
         if st.session_state.get("s_language", "Danish") in languages else "Danish"
-    )
+    ),
+    format_func=lambda x: _LANG_LABELS.get(x, x),
 )
 
 lang_voices = VOICES_BY_LANG.get(language, VOICES)
@@ -173,13 +175,7 @@ if affected:
         unsafe_allow_html=True
     )
 
-model_keys  = list(MODELS.keys())
-model_label = st.selectbox(
-    "AI model",
-    model_keys,
-    index=model_keys.index(
-        st.session_state.get("s_model_label", "Haiku 4.5 — fastest"))
-)
+model_label = "Haiku 4.5 — fastest"  # fixed — not user-configurable
 
 st.markdown("<div class='sec-div'></div>", unsafe_allow_html=True)
 
@@ -462,6 +458,6 @@ with col_lesson:
         _save()
         st.switch_page("pages/lesson.py")
 with col_ob:
-    if st.button("👋 Onboarding", use_container_width=True):
+    if st.button("👋 Redo Onboarding", use_container_width=True):
         _save()
         st.switch_page("pages/onboarding.py")

@@ -236,6 +236,11 @@ Scene done:                          {{"verdict":"accept","speaker":"tutor","tex
 
 correct:false — only when the student used the wrong language or was clearly missing key vocabulary.
 correct:true  — any {target_lang} attempt, even imperfect grammar.
+
+LEVEL-BASED ACCEPTANCE ({level}):
+A1/A2 — be very forgiving. Phonetic approximations ("korth" for "kort", "haij" for "hej") count as correct. Accent, wrong gender (en/et), minor word-order errors — all fine. Only flag if the word is completely unrecognisable.
+B1/B2 — accept rough attempts but silently log notable grammar errors (e.g. wrong case, wrong tense).
+C1/C2 — log grammar and vocabulary precision errors silently.
 HARD RULES: max 2 sentences · no bullets · no markdown · correction is always a full model answer to the question asked, never just an isolated word.
 """
 
@@ -395,6 +400,7 @@ def build_system_prompt(name: str, level: str, bg_lang: str,
             target_lang=lang_display,
             tutor_name=tutor_name,
             name=name,
+            level=level,
         )
 
     if telegram:
