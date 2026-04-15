@@ -759,11 +759,11 @@ function _attachWsHandlers() {
         resetUI();
       }
       if (mt === 'error' || mt === 'auth_error' || mt === 'input_error') {
-        lbl.textContent = 'STT error'; resetUI();
+        lbl.textContent = 'error — tap to retry'; resetUI();
       }
     } catch(_) {}
   };
-  ws.onerror = function() { lbl.textContent = 'proxy error'; resetUI(); };
+  ws.onerror = function() { lbl.textContent = 'error — tap to retry'; resetUI(); };
   // If WS closes while user is actively speaking (network drop, server timeout),
   // commit whatever partial we have rather than silently discarding it.
   ws.onclose = function() { if (listening) { commitAndStop(); } else { resetUI(); } };
@@ -908,7 +908,7 @@ function resetUI() {
   // Null ws BEFORE closing so onclose re-entry guard (if (ws)) fires false
   var _ws = ws; ws = null;
   if (_ws) { try { _ws.close(); } catch(_) {} }
-  setTimeout(function() { if (!listening) lbl.textContent = 'tap to speak'; }, 1500);
+  setTimeout(function() { if (!listening) lbl.textContent = 'tap to speak'; }, 800);
   // Re-warm immediately so the next tap is also instant
   if (started) setTimeout(prewarm, 200);
 }

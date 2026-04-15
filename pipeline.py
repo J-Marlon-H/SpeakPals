@@ -43,9 +43,17 @@ def tts_chunk(text, voice_id, eleven_key, lang_code="da"):
     r.raise_for_status()
 
 
-# Matches single- or double-quoted spans (straight ' " and curly quotes), max 80 chars.
-# Straight apostrophe (0x27) included so Claude outputs like Try 'Nej tak' are caught.
-_QUOTED_RE = re.compile(r"['\"\u2018\u2019\u201c\u201d]([^'\"\u2018\u2019\u201c\u201d]{1,80})['\"\u2018\u2019\u201c\u201d]")
+# Matches quoted spans that contain target-language phrases.
+# Word-boundary guards on straight apostrophes prevent contractions (I'm, you're, I'd)
+# from being split: (?<!\w) requires no word char before the opening quote,
+# (?!\w) requires no word char after the closing quote.
+# Double/curly quotes never appear in contractions so they have no guards.
+# Max span raised to 150 chars to capture longer quoted phrases cleanly.
+_QUOTED_RE = re.compile(
+    r"(?:(?<!\w)['\u2018\u2019]|[\"\u201c\u201d])"   # opening quote (apostrophe: not after word char)
+    r"([^'\"\u2018\u2019\u201c\u201d]{1,150})"        # content, up to 150 chars
+    r"(?:['\u2018\u2019](?!\w)|[\"\u201c\u201d])"     # closing quote (apostrophe: not before word char)
+)
 
 
 def tts_tutor_mixed(text: str, voice_id: str, eleven_key: str, tl_lang_code: str) -> bytes:
@@ -80,12 +88,15 @@ def tts_tutor_mixed(text: str, voice_id: str, eleven_key: str, tl_lang_code: str
 
 def generate_language_tip(conversation_lines: list, bg_lang: str, claude_key: str,
                           model: str = "claude-haiku-4-5-20251001",
-                          bg_context: str = "") -> str:
+                          bg_context: str = "",
+                          target_lang: str = "Danish",
+                          coaching_log: list = None,
+                          knowledge_profile: dict = None) -> str:
     """Generate a conversation-specific language tip for a given background language.
 
-    bg_context — optional known facts about {bg_lang} → Danish patterns (cognates,
-    false friends, grammar traps). Used as a reference so the model grounds its tip
-    in verified patterns rather than guessing.
+    bg_context       — optional known facts about {bg_lang} → {target_lang} patterns.
+    coaching_log     — list of {question, attempt, correction} dicts from this session.
+    knowledge_profile — persistent profile dict; used to pull common_errors context.
 
     Returns plain text (2-3 sentences). Raises on API error.
     """
@@ -93,31 +104,61 @@ def generate_language_tip(conversation_lines: list, bg_lang: str, claude_key: st
         f"{'Character' if e['who'] == 'character' else 'Student'}: {e['text']}"
         for e in conversation_lines
     )
+
+    # Build errors block from coaching_log — these are the most actionable items
+    errors_block = ""
+    if coaching_log:
+        error_lines = []
+        for entry in coaching_log:
+            q  = entry.get("question", "")
+            a  = entry.get("attempt", "")
+            c  = entry.get("correction", "")
+            if a and c:
+                error_lines.append(f"  • Student said: \"{a}\" → Ideal: \"{c}\"" +
+                                   (f" (after: \"{q}\")" if q else ""))
+        if error_lines:
+            errors_block = "\n\nMistakes made this session (highest priority — tip MUST address at least one of these):\n" + "\n".join(error_lines)
+
+    # Pull common_errors from knowledge profile for extra context
+    profile_block = ""
+    if knowledge_profile:
+        ce = knowledge_profile.get("common_errors", {})
+        if isinstance(ce, dict) and ce.get("content", "").strip():
+            profile_block = f"\n\nKnown recurring errors for this student: {ce['content']}"
+        ll = knowledge_profile.get("language_level", {})
+        if isinstance(ll, dict) and ll.get("content", "").strip():
+            profile_block += f"\nStudent level: {ll['content']}"
+
     context_block = (
-        f"\n\nKnown {bg_lang}→Danish patterns for reference (use ONLY if relevant "
-        f"to the conversation above):\n{bg_context}"
+        f"\n\nBackground language patterns for reference (use ONLY when directly "
+        f"relevant to the mistakes above):\n{bg_context}"
         if bg_context else ""
     )
+
     prompt = (
-        f"A student whose native language is {bg_lang} just completed this short Danish conversation:\n\n"
+        f"A student whose native language is {bg_lang} just completed this {target_lang} conversation:\n\n"
         f"{conv_text}"
+        f"{errors_block}"
+        f"{profile_block}"
         f"{context_block}\n\n"
-        f"Write a short tip (2–3 sentences max) specifically for {bg_lang} speakers.\n\n"
+        f"Write ONE short tip (2–3 sentences) specifically for THIS student.\n\n"
         f"STRICT RULES:\n"
-        f"- Only mention patterns that are DIRECTLY VISIBLE in the conversation above.\n"
-        f"- Every word you reference MUST appear verbatim in the conversation text.\n"
-        f"- You may draw on the known patterns above only when those patterns appear in "
-        f"the actual conversation words — do not bring in patterns that are not demonstrated.\n"
-        f"- Do NOT invent cognates, false friends, or linguistic connections you cannot "
-        f"verify from the conversation or the reference above.\n"
-        f"- If there is nothing genuinely noteworthy, reply with an empty string only.\n"
-        f"Plain text only — no markdown, no bullet points."
+        f"- If there are mistakes listed above, the tip MUST address one of them — explain why "
+        f"{bg_lang} speakers specifically make that error and give the correct form.\n"
+        f"- If you mention a {bg_lang} connection, explain the EXACT mechanism: why does "
+        f"{bg_lang} lead to this mistake? A tip like 'watch out for X' with no {bg_lang} "
+        f"explanation is not acceptable.\n"
+        f"- Every {target_lang} word you reference MUST appear verbatim in the conversation "
+        f"or mistakes above.\n"
+        f"- Do NOT bring in generic language patterns not demonstrated in this session.\n"
+        f"- If there is genuinely nothing noteworthy, reply with an empty string only.\n"
+        f"Plain text only — no markdown, no bullet points, no emoji."
     )
     r = get_session().post(
         "https://api.anthropic.com/v1/messages",
         headers={"x-api-key": claude_key, "anthropic-version": "2023-06-01",
                  "Content-Type": "application/json"},
-        json={"model": model, "max_tokens": 150, "temperature": 0.5,
+        json={"model": model, "max_tokens": 200, "temperature": 0.4,
               "messages": [{"role": "user", "content": prompt}]},
         timeout=20,
     )

@@ -85,11 +85,14 @@ st.markdown("""<style>
   [data-testid="stVerticalBlock"]{gap:0!important;padding:0!important}
   section[data-testid="stMain"]{padding:0!important;overflow:hidden}
   [data-testid="stCustomComponentV1"]{padding:0!important;margin:0!important}
-  /* Force VAD iframe (main area only) to fill the full viewport */
-  section[data-testid="stMain"] [data-testid="stCustomComponentV1"]{height:100vh!important;overflow:hidden!important}
-  section[data-testid="stMain"] [data-testid="stCustomComponentV1"] iframe{
+  /* VAD component (main area only) — fixed wrapper + absolute iframe: zero layout shift */
+  section[data-testid="stMain"] [data-testid="stCustomComponentV1"]{
     position:fixed!important;top:0!important;left:320px!important;
     height:100vh!important;width:calc(100vw - 320px)!important;
+    overflow:hidden!important;z-index:1}
+  section[data-testid="stMain"] [data-testid="stCustomComponentV1"] iframe{
+    position:absolute!important;top:0!important;left:0!important;
+    height:100%!important;width:100%!important;
     border:none!important;display:block!important;margin:0!important}
   /* Sidebar custom components (scroll helper, feedback widget) — invisible, zero space */
   [data-testid="stSidebar"] [data-testid="stCustomComponentV1"]{height:0!important;overflow:hidden!important;padding:0!important;margin:0!important;min-height:0!important}
@@ -185,12 +188,10 @@ current_scene     = scene_list[st.session_state.scene_idx] if scene_list else No
 scene_description = current_scene["description"] if current_scene else ""
 _scene_src_raw    = current_scene["src"] if current_scene else ""
 is_free_conv      = current_scene.get("free_conv", False) if current_scene else False
-# Free conversation: user talks to the tutor in any language (English, target, or both).
-# Scribe v2 auto-detect (empty string) handles code-switching natively.
-# Scene mode: lock to the target-language code so Danish/Portuguese words are never
-# mis-read as English.
-if is_free_conv:
-    stt_lang_code = ""
+# Lock STT to the target language code in all modes (scene and free conversation).
+# Scribe v2 handles English code-switching natively even when locked to a language,
+# so English words still come through — but locking prevents the model from drifting
+# to unrelated languages (Greek, etc.) on ambiguous first utterances.
 scene_idx_1based  = st.session_state.scene_idx + 1
 
 # Convert local images to base64; FAL URLs pass through as-is
@@ -221,8 +222,11 @@ if is_free_conv:
     if _sb_uid:
         _cal_events = _gcal.get_upcoming_events(f"web_{_sb_uid}") or []
 
+# Free conversation should reflect the student's own CEFR level (drives language mix).
+# Scene mode uses the scene's level (a B1 restaurant scene stays B1 even for A2 users).
+_prompt_level = user_level if is_free_conv else scene_level
 system = build_system_prompt(
-    name, scene_level, bg_lang,
+    name, _prompt_level, bg_lang,
     target_lang=target_lang,
     scene_description=scene_description,
     turn_count=turn_count,

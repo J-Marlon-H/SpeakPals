@@ -268,7 +268,10 @@ if (correct_log or coaching_log) and not _already_done:
         with ThreadPoolExecutor(max_workers=3) as ex:
             _bg_ctx = BG_LANG_TIPS.get(_target_lang, {}).get(_bg_lang, ("", ""))[1]
             fut_tip = ex.submit(generate_language_tip, all_lines, _bg_lang, CLAUDE_KEY,
-                                bg_context=_bg_ctx)
+                                bg_context=_bg_ctx,
+                                target_lang=_target_lang,
+                                coaching_log=coaching_log,
+                                knowledge_profile=_current_profile)
             fut_vocab   = ex.submit(extract_vocabulary, all_lines, _bg_lang, _level, CLAUDE_KEY)
             fut_profile = ex.submit(
                 update_knowledge_profile,
