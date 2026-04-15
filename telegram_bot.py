@@ -180,16 +180,22 @@ def save_user(chat_id: int, state: dict) -> None:
 
 
 def load_user_synced(chat_id: int) -> dict:
-    """Load user state, pulling fresh settings and chat history from Supabase if linked."""
+    """Load user state, pulling fresh settings and chat history from Supabase if linked.
+
+    Always queries Supabase by chat_id so the link survives app restarts
+    (the local JSON file is ephemeral on Streamlit Cloud).
+    """
     user = load_user(chat_id)
-    if user.get("sb_user_id"):
-        try:
-            from db import get_telegram_profile, load_knowledge_profile_for_bot, load_bot_chat_history
-            profile = get_telegram_profile(chat_id)
-            if profile:
-                for key in _PROFILE_KEYS:
-                    if profile.get(key):
-                        user[key] = profile[key]
+    try:
+        from db import get_telegram_profile, load_knowledge_profile_for_bot, load_bot_chat_history
+        profile = get_telegram_profile(chat_id)
+        if profile:
+            # Re-establish the link flag in case the local file was wiped after a restart
+            if not user.get("sb_user_id"):
+                user["sb_user_id"] = True  # used as a boolean; all RPCs use chat_id
+            for key in _PROFILE_KEYS:
+                if profile.get(key):
+                    user[key] = profile[key]
             kp = load_knowledge_profile_for_bot(chat_id)
             if kp:
                 user["knowledge_profile"] = kp
@@ -197,8 +203,8 @@ def load_user_synced(chat_id: int) -> dict:
             if history:
                 user["chat"] = history
             save_user(chat_id, user)
-        except Exception:
-            pass
+    except Exception:
+        pass
     return user
 
 
