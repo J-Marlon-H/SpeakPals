@@ -209,11 +209,11 @@ TTS_LANG_CODE = {
 }
 
 STT_LANG_CODE = {
-    # Empty string = Scribe v2 auto-detects the language per utterance.
-    # Both Danish and Portuguese learners may speak English to the tutor,
-    # so locking to a single language would mis-transcribe those English turns.
-    "Danish":                 "",
-    "Portuguese (Brazilian)": "",
+    # Locked to each target language — Scribe v2 still transcribes English words
+    # naturally when locked, so code-switching (a few English words mid-sentence) works.
+    # Danish was effectively "da" before (empty string fell back to "da" in the component).
+    "Danish":                 "da",
+    "Portuguese (Brazilian)": "pt",
 }
 
 TTS_MODEL = {

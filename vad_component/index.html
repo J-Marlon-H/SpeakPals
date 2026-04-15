@@ -269,7 +269,7 @@ function sendToStreamlit(val) {
 window.parent.postMessage({isStreamlitMessage:true, type:"streamlit:componentReady", apiVersion:1}, "*");
 
 // ── State ─────────────────────────────────────────────────────────────────────
-var lang           = "da";
+var lang           = "";
 var proxyPort      = null;
 var wsToken        = null;
 var rendered       = false;
@@ -320,7 +320,7 @@ document.getElementById('start-btn').addEventListener('click', function() {
 window.addEventListener("message", function(e) {
   if (!e.data || e.data.type !== "streamlit:render" || !e.data.args) return;
   var a = e.data.args;
-  lang      = a.lang       || "da";
+  lang      = (a.lang !== undefined && a.lang !== null) ? a.lang : "";
   proxyPort = a.proxy_port || null;
   wsToken   = a.ws_token   || null;
   rendered  = true;
