@@ -43,9 +43,18 @@ def tts_chunk(text, voice_id, eleven_key, lang_code="da"):
     r.raise_for_status()
 
 
-# Matches single- or double-quoted spans (straight ' " and curly quotes), max 80 chars.
-# Straight apostrophe (0x27) included so Claude outputs like Try 'Nej tak' are caught.
-_QUOTED_RE = re.compile(r"['\"\u2018\u2019\u201c\u201d]([^'\"\u2018\u2019\u201c\u201d]{1,80})['\"\u2018\u2019\u201c\u201d]")
+# Matches quoted target-language spans.
+# Single quotes (straight ' and curly \u2018\u2019) are only treated as delimiters when
+# they sit at a word boundary — i.e. NOT preceded (opening) or followed (closing) by a
+# word character.  This prevents English contractions like I'd / you're / it's from being
+# split, while still catching intended quotes like 'Nej tak' or 'Bom dia'.
+# Double quotes (straight " and curly \u201c\u201d) always act as delimiters.
+# Max span raised to 150 chars to handle longer target-language phrases.
+_QUOTED_RE = re.compile(
+    r"(?:(?<!\w)['\u2018\u2019]|[\"\u201c\u201d])"   # opening quote
+    r"([^'\"\u2018\u2019\u201c\u201d]{1,150})"        # captured content
+    r"(?:['\u2018\u2019](?!\w)|[\"\u201c\u201d])"     # closing quote
+)
 
 
 def tts_tutor_mixed(text: str, voice_id: str, eleven_key: str, tl_lang_code: str) -> bytes:
