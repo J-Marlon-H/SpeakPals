@@ -1,0 +1,188 @@
+# Language Background: Dutch → Danish
+
+## How to use this profile
+Dutch speakers have the second-largest head start after Germans. Dutch and Danish are both Low
+Germanic languages and share enormous vocabulary overlap — a Dutch speaker can often read a Danish
+sentence and understand it immediately. Move FAST at A1. The shared grammar structures (V2 word
+order, definite suffix concept, de/het ≈ en/et) mean the student can focus almost entirely on
+vocabulary and pronunciation from day one. Pronunciation is the main challenge — the two languages
+sound very different despite sharing so much in writing.
+
+---
+
+## A1 — Instant wins: cognates the student can use from day one
+
+These words are nearly identical — Dutch speakers will recognise them immediately:
+
+| Dutch | Danish | Note |
+|-------|--------|------|
+| huis | hus | same root |
+| hand | hånd | same |
+| arm | arm | identical |
+| vinger | finger | near-identical |
+| naam | navn | same root |
+| brood | brød | near-identical |
+| melk | mælk | near-identical |
+| water | vand | same root, different form |
+| winter | vinter | identical |
+| zomer | sommer | close |
+| school | skole | close |
+| boek | bog | same root |
+| dag | dag | identical |
+| nacht | nat | same root |
+| jaar | år | same root |
+| man | mand | near-identical |
+| kind | barn | note: kind = child in Dutch, barn in Danish |
+| eten | spise/mad | same concept, different form |
+| groot | stor | note: different word, but groot = big = stor |
+| klein | lille | note: different word |
+| goed | god | close (good = god) |
+| nieuw | ny | same root |
+| oud | gammel | note: differs, but oud = old |
+| werken | arbejde | note: differs, but werken = to work |
+| hond | hund | near-identical (dog) |
+| kat | kat | identical (cat) |
+| vis | fisk | close (fish) |
+| vlees | kød | note: differs |
+| bier | øl | note: differs, but both mean beer |
+| koffie | kaffe | near-identical |
+| thee | te | close (tea) |
+
+### A1 Core vocabulary by topic
+
+**Greetings:**
+- Hallo / Hoi → Hej
+- Goedemorgen → Godmorgen
+- Dag / Tot ziens → Hej hej / Farvel
+- Dank je / Bedankt → Tak
+- Alsjeblieft → Vær så venlig / tak
+- Ja → Ja | Nee → Nej
+
+**Numbers 1–10:** en/et, to, tre, fire, fem, seks, syv, otte, ni, ti
+(Dutch: één, twee, drie, vier, vijf, zes, zeven, acht, negen, tien — very close to Danish)
+
+**Colors:**
+- rood = rød | blauw = blå | groen = grøn | geel = gul
+- zwart = sort | wit = hvid | bruin = brun | grijs = grå
+
+**Family:**
+- moeder = mor | vader = far | zus = søster | broer = bror
+- kind = barn | familie = familie
+
+**Food & drink:**
+- brood = brød | melk = mælk | water = vand | bier = øl
+- appel = æble | vis = fisk | vlees = kød | ei = æg
+
+---
+
+## A2 — Grammar comparisons for Dutch speakers
+
+### What is EASIER — and already familiar from Dutch:
+
+**1. V2 word order — Dutch speakers already know this**
+Dutch: "Gisteren ging ik naar school." (verb second after fronted element)
+Danish: "I går gik jeg i skole." — identical rule. This is a major advantage.
+Teach it as: "You already do this in Dutch — same rule."
+
+**2. Grammatical gender concept: en/et ≈ de/het**
+Dutch has de (common) and het (neuter). Danish has en (common) and et (neuter).
+The split is not identical but the CONCEPT is the same — two gender classes, one for most nouns,
+one for neuter nouns. Dutch speakers understand this immediately.
+Note: the actual assignment differs — "de hond" (Dutch) = "en hund" (Danish), same class.
+But "het huis" (Dutch) = "et hus" (Danish) — both neuter. Significant overlap.
+
+**3. Definite article as suffix — partially familiar**
+Dutch attaches "-de/-te" for diminutives and has some suffix patterns. Danish attaches the definite article
+as a full suffix: hund → hunden, hus → huset. The concept of attaching morphology to nouns is natural for Dutch speakers.
+
+**4. Negation position**
+Dutch: "Ik eet geen vlees." / "Ik eet het vlees niet."
+Danish: "Jeg spiser ikke kød." — ikke after the verb, same structural position as Dutch "niet".
+
+### What is still HARDER:
+
+**1. Stød (glottal stop)**
+Dutch has no stød. A creaky glottal stop that changes word meaning in Danish.
+No Dutch equivalent — closest analogy is the pause between vowels in "beamen" (be-amen).
+Drill: hund, mand, sol — expose early, expect approximation only at A1–A2.
+
+**2. Pronunciation divergence**
+Despite shared vocabulary, Dutch and Danish sound very different. Dutch is harder-edged with
+clear consonants. Danish swallows syllables, has the soft d, and the stød. The student may
+be surprised how different it sounds after reading so much successfully.
+
+**3. Vocabulary where Dutch and Danish diverged**
+Some core words differ entirely despite shared roots:
+- Dutch: eten (to eat) → Danish: spise (to eat)
+- Dutch: zien (to see) → Danish: se (to see — actually close!)
+- Dutch: spreken (to speak) → Danish: tale/snakke
+- Dutch: lopen (to walk) → Danish: gå
+Teach these active differences explicitly.
+
+### A2 Key grammar structures to practise:
+- Present tense: spise → jeg spiser, du spiser, han spiser (same for all persons — simpler than Dutch)
+- Past tense: spiste (regular), var (was), fik (got), gik (went)
+- Question formation: Spiser du? (inversion — same as Dutch: Eet jij?)
+- Negation: ikke (not), aldrig (never), ingen (none)
+
+### A2 Vocabulary expansion — everyday life:
+**Transport:** bus, tog (train — Dutch: trein), cykel (bicycle — Dutch: fiets), bil (car — Dutch: auto), fly (plane — Dutch: vliegtuig)
+**Shopping:** butik (shop), pris (prijs — close!), billig (cheap), dyr (expensive — Dutch: duur, same root!), købe (to buy)
+**Time:** i dag (today — Dutch: vandaag), i morgen (tomorrow — Dutch: morgen, same root!), i går (yesterday — Dutch: gisteren), nu (now — Dutch: nu, identical!)
+**Weather:** sol (zon — close!), regn (regen — near-identical!), sne (sneeuw — same root), vind (wind — identical!), koldt (koud — same root), varmt (warm — same root)
+
+---
+
+## B1 — Advanced connections and nuances
+
+### Idiomatic expressions (with Dutch equivalents):
+- "Det er lige meget" = "Het maakt niet uit" (it doesn't matter)
+- "Hvad så?" = "En dan?" / "En nu?" (so what / what's up)
+- "Gå op i røg" = "In rook opgaan" (go up in smoke — same idiom, same structure!)
+- "Slå to fluer med ét smæk" = "Twee vliegen in één klap slaan" (kill two birds — near-identical!)
+- "Tage det roligt" = "Het rustig aan doen" (take it easy)
+- "Koste en arm og et ben" = "Een vermogen kosten" (cost a fortune)
+- "Komme til sagen" = "Ter zake komen" (get to the point — same structure!)
+- "Gøre en bjørnetjeneste" = "Een berendienst bewijzen" (do a disservice — same bear idiom!)
+
+### B1 Grammar nuances:
+- **Passive voice:** Bogen læses vs. Bogen bliver læst — same two-form passive as Dutch (word wordt gelezen / het boek is gelezen)
+- **Modal verbs in past:** kunne (kon), måtte (moest), ville (wilde), skulle (moest/zou) — close to Dutch equivalents
+- **Relative clauses:** "Manden, som/der bor her..." = "De man die hier woont..." — same structure
+- **Subordinate clause word order:** "Jeg ved, at han ikke kommer" — ikke before verb in subordinate clauses,
+  same as Dutch: "Ik weet dat hij niet komt."
+
+### B1 Register — formal vs. informal:
+- De (formal you) vs. du (informal) — same concept as Dutch U vs. jij/je
+- Danish informal (du) is universal even in professional settings — more so than Dutch
+
+### False friends — warn the student immediately:
+| Danish | What it means | Dutch false friend |
+|--------|--------------|---------------------|
+| gift | married / poison | gift (in Dutch = poison too! — actually a TRUE friend in the poison sense) |
+| fart | speed | vaart (speed/pace — actually a true friend! Both mean speed) |
+| have | garden | hebben (to have — different meaning) |
+| bad | bath | bad (bad = bath in Dutch too — TRUE friend!) |
+| kind | cheek | kind (child in Dutch — false friend, means cheek in Danish) |
+| mand | man / husband | man (man — true friend) |
+| gå | to walk/go | gaan (to go — true friend!) |
+| stå | to stand | staan (to stand — true friend!) |
+| se | to see | zien / zien (to see — close enough) |
+| dag | day | dag (day — identical, AND goodbye in Dutch) |
+
+### Pronunciation guide for Dutch speakers:
+- **Soft d (blødt d):** Between vowels, Danish d sounds like English "th" in "the". Dutch d in
+  similar positions is harder. Example: "mad" (food) → sounds like "math". Dutch speakers need
+  to soften the d significantly.
+- **Stød (glottal stop):** No equivalent in Dutch. Brief creaky catch in the voice.
+  Drill: hund, mand, sol. Tell the student: think of it as a tiny pause with a creak — not a full stop.
+- **å sound:** Like Dutch "oo" in "boot" but more open and forward. Practice: å, år, gå, stå.
+- **ø sound:** Similar to Dutch "eu" in "neus" or "deur". Dutch speakers usually produce this well.
+  Use: "grøn sounds like Dutch 'greun', øl like Dutch 'eul'." Confidence booster.
+- **æ sound:** Similar to Dutch "ee" in open syllables or "e" in "bed". Practice: læse, æble.
+- **Danish r:** Guttural like Dutch r (both uvular). Dutch speakers usually produce this correctly.
+  Another confidence booster — point this out early.
+- **Swallowed syllables:** Danish drops far more sounds than Dutch in natural speech.
+  "Selvfølgelig" (of course) sounds like "sel-fol-li". Train the ear — don't read, listen.
+- **Hard vs. soft consonants:** Danish consonants are generally softer/more voiced than Dutch.
+  Dutch "p/t/k" are strongly aspirated; Danish versions are much softer.

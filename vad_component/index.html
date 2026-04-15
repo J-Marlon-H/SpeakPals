@@ -351,12 +351,11 @@ window.addEventListener("message", function(e) {
       if (avTitle) avTitle.style.color = 'rgba(17,24,39,.5)';
       var avLblEl = ap.querySelector('.av-lbl');
       if (avLblEl) avLblEl.style.color = 'rgba(17,24,39,.5)';
-      var rBtn = ap.querySelector('.replay-btn');
-      if (rBtn) {
+      ap.querySelectorAll('.replay-btn').forEach(function(rBtn) {
         rBtn.style.background  = 'rgba(0,0,0,.07)';
         rBtn.style.border      = '1px solid rgba(0,0,0,.13)';
         rBtn.style.color       = 'rgba(17,24,39,.55)';
-      }
+      });
     }
 
     // Mic wrap — subtle dark backdrop on light bg
@@ -669,7 +668,7 @@ var lastPartial='';
 // ── Pre-warm state — filled on Start Lesson, consumed on first mic click ───────
 var _pwStream=null, _pwAudioCtx=null, _pwWorklet=false, _pwWs=null;
 
-var SILENCE_MS = 1200;
+var SILENCE_MS = 1800;
 var PROTECT_MS = 1000;
 var THRESH     = 5;
 
@@ -765,7 +764,9 @@ function _attachWsHandlers() {
     } catch(_) {}
   };
   ws.onerror = function() { lbl.textContent = 'proxy error'; resetUI(); };
-  ws.onclose = function() { if (ws) resetUI(); };
+  // If WS closes while user is actively speaking (network drop, server timeout),
+  // commit whatever partial we have rather than silently discarding it.
+  ws.onclose = function() { if (listening) { commitAndStop(); } else { resetUI(); } };
 }
 
 async function _setupAudioAndListen() {
@@ -779,6 +780,9 @@ async function _setupAudioAndListen() {
     await audioCtx.audioWorklet.addModule(blobUrl);
     URL.revokeObjectURL(blobUrl);
   }
+  // Browsers suspend mic-only AudioContexts (no output node). Resume explicitly
+  // to prevent analyser returning flat zeros mid-speech → false silence → early cutoff.
+  if (audioCtx.state === 'suspended') { try { await audioCtx.resume(); } catch(_) {} }
   analyser = audioCtx.createAnalyser();
   analyser.fftSize = 512;
   var src = audioCtx.createMediaStreamSource(stream);
@@ -839,6 +843,8 @@ async function prewarm() {
 function startVAD() {
   vadTimer = setInterval(function() {
     if (!listening || !analyser) { clearInterval(vadTimer); return; }
+    // Keep AudioContext alive — browsers may re-suspend mic-only contexts
+    if (audioCtx && audioCtx.state === 'suspended') { audioCtx.resume(); }
     var data = new Uint8Array(analyser.fftSize);
     analyser.getByteTimeDomainData(data);
     var sum = 0;

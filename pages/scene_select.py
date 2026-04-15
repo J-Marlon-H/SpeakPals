@@ -7,8 +7,7 @@ st.set_page_config(page_title="Choose a Scene — SpeakPals", page_icon="🎭",
                    layout="wide", initial_sidebar_state="collapsed")
 
 st.markdown("""<style>
-  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
-  html,body{font-family:'Inter',sans-serif!important}
+  html,body{font-family:system-ui,-apple-system,BlinkMacSystemFont,Roboto,sans-serif!important}
   #MainMenu,footer,[data-testid="stToolbar"]{visibility:hidden}
   [data-testid="stHeader"],header,.stAppHeader{display:none!important}
   [data-testid="collapsedControl"],[data-testid="stSidebarCollapseButton"],
@@ -39,12 +38,12 @@ st.markdown("""<style>
     background:linear-gradient(to top,rgba(10,10,20,.88) 0%,rgba(10,10,20,.35) 55%,transparent 100%);
     padding:24px 22px 20px;border-radius:0 0 18px 18px}
   .scene-card-tag{
-    font:700 9px/1 'Inter',sans-serif;letter-spacing:2.5px;
+    font:700 9px/1 system-ui,-apple-system,BlinkMacSystemFont,Roboto,sans-serif;letter-spacing:2.5px;
     text-transform:uppercase;color:#dc6b4a;margin-bottom:6px}
   .scene-card-title{
-    font:800 20px/1.2 'Inter',sans-serif;color:#fff;margin-bottom:4px}
+    font:800 20px/1.2 system-ui,-apple-system,BlinkMacSystemFont,Roboto,sans-serif;color:#fff;margin-bottom:4px}
   .scene-card-desc{
-    font:400 12px 'Inter',sans-serif;color:rgba(255,255,255,.6)}
+    font:400 12px system-ui,-apple-system,BlinkMacSystemFont,Roboto,sans-serif;color:rgba(255,255,255,.6)}
 
   /* Placeholder gradient for missing images */
   .scene-placeholder{
@@ -81,10 +80,10 @@ target_lang = st.session_state.get("s_language", "Danish")
 
 st.markdown(f"""
 <div style='text-align:center;margin-bottom:36px'>
-  <div style='font:800 28px Inter,sans-serif;color:#111827;letter-spacing:-.5px'>
+  <div style='font:800 28px system-ui,-apple-system,BlinkMacSystemFont,Roboto,sans-serif;color:#111827;letter-spacing:-.5px'>
     Choose your next scene
   </div>
-  <div style='font:400 14px Inter;color:rgba(17,24,39,.55);margin-top:6px'>
+  <div style='font:400 14px system-ui;color:rgba(17,24,39,.55);margin-top:6px'>
     Pick where you want to practice {target_lang} next
   </div>
 </div>

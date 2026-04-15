@@ -5,11 +5,13 @@ import streamlit.components.v1 as components
 import hashlib, pathlib, base64
 from dotenv import load_dotenv
 import json as _json
-from pipeline import (run_pipeline_stream, MODELS, VOICES, VOICES_BY_LANG, VOICE_GENDER,
-                      SCENE_CATALOG, SETTINGS_DEFAULTS, TTS_LANG_CODE, STT_LANG_CODE,
-                      parse_claude_response, generate_scene_image, character_tts_b64,
+from pipeline import (VOICES, VOICES_BY_LANG, VOICE_GENDER,
+                      SCENE_CATALOG, SETTINGS_DEFAULTS, STT_LANG_CODE,
+                      parse_claude_response, character_tts_b64,
                       SCENE_OPENERS_BY_LANG, SCENE_CHAR_GENDER)
+from feedback_widget import render_feedback_widget
 from prompts import build_system_prompt, get_tutor_name
+from tutor import Tutor
 from ws_proxy import start_in_thread, PROXY_PORT, scribe_token as _scribe_token
 from db import require_auth, load_knowledge_profile, _secret
 
@@ -17,14 +19,6 @@ load_dotenv("keys.env")
 
 CLAUDE_KEY = _secret("CLAUDE_API_KEY")
 ELEVEN_KEY = _secret("ELEVENLABS_API_KEY")
-FAL_KEY    = _secret("FAL_KEY")
-
-SCENE_NEXT_PROMPT = {
-    "supermarket": (
-        "interior of a Danish bakery, a friendly baker facing directly toward you "
-        "behind the counter with eye contact, warm morning light, pastries on display"
-    )
-}
 
 # Build scene lookup from catalog
 _SCENE_BY_KEY = {s["key"]: s for s in SCENE_CATALOG}
@@ -68,8 +62,7 @@ Object.keys(localStorage).forEach(function(k){
 </script>""", height=0)
 
 st.markdown("""<style>
-  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
-  html,body{font-family:'Inter',sans-serif!important}
+  html,body{font-family:system-ui,-apple-system,BlinkMacSystemFont,Roboto,sans-serif!important}
   #MainMenu,footer,[data-testid="stToolbar"]{visibility:hidden}
   [data-testid="collapsedControl"]{display:none!important}
   [data-testid="stSidebarCollapseButton"]{display:none!important}
@@ -91,12 +84,15 @@ st.markdown("""<style>
   [data-testid="stVerticalBlock"]{gap:0!important;padding:0!important}
   section[data-testid="stMain"]{padding:0!important;overflow:hidden}
   [data-testid="stCustomComponentV1"]{padding:0!important;margin:0!important}
-  /* Force iframe to fill the full main area */
-  [data-testid="stCustomComponentV1"]{height:100vh!important;overflow:hidden!important}
-  [data-testid="stCustomComponentV1"] iframe{
+  /* Force VAD iframe (main area only) to fill the full viewport */
+  section[data-testid="stMain"] [data-testid="stCustomComponentV1"]{height:100vh!important;overflow:hidden!important}
+  section[data-testid="stMain"] [data-testid="stCustomComponentV1"] iframe{
     position:fixed!important;top:0!important;left:320px!important;
     height:100vh!important;width:calc(100vw - 320px)!important;
     border:none!important;display:block!important;margin:0!important}
+  /* Sidebar custom components (scroll helper, feedback widget) — invisible, zero space */
+  [data-testid="stSidebar"] [data-testid="stCustomComponentV1"]{height:0!important;overflow:hidden!important;padding:0!important;margin:0!important;min-height:0!important}
+  [data-testid="stSidebar"] [data-testid="stCustomComponentV1"] iframe{height:0!important;width:0!important;position:absolute!important;pointer-events:none!important;border:none!important}
   /* Prevent Streamlit from fading/dimming content during reruns */
   [data-stale="true"],[data-stale="true"] *{opacity:1!important;transition:none!important}
   /* Chat message slide-in animation */
@@ -113,6 +109,9 @@ st.markdown("""<style>
     width:320px!important;padding:10px 16px 14px!important;
     background:#f5f5f5!important;border-top:1px solid #e5e5e5!important;
     z-index:100!important}
+  /* Raise feedback button above the pinned Back-to-Home bar (~60px) */
+  #__fb_btn{bottom:82px!important}
+  #__fb_panel{bottom:136px!important}
 </style>""", unsafe_allow_html=True)
 
 # ── Read settings — seed session_state from file if not already set ────────────
@@ -135,23 +134,25 @@ if "knowledge_profile" not in st.session_state:
     else:
         st.session_state["knowledge_profile"] = {}
 
-name        = st.session_state.get("s_name",        SETTINGS_DEFAULTS["s_name"])
-_sel_scene  = st.session_state.get("selected_scene")
-level       = _SCENE_BY_KEY[_sel_scene]["level"] if _sel_scene in _SCENE_BY_KEY else "A1"
-bg_lang     = st.session_state.get("s_bg_lang",     SETTINGS_DEFAULTS["s_bg_lang"])
-voice_label = st.session_state.get("s_voice_label", SETTINGS_DEFAULTS["s_voice_label"])
-model_label = st.session_state.get("s_model_label", SETTINGS_DEFAULTS["s_model_label"])
-model_id    = MODELS[model_label]
-target_lang    = st.session_state.get("s_language", SETTINGS_DEFAULTS["s_language"])
-lang_voices    = VOICES_BY_LANG.get(target_lang, VOICES)
-tts_lang_code  = TTS_LANG_CODE.get(target_lang, "da")
-stt_lang_code  = STT_LANG_CODE.get(target_lang, "da")
+tutor = Tutor.from_session(st.session_state)
+
+# Unpack for local use
+name          = tutor.name
+user_level    = tutor.level    # user's own CEFR level — shown in header
+bg_lang       = tutor.bg_lang
+target_lang   = tutor.target_lang
+tts_lang_code = tutor.tl_lang_code
+stt_lang_code = STT_LANG_CODE.get(target_lang, "da")
+
+_sel_scene   = st.session_state.get("selected_scene")
+scene_level  = _SCENE_BY_KEY[_sel_scene]["level"] if _sel_scene in _SCENE_BY_KEY else "A1"
+lang_voices  = VOICES_BY_LANG.get(target_lang, VOICES)
 
 # ── Session state ──────────────────────────────────────────────────────────────
 
 for k, v in [
     ("chat", []), ("last_chunks", None), ("last_response", None), ("last_id", None),
-    ("scene_images", []), ("scene_idx", 0), ("scene_loading", False),
+    ("scene_images", []), ("scene_idx", 0),
     ("turn_count", 0), ("opener_loaded", False), ("scene_complete", False), ("char_audio", []),
     ("pipeline_error", None), ("pending_student", None), ("avatar_thinking", False),
     ("correct_log", []), ("coaching_log", []), ("lesson_started", False),
@@ -183,6 +184,8 @@ current_scene     = scene_list[st.session_state.scene_idx] if scene_list else No
 scene_description = current_scene["description"] if current_scene else ""
 _scene_src_raw    = current_scene["src"] if current_scene else ""
 is_free_conv      = current_scene.get("free_conv", False) if current_scene else False
+# stt_lang_code stays as "" (Scribe auto-detect) for all modes — handles English and
+# Danish words in the same utterance. VAD AudioContext fixes prevent echo-biasing.
 scene_idx_1based  = st.session_state.scene_idx + 1
 
 # Convert local images to base64; FAL URLs pass through as-is
@@ -191,15 +194,13 @@ if _scene_src_raw and not _scene_src_raw.startswith(("http", "data:")):
 else:
     scene_src = _scene_src_raw  # "" for free conversation — ob_mode handles the background
 
-voice_id = lang_voices[voice_label] if voice_label in lang_voices else next(iter(lang_voices.values()))
-
 _scene_gender = SCENE_CHAR_GENDER.get(st.session_state.get("selected_scene") or "", None)
 _same_gender  = [vid for lbl, vid in lang_voices.items()
                  if VOICE_GENDER.get(lbl) == _scene_gender]
 char_voice_id = (
-    next((v for v in _same_gender if v != voice_id), None)
+    next((v for v in _same_gender if v != tutor.voice_id), None)
     or (_same_gender[0] if _same_gender else None)
-    or next((v for v in lang_voices.values() if v != voice_id), next(iter(lang_voices.values())))
+    or next((v for v in lang_voices.values() if v != tutor.voice_id), next(iter(lang_voices.values())))
 )
 
 sk          = _scene_key(_scene_src_raw)
@@ -210,7 +211,7 @@ _lang_openers = SCENE_OPENERS_BY_LANG.get(target_lang, SCENE_OPENERS_BY_LANG["Da
 opener_line   = _lang_openers.get(sk, "") if (sk and not is_free_conv) else ""
 
 system = build_system_prompt(
-    name, level, bg_lang,
+    name, scene_level, bg_lang,
     target_lang=target_lang,
     scene_description=scene_description,
     turn_count=turn_count,
@@ -231,6 +232,11 @@ if (opener_line
     _log = st.session_state.correct_log
     if not any(e["who"] == "character" and e["text"] == opener_line for e in _log):
         _log.append({"who": "character", "text": opener_line})
+    # Also add to Claude chat history so the tutor always knows what the character
+    # just said. Without this, the first student reply has no character context.
+    if not any(m["role"] == "assistant" and m["content"] == opener_line
+               for m in st.session_state.chat):
+        st.session_state.chat.append({"role": "assistant", "content": opener_line})
     st.session_state.opener_loaded = True
 
 # ── Sidebar: conversation log ──────────────────────────────────────────────────
@@ -241,8 +247,8 @@ with st.sidebar:
     with col_title:
         st.markdown(
             "<div style='padding:20px 0 0 16px'>"
-            "<div style='font:800 18px/1.2 Inter,sans-serif;color:#111827;letter-spacing:-.3px'>Lesson Chat</div>"
-            f"<div style='font:500 12px Inter;color:rgba(17,24,39,.55);margin-top:4px'>Scene {scene_idx_1based} · {level} · {name}</div>"
+            "<div style='font:800 18px/1.2 system-ui,-apple-system,BlinkMacSystemFont,Roboto,sans-serif;color:#111827;letter-spacing:-.3px'>Lesson Chat</div>"
+            f"<div style='font:500 12px system-ui;color:rgba(17,24,39,.55);margin-top:4px'>Scene {scene_idx_1based} · {user_level} · {name}</div>"
             "</div>",
             unsafe_allow_html=True
         )
@@ -286,7 +292,7 @@ with st.sidebar:
                     f"<div style='background:#ffffff;border:1px solid #e5e5e5;border-radius:12px 12px 12px 3px;"
                     f"padding:10px 12px;font-size:13px;line-height:1.5;"
                     f"color:#111827;word-break:break-word;{anim}'>"
-                    f"<span style='font:600 10px Inter;color:#9ca3af;display:block;margin-bottom:4px;letter-spacing:.5px;text-transform:uppercase'>{char_label}</span>"
+                    f"<span style='font:600 10px system-ui;color:#9ca3af;display:block;margin-bottom:4px;letter-spacing:.5px;text-transform:uppercase'>{char_label}</span>"
                     f"<em>{txt}</em></div></div>"
                 )
             elif entry["who"] == "tutor" or (entry["who"] == "character" and is_free_conv):
@@ -295,7 +301,7 @@ with st.sidebar:
                     f"<div style='background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.25);border-radius:12px 12px 12px 3px;"
                     f"padding:10px 12px;font-size:13px;line-height:1.5;"
                     f"color:#78350f;word-break:break-word;{anim}'>"
-                    f"<span style='font:600 10px Inter;color:#d97706;display:block;margin-bottom:4px;letter-spacing:.5px;text-transform:uppercase'>💡 {tutor_name}</span>"
+                    f"<span style='font:600 10px system-ui;color:#d97706;display:block;margin-bottom:4px;letter-spacing:.5px;text-transform:uppercase'>💡 {tutor_name}</span>"
                     f"{txt}</div></div>"
                 )
             else:
@@ -304,10 +310,22 @@ with st.sidebar:
                     f"<div style='background:rgba(13,148,136,.1);border:1px solid rgba(13,148,136,.2);border-radius:12px 12px 3px 12px;"
                     f"padding:10px 12px;font-size:13px;line-height:1.5;"
                     f"color:#0f3d39;word-break:break-word;{anim}'>"
-                    f"<span style='font:600 10px Inter;color:#0d9488;display:block;margin-bottom:4px;letter-spacing:.5px;text-transform:uppercase'>You ✓</span>"
+                    f"<span style='font:600 10px system-ui;color:#0d9488;display:block;margin-bottom:4px;letter-spacing:.5px;text-transform:uppercase'>You ✓</span>"
                     f"{txt}</div></div>"
                 )
         st.markdown("".join(parts), unsafe_allow_html=True)
+        components.html(f"""<script>
+(function(){{
+  var _len={len(st.session_state.correct_log) + len(st.session_state.coaching_log)};
+  function scroll(){{
+    var s=window.parent.document.querySelector('[data-testid="stSidebar"]>div:first-child');
+    if(s) s.scrollTop=s.scrollHeight;
+    var m=window.parent.document.querySelectorAll('[data-testid="stVerticalBlock"]');
+    if(m.length) m[m.length-1].scrollIntoView({{behavior:'smooth',block:'end'}});
+  }}
+  scroll(); setTimeout(scroll,120); setTimeout(scroll,400);
+}})();
+</script>""", height=0)
         # Replay button rendered separately after the chat block
         if last_char_i is not None and st.session_state.char_audio:
             _, rb = st.columns([5, 1])
@@ -327,7 +345,7 @@ with st.sidebar:
         st.markdown(
             "<div style='margin:10px 12px;padding:14px 16px;"
             "background:rgba(13,148,136,.1);border:1px solid rgba(13,148,136,.3);"
-            "border-radius:12px;font:500 12px Inter;color:#0d9488;line-height:1.5'>"
+            "border-radius:12px;font:500 12px system-ui;color:#0d9488;line-height:1.5'>"
             "Great session! Head to the feedback page to review what I noted.</div>",
             unsafe_allow_html=True
         )
@@ -338,27 +356,20 @@ with st.sidebar:
         if st.button("Finish Lesson", type="primary", use_container_width=True):
             st.switch_page("pages/feedback.py")
 
+    # Feedback widget — rendered in sidebar so it doesn't create a stCustomComponentV1
+    # in the main area (which would conflict with the full-screen VAD iframe CSS)
+    render_feedback_widget()
+
     # Back to Home — always last → pinned to bottom by CSS (.st-key-btn_home)
     if st.button("🏠 Back to Home", key="btn_home", use_container_width=True):
         st.switch_page("pages/home.py")
 
 # ── VAD / scene component ──────────────────────────────────────────────────────
 
-def _make_image_ready_cb(next_prompt):
-    def _cb(url):
-        if url:
-            st.session_state.scene_images.append({"description": next_prompt, "src": url})
-            st.session_state.scene_idx  += 1
-            st.session_state.turn_count  = 0
-            st.session_state.opener_loaded = False
-        st.session_state.scene_loading = False
-    return _cb
-
 from vad_helper import mic
 
 chunks  = st.session_state.last_chunks or []
-caption = ("Generating next scene…" if st.session_state.scene_loading
-           else f"Scene {scene_idx_1based}")
+caption = f"Scene {scene_idx_1based}"
 
 mic_props = dict(
     lang              = stt_lang_code,
@@ -415,11 +426,10 @@ if student_text:
         raw_tutor_text = ""
         last_speaker   = "character"
 
-        for raw_tutor_text, chunk_b64, last_speaker in run_pipeline_stream(
-                system, student_text, st.session_state.chat, voice_id,
-                CLAUDE_KEY, ELEVEN_KEY, model=model_id,
-                use_structured=True, lang_code=tts_lang_code,
-                char_voice_id=char_voice_id):
+        for raw_tutor_text, chunk_b64, last_speaker in tutor.stream(
+                system, student_text, st.session_state.chat,
+                CLAUDE_KEY, ELEVEN_KEY,
+                use_structured=True, char_voice_id=char_voice_id):
             if chunk_b64:
                 all_chunks.append(chunk_b64)
 
@@ -469,12 +479,6 @@ if student_text:
         # ── Handle scene done ─────────────────────────────────────────────────
         if scene_done:
             st.session_state.scene_complete = True
-            if not is_free_conv and st.session_state.scene_idx < 4 and FAL_KEY:
-                next_prompt = SCENE_NEXT_PROMPT.get(sk, "")
-                if next_prompt:
-                    st.session_state.scene_loading = True
-                    generate_scene_image(next_prompt, FAL_KEY,
-                                         _make_image_ready_cb(next_prompt))
 
     except Exception as e:
         st.session_state.avatar_thinking = False

@@ -6,35 +6,30 @@ Run:  python telegram_bot.py
 Needs TELEGRAM_BOT_TOKEN in keys.env (alongside the existing API keys).
 
 Commands:
-  /start  — welcome & onboarding
-  /scene  — pick or change scene
-  /level  — change level
-  /stop   — end lesson + corrections summary
+  /stop   — end session + corrections summary
+  /reset  — clear conversation history
+  /link   — link to SpeakPals web account
   /help   — list commands
 
-Send text or a voice note to practise.
+Send text or a voice note to chat with your tutor.
 """
 from __future__ import annotations
 
 import asyncio
-import base64
 import io
 import json
 import logging
 import os
 import pathlib
-import re
 from concurrent.futures import ThreadPoolExecutor
-from datetime import date
 
 import subprocess
 
 import requests
 from dotenv import load_dotenv
-from telegram import InputFile, InlineKeyboardButton, InlineKeyboardMarkup, Update
+from telegram import InputFile, Update
 from telegram.ext import (
     Application,
-    CallbackQueryHandler,
     CommandHandler,
     ContextTypes,
     MessageHandler,
@@ -42,18 +37,11 @@ from telegram.ext import (
 )
 
 from pipeline import (
-    SCENE_CATALOG,
-    STT_LANG_CODE,
-    TTS_LANG_CODE,
-    VERDICT_SCHEMA,
-    VOICES_BY_LANG,
     clean_for_tts,
-    get_session,
-    parse_claude_response,
-    tts_chunk,
+    tts_tutor_mixed,
 )
 from prompts import build_system_prompt, get_tutor_name
-import gcal
+from tutor import Tutor
 
 # ── Setup ─────────────────────────────────────────────────────────────────────
 
@@ -84,6 +72,63 @@ USERS_DIR.mkdir(exist_ok=True)
 
 _executor = ThreadPoolExecutor(max_workers=4)
 
+# ── Inactivity-based profile update ──────────────────────────────────────────
+# After PROFILE_UPDATE_DELAY seconds of silence, update the knowledge profile.
+PROFILE_UPDATE_DELAY = 120  # 2 minutes
+
+# Pending asyncio tasks keyed by chat_id — cancelled when a new message arrives
+_profile_tasks: dict[int, asyncio.Task] = {}
+
+
+def _build_profile_log(user: dict) -> list[dict]:
+    """Convert the bot chat history into the format expected by update_knowledge_profile."""
+    log = []
+    for m in user.get("chat", []):
+        if m.get("role") == "user":
+            log.append({"who": "student", "text": m.get("content", "")})
+        elif m.get("role") == "assistant":
+            log.append({"who": "tutor",   "text": m.get("content", "")})
+    return log
+
+
+def _run_profile_update(chat_id: int) -> None:
+    """Blocking: update knowledge profile from latest chat and persist to Supabase."""
+    from profile import update_knowledge_profile
+    from db import save_knowledge_profile_for_bot
+    user = load_user(chat_id)
+    conv_log = _build_profile_log(user)
+    if not conv_log or not user.get("sb_user_id"):
+        return
+    updated = update_knowledge_profile(
+        user.get("knowledge_profile") or {},
+        user.get("name", ""), user.get("level", "A1"),
+        user.get("language", "Danish"), user.get("bg_lang", "English"),
+        conv_log, user.get("coaching_log", []),
+        CLAUDE_KEY,
+    )
+    if updated:
+        user["knowledge_profile"] = updated
+        save_user(chat_id, user)
+        save_knowledge_profile_for_bot(chat_id, updated)
+        log.info("Knowledge profile updated for chat %s", chat_id)
+
+
+async def _schedule_profile_update(chat_id: int) -> None:
+    """Wait for inactivity then save the knowledge profile in the background."""
+    await asyncio.sleep(PROFILE_UPDATE_DELAY)
+    loop = asyncio.get_running_loop()
+    await loop.run_in_executor(_executor, lambda: _run_profile_update(chat_id))
+    _profile_tasks.pop(chat_id, None)
+
+
+def _reset_profile_timer(chat_id: int) -> None:
+    """Cancel any pending profile update and start a fresh countdown."""
+    existing = _profile_tasks.pop(chat_id, None)
+    if existing:
+        existing.cancel()
+    task = asyncio.create_task(_schedule_profile_update(chat_id))
+    _profile_tasks[chat_id] = task
+
 # Scribe v1 REST API needs an explicit language code to avoid misidentifying
 # similar languages (e.g. Danish → Swedish). Different from STT_LANG_CODE
 # which is used by the Streamlit app's Scribe v2 Realtime WebSocket stream.
@@ -98,24 +143,19 @@ FFMPEG = shutil.which("ffmpeg") or "/opt/homebrew/bin/ffmpeg"
 # ── User state ────────────────────────────────────────────────────────────────
 
 DEFAULT_STATE: dict = {
-    "name":         None,
-    "level":        "A1",
-    "bg_lang":      "English",
-    "language":     "Danish",
-    "voice_label":  "Mathias — male baritone",
-    "scene_key":    None,
-    "chat":         [],
-    "turn_count":   0,
-    "correct_log":  [],
-    "coaching_log": [],
-    "setup_step":   "name",   # None = fully set up
-    "sb_user_id":   None,     # set when linked to a web account
+    "name":              None,
+    "level":             "A1",
+    "bg_lang":           "English",
+    "language":          "Danish",
+    "voice_label":       "Mathias — male baritone",
+    "chat":              [],
+    "coaching_log":      [],
+    "sb_user_id":        None,     # set when linked to a web account
+    "knowledge_profile": {},       # JSON profile synced from Supabase
 }
 
 # Mapping from Supabase column names to bot state keys (they match, listed for clarity)
 _PROFILE_KEYS = ("name", "level", "language", "voice_label", "bg_lang")
-
-BG_LANGS = ["English", "German", "Swedish", "Other"]
 
 
 def _user_file(chat_id: int) -> pathlib.Path:
@@ -140,19 +180,31 @@ def save_user(chat_id: int, state: dict) -> None:
 
 
 def load_user_synced(chat_id: int) -> dict:
-    """Load user state, pulling fresh settings from Supabase if the account is linked."""
+    """Load user state, pulling fresh settings and chat history from Supabase if linked.
+
+    Always queries Supabase by chat_id so the link survives app restarts
+    (the local JSON file is ephemeral on Streamlit Cloud).
+    """
     user = load_user(chat_id)
-    if user.get("sb_user_id"):
-        try:
-            from db import get_telegram_profile
-            profile = get_telegram_profile(chat_id)
-            if profile:
-                for key in _PROFILE_KEYS:
-                    if profile.get(key):
-                        user[key] = profile[key]
-                save_user(chat_id, user)
-        except Exception:
-            pass
+    try:
+        from db import get_telegram_profile, load_knowledge_profile_for_bot, load_bot_chat_history
+        profile = get_telegram_profile(chat_id)
+        if profile:
+            # Re-establish the link flag in case the local file was wiped after a restart
+            if not user.get("sb_user_id"):
+                user["sb_user_id"] = True  # used as a boolean; all RPCs use chat_id
+            for key in _PROFILE_KEYS:
+                if profile.get(key):
+                    user[key] = profile[key]
+            kp = load_knowledge_profile_for_bot(chat_id)
+            if kp:
+                user["knowledge_profile"] = kp
+            history = load_bot_chat_history(chat_id)
+            if history:
+                user["chat"] = history
+            save_user(chat_id, user)
+    except Exception:
+        pass
     return user
 
 
@@ -203,191 +255,23 @@ def _stt_sync(audio_bytes: bytes, lang_code: str = "da") -> str:
 
 # ── Inline keyboards ──────────────────────────────────────────────────────────
 
-def _lang_keyboard() -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup([[
-        InlineKeyboardButton("🇩🇰 Danish",      callback_data="language:Danish"),
-        InlineKeyboardButton("🇧🇷 Portuguese",  callback_data="language:Portuguese (Brazilian)"),
-    ]])
-
-
-def _level_keyboard() -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup([
-        [
-            InlineKeyboardButton("A1 — Beginner",      callback_data="level:A1"),
-            InlineKeyboardButton("A2 — Elementary",    callback_data="level:A2"),
-        ],
-        [
-            InlineKeyboardButton("B1 — Intermediate",       callback_data="level:B1"),
-            InlineKeyboardButton("B2 — Upper Intermediate", callback_data="level:B2"),
-        ],
-    ])
-
-
-def _bg_lang_keyboard() -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup([
-        [InlineKeyboardButton(lang, callback_data=f"bg_lang:{lang}")]
-        for lang in BG_LANGS
-    ])
-
-
-def _scene_keyboard(level: str, cal_events: list[dict] | None = None) -> InlineKeyboardMarkup:
-    rows = []
-    # Calendar-based scenes at the top (max 3 to keep keyboard tidy)
-    if cal_events:
-        for ev in cal_events[:3]:
-            label = f"📅 {ev['title']}"
-            # Telegram callback_data max 64 bytes — truncate title if needed
-            key = ev["title"][:50]
-            rows.append([InlineKeyboardButton(label, callback_data=f"cal_scene:{key}")])
-    scenes = [s for s in SCENE_CATALOG if s["level"] == level] or SCENE_CATALOG
-    for i in range(0, len(scenes), 2):
-        rows.append([
-            InlineKeyboardButton(s["title"], callback_data=f"scene:{s['key']}")
-            for s in scenes[i:i + 2]
-        ])
-    return InlineKeyboardMarkup(rows)
-
-
 # ── Commands ──────────────────────────────────────────────────────────────────
-
-async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    chat_id = update.effective_chat.id
-    user = load_user_synced(chat_id)  # pulls fresh settings from Supabase if linked
-
-    if user["name"] and not user.get("setup_step"):
-        level_labels = {"A1": "Beginner", "A2": "Elementary",
-                        "B1": "Intermediate", "B2": "Upper Intermediate"}
-        cal_status = "✅ connected" if gcal.is_connected(str(chat_id)) else "not connected — use /calendar to link it"
-        await update.message.reply_text(
-            f"Velkommen tilbage, *{user['name']}*! 👋\n"
-            f"Level: *{user['level']} — {level_labels.get(user['level'], '')}*  |  "
-            f"Language: *{user['language']}*\n"
-            f"📅 Calendar: {cal_status}\n\n"
-            "Use /scene to start a conversation, or just send me a message to continue.",
-            parse_mode="Markdown",
-        )
-    else:
-        user["setup_step"] = "name"
-        save_user(chat_id, user)
-        await update.message.reply_text(
-            "👋 Welcome to *SpeakPals*!\n\n"
-            "I'm your AI language tutor. Here's how it works:\n\n"
-            "1️⃣ Pick a *scene* — a real-life situation like a café, supermarket, or meeting a friend\n"
-            "2️⃣ Have a conversation in the language you're learning — "
-            "type or send a *voice note*, whatever feels natural\n"
-            "3️⃣ Your tutor plays the character and gently corrects mistakes along the way\n"
-            "4️⃣ Use /stop at any time to end the lesson and see a corrections summary\n\n"
-            "*Commands:*\n"
-            "/scene    — pick a scene\n"
-            "/level    — change your level\n"
-            "/stop     — end lesson & see feedback\n"
-            "/calendar — connect Google Calendar\n"
-            "/reset    — start over with a new profile\n"
-            "/help     — show this again\n\n"
-            "💡 *Tip:* Use /calendar to connect your Google Calendar — "
-            "your tutor will use your upcoming events as conversation topics!\n\n"
-            "Let's get you set up. What's your name?",
-            parse_mode="Markdown",
-        )
-
-
-async def cmd_scene(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    chat_id = update.effective_chat.id
-    user = load_user(chat_id)
-    if not user["name"] or user.get("setup_step"):
-        await update.message.reply_text("Please finish setup first — use /start.")
-        return
-    loop = asyncio.get_running_loop()
-    cal_events = await loop.run_in_executor(
-        _executor, lambda: gcal.get_upcoming_events_raw(str(chat_id))
-    )
-    intro = "Choose a scene to practise:"
-    if cal_events:
-        intro = "Choose a scene — or pick one of your upcoming events at the top 📅:"
-    await update.message.reply_text(
-        intro,
-        reply_markup=_scene_keyboard(user["level"], cal_events),
-    )
-
-
-async def cmd_level(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    await update.message.reply_text("Choose your level:", reply_markup=_level_keyboard())
-
-
-async def cmd_stop(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    chat_id = update.effective_chat.id
-    user = load_user(chat_id)
-    turns = user.get("turn_count", 0)
-
-    if turns == 0:
-        await update.message.reply_text(
-            "No lesson in progress. Use /scene to start one!"
-        )
-        return
-
-    coaching = user.get("coaching_log", [])
-    if coaching:
-        corrections = "\n".join(
-            f"• _{c['student']}_ → *{c['correct_form']}*"
-            for c in coaching[-6:]
-        )
-    else:
-        corrections = "_No corrections — great work!_ 🎉"
-
-    if user.get("scene_key") == "custom" and user.get("custom_scene"):
-        scene_title = user["custom_scene"].get("title", "Custom scene") + " 📅"
-    else:
-        scene = next((s for s in SCENE_CATALOG if s["key"] == user.get("scene_key")), None)
-        scene_title = scene["title"] if scene else "—"
-
-    await update.message.reply_text(
-        f"*Lesson complete!* 📋\n\n"
-        f"Scene: *{scene_title}*  |  Turns: *{turns}*\n\n"
-        f"*Things to remember:*\n{corrections}\n\n"
-        "Use /scene to start a new conversation!",
-        parse_mode="Markdown",
-    )
-
-    # Clear lesson state, keep profile
-    user.update({"chat": [], "turn_count": 0, "correct_log": [],
-                 "coaching_log": [], "scene_key": None})
-    save_user(chat_id, user)
 
 
 async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_text(
         "*SpeakPals* 🇩🇰\n\n"
-        "*How it works:*\n"
-        "1️⃣ Pick a scene with /scene — a real-life situation to practise in\n"
-        "2️⃣ Send a *text message* or *voice note* to reply to the character\n"
-        "3️⃣ Your tutor plays the character and corrects mistakes gently\n"
-        "4️⃣ Use /stop to end the lesson and see what to remember\n\n"
+        "Chat with your AI language tutor — type or send a voice note, "
+        "and your tutor will reply in text and audio.\n\n"
         "*Commands:*\n"
-        "/start               — welcome & profile setup\n"
-        "/scene               — pick or change your scene\n"
-        "/level               — change your level (A1 → B2)\n"
-        "/stop                — end lesson & see corrections\n"
-        "/calendar            — connect Google Calendar\n"
-        "/calendar\\_disconnect — remove calendar access\n"
-        "/link CODE           — link to your SpeakPals web account\n"
-        "/help                — show this message\n\n"
+        "/link CODE — link to your SpeakPals web account\n"
+        "/help      — show this message\n\n"
         "*Tips:*\n"
+        "• Link your web account with /link to sync your profile (name, level, language)\n"
         "• Voice notes are transcribed automatically — speak naturally\n"
         "• Your tutor echoes back what it heard before replying\n"
-        "• Corrections appear in _italics_ — note them for next time\n"
-        "• You can switch scenes any time with /scene\n"
-        "• Use /reset to start fresh with a new profile",
+        "• Corrections appear in _italics_ — note them for next time",
         parse_mode="Markdown",
-    )
-
-
-async def cmd_reset(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    chat_id = update.effective_chat.id
-    f = _user_file(chat_id)
-    if f.exists():
-        f.unlink()
-    await update.message.reply_text(
-        "Profile cleared! Use /start to set up a new one."
     )
 
 
@@ -424,401 +308,84 @@ async def cmd_link(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user = load_user(chat_id)
     user["sb_user_id"] = user_id
     try:
+        from db import load_knowledge_profile_for_bot
         profile = get_telegram_profile(chat_id)
         if profile:
             for key in _PROFILE_KEYS:
                 if profile.get(key):
                     user[key] = profile[key]
-            user["setup_step"] = None  # skip onboarding if profile is complete
+        kp = load_knowledge_profile_for_bot(chat_id)
+        if kp:
+            user["knowledge_profile"] = kp
     except Exception:
         pass
     save_user(chat_id, user)
 
     await update.message.reply_text(
         "✅ *Account linked!*\n\n"
-        "Your SpeakPals web settings (name, level, language, voice) are now "
-        "active in the bot. They'll refresh automatically each time you use /start.",
+        "Your SpeakPals settings (name, level, language, voice) are now active. "
+        "Just send a message to start chatting!",
         parse_mode="Markdown",
     )
-
-
-async def cmd_calendar(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Start Google Calendar device-flow OAuth."""
-    chat_id = update.effective_chat.id
-
-    if gcal.is_connected(str(chat_id)):
-        await update.message.reply_text(
-            "✅ Your Google Calendar is already connected.\n\n"
-            "Use /calendar\\_disconnect to remove access.",
-            parse_mode="Markdown",
-        )
-        return
-
-    try:
-        flow = gcal.start_device_flow()
-    except FileNotFoundError as e:
-        await update.message.reply_text(f"⚠️ {e}")
-        return
-    except Exception as e:
-        log.exception("Calendar device flow start failed")
-        await update.message.reply_text(f"⚠️ Could not start calendar login: {e}")
-        return
-
-    device_code  = flow["device_code"]
-    user_code    = flow["user_code"]
-    verify_url   = flow["verification_url"]
-    interval     = int(flow.get("interval", 5))
-    expires_in   = int(flow.get("expires_in", 1800))
-
-    await update.message.reply_text(
-        f"📅 *Connect Google Calendar*\n\n"
-        f"1. Open this URL on your phone or computer:\n{verify_url}\n\n"
-        f"2. Enter this code: `{user_code}`\n\n"
-        f"3. Sign in with Google and click *Allow*\n\n"
-        f"I'll automatically detect when you've approved it "
-        f"(checking for the next {expires_in // 60} minutes).",
-        parse_mode="Markdown",
-    )
-
-    # Poll in background — notify user when done
-    loop = asyncio.get_running_loop()
-
-    async def _poll():
-        try:
-            token = await loop.run_in_executor(
-                _executor,
-                lambda: gcal.poll_for_token(device_code, interval, expires_in),
-            )
-        except PermissionError:
-            await context.bot.send_message(
-                chat_id, "❌ Calendar access was denied. Use /calendar to try again."
-            )
-            return
-        except Exception:
-            log.exception("Calendar poll error for %s", chat_id)
-            await context.bot.send_message(
-                chat_id, "⚠️ Something went wrong while connecting calendar. Try /calendar again."
-            )
-            return
-
-        if token is None:
-            await context.bot.send_message(
-                chat_id,
-                "⏰ The login code expired before you approved it. Use /calendar to try again.",
-            )
-            return
-
-        gcal.save_token(str(chat_id), token)
-        events = gcal.get_upcoming_events(str(chat_id))
-        if events:
-            preview = "\n".join(f"  • {e}" for e in events[:5])
-            await context.bot.send_message(
-                chat_id,
-                f"✅ *Calendar connected!*\n\n"
-                f"Your upcoming events:\n{preview}\n\n"
-                "I'll weave these into your lessons as conversation topics.",
-                parse_mode="Markdown",
-            )
-        else:
-            await context.bot.send_message(
-                chat_id,
-                "✅ *Calendar connected!* No events found in the next 7 days, "
-                "but I'll check again at the start of each lesson.",
-                parse_mode="Markdown",
-            )
-
-    asyncio.create_task(_poll())
-
-
-async def cmd_calendar_disconnect(
-    update: Update, context: ContextTypes.DEFAULT_TYPE
-) -> None:
-    chat_id = update.effective_chat.id
-    gcal.revoke_token(str(chat_id))
-    await update.message.reply_text("🗓️ Calendar disconnected.")
-
-
-# ── Onboarding (text step) ────────────────────────────────────────────────────
-
-def _extract_name(raw: str) -> str:
-    """Pull just the first name out of phrases like 'Hi, my name is Milla!'"""
-    text = raw.strip().rstrip("!.,")
-    # Strip common intro phrases, case-insensitive
-    patterns = [
-        r"(?:hi|hello|hey)[,\s]+(?:my name is|i(?:'m| am)|i'm)\s+",
-        r"(?:my name is|i(?:'m| am)|i'm|call me|it'?s)\s+",
-        r"(?:hi|hello|hey)[,!\s]+",
-    ]
-    for pat in patterns:
-        text = re.sub(pat, "", text, flags=re.IGNORECASE).strip().rstrip("!.,")
-    # Take only the first word (first name)
-    first_word = text.split()[0] if text.split() else raw.strip()
-    return first_word.capitalize()
-
-
-async def _handle_setup_text(
-    update: Update, user: dict, chat_id: int
-) -> None:
-    step = user.get("setup_step")
-
-    if step == "name":
-        name = _extract_name(update.message.text)
-        user["name"] = name
-        user["setup_step"] = "language"
-        save_user(chat_id, user)
-        await update.message.reply_text(
-            f"Nice to meet you, *{name}*! 🎉\n\nWhat language would you like to practise?",
-            parse_mode="Markdown",
-            reply_markup=_lang_keyboard(),
-        )
-    else:
-        # Other steps need button presses — remind the user
-        prompts = {
-            "language": ("Choose a language:", _lang_keyboard()),
-            "level":    ("Choose your level:", _level_keyboard()),
-            "bg_lang":  ("What's your native language?", _bg_lang_keyboard()),
-        }
-        if step in prompts:
-            msg, kb = prompts[step]
-            await update.message.reply_text(msg, reply_markup=kb)
-
-
-# ── Callback queries (inline button presses) ──────────────────────────────────
-
-async def callback_handler(
-    update: Update, context: ContextTypes.DEFAULT_TYPE
-) -> None:
-    query = update.callback_query
-    await query.answer()
-    chat_id = query.message.chat_id
-    user = load_user(chat_id)
-    action, _, value = query.data.partition(":")
-
-    if action == "language":
-        user["language"] = value
-        voices = VOICES_BY_LANG.get(value, {})
-        user["voice_label"] = next(iter(voices.keys()), user["voice_label"])
-        if user.get("setup_step") == "language":
-            user["setup_step"] = "level"
-            save_user(chat_id, user)
-            await query.edit_message_text(
-                f"Great — we'll practise *{value}*! 🎯\n\nWhat's your current level?",
-                parse_mode="Markdown",
-                reply_markup=_level_keyboard(),
-            )
-        else:
-            save_user(chat_id, user)
-            await query.edit_message_text(
-                f"Language updated to *{value}*.", parse_mode="Markdown"
-            )
-
-    elif action == "level":
-        level_labels = {"A1": "Beginner", "A2": "Elementary",
-                        "B1": "Intermediate", "B2": "Upper Intermediate"}
-        user["level"] = value
-        if user.get("setup_step") == "level":
-            user["setup_step"] = "bg_lang"
-            save_user(chat_id, user)
-            await query.edit_message_text(
-                f"Level set to *{value} — {level_labels.get(value, '')}*.\n\n"
-                "What's your native language?",
-                parse_mode="Markdown",
-                reply_markup=_bg_lang_keyboard(),
-            )
-        else:
-            save_user(chat_id, user)
-            await query.edit_message_text(
-                f"Level updated to *{value}*.", parse_mode="Markdown"
-            )
-
-    elif action == "bg_lang":
-        user["bg_lang"] = value
-        if user.get("setup_step") == "bg_lang":
-            user["setup_step"] = None
-            save_user(chat_id, user)
-            await query.edit_message_text(
-                f"All set, *{user['name']}*! 🚀\n\n"
-                f"Language: *{user['language']}*  |  Level: *{user['level']}*  |  Native: *{value}*\n\n"
-                "Pick a scene below to start your first conversation.\n"
-                "You can send *text* or a *voice note* — I'll handle the rest.\n"
-                "Use /stop when you're done to see your corrections.",
-                parse_mode="Markdown",
-                reply_markup=_scene_keyboard(user["level"]),
-            )
-        else:
-            save_user(chat_id, user)
-            await query.edit_message_text(
-                f"Native language updated to *{value}*.", parse_mode="Markdown"
-            )
-
-    elif action == "scene":
-        scene = next((s for s in SCENE_CATALOG if s["key"] == value), None)
-        if not scene:
-            await query.edit_message_text("Scene not found.")
-            return
-        user.update({"scene_key": value, "custom_scene": None, "chat": [], "turn_count": 0,
-                     "correct_log": [], "coaching_log": []})
-        save_user(chat_id, user)
-        await query.edit_message_text(
-            f"*{scene['title']}* 🎬\n_{scene['desc']}_\n\n"
-            f"The {scene['char_name']} is ready. Start speaking!\n"
-            "_(Send a text message or voice note)_",
-            parse_mode="Markdown",
-        )
-
-    elif action == "cal_scene":
-        # value is the event title (truncated to 50 chars)
-        event_title = value
-        await query.edit_message_text(
-            f"📅 Generating a scene for *{event_title}*…",
-            parse_mode="Markdown",
-        )
-        # Find matching raw event to get date label
-        loop = asyncio.get_running_loop()
-        raw_events = await loop.run_in_executor(
-            _executor, lambda: gcal.get_upcoming_events_raw(str(chat_id))
-        )
-        match = next((e for e in raw_events if e["title"].startswith(event_title)), None)
-        date_label = match["date_label"] if match else ""
-        try:
-            generated = await loop.run_in_executor(
-                _executor,
-                lambda: _generate_scene_sync(event_title, date_label, user["language"]),
-            )
-        except Exception:
-            log.exception("Scene generation failed for %s", chat_id)
-            await query.edit_message_text(
-                "⚠️ Couldn't generate a scene for that event. Try a regular scene instead."
-            )
-            return
-        user.update({
-            "scene_key":    "custom",
-            "custom_scene": generated,
-            "chat": [], "turn_count": 0, "correct_log": [], "coaching_log": [],
-        })
-        save_user(chat_id, user)
-        await query.edit_message_text(
-            f"*{generated.get('title', event_title)}* 📅🎬\n"
-            f"_{generated.get('desc', '')}_\n\n"
-            f"{generated.get('char_name', 'Character')} is ready. Start speaking!\n"
-            "_(Send a text message or voice note)_",
-            parse_mode="Markdown",
-        )
-
-
-# ── Calendar scene generation ─────────────────────────────────────────────────
-
-def _generate_scene_sync(event_title: str, date_label: str, language: str) -> dict:
-    """Call Claude to generate a scene dict from a calendar event."""
-    prompt = (
-        f"A language learner is practising {language}. "
-        f"They have an upcoming event: '{event_title}' on {date_label}. "
-        "Generate a short roleplay scene they can practise to prepare for it.\n\n"
-        "Respond with ONLY a JSON object on one line with these fields:\n"
-        '  "title": short scene title (max 5 words)\n'
-        '  "desc": one sentence describing what the student practises\n'
-        '  "char_name": name/role of the character (e.g. "Colleague", "Doctor", "Host")\n'
-        '  "scene_description": 1–2 sentence scene-setting description for the AI tutor '
-        "(describe the setting and character's role/mood — this becomes the system prompt scene)\n\n"
-        "Keep it realistic and directly relevant to the event."
-    )
-    sess = get_session()
-    resp = sess.post(
-        "https://api.anthropic.com/v1/messages",
-        headers={"x-api-key": CLAUDE_KEY, "anthropic-version": "2023-06-01",
-                 "Content-Type": "application/json"},
-        json={"model": "claude-haiku-4-5-20251001", "max_tokens": 300, "temperature": 0.7,
-              "messages": [{"role": "user", "content": prompt}]},
-        timeout=20,
-    )
-    resp.raise_for_status()
-    text = resp.json()["content"][0]["text"].strip()
-    # Strip markdown code fences if present
-    if text.startswith("```"):
-        text = text.split("```")[1]
-        if text.startswith("json"):
-            text = text[4:]
-    return json.loads(text.strip())
 
 
 # ── Pipeline helpers ──────────────────────────────────────────────────────────
 
-def _build_context(user: dict, chat_id: int) -> tuple[str, str, str, str, str]:
-    """Return (system_prompt, voice_id, char_voice_id, lang_code, model)."""
-    if user.get("scene_key") == "custom" and user.get("custom_scene"):
-        scene_description = user["custom_scene"].get("scene_description", "")
-    else:
-        scene = next((s for s in SCENE_CATALOG if s["key"] == user.get("scene_key")), None)
-        scene_description = scene["scene_description"] if scene else ""
-    events = gcal.get_upcoming_events(str(chat_id))
+def _build_context(user: dict) -> tuple[str, str, str, str]:
+    """Return (system_prompt, voice_id, lang_code, model)."""
+    tutor = Tutor.from_bot_user(user)
     system = build_system_prompt(
-        user["name"], user["level"], user["bg_lang"],
-        target_lang=user["language"],
-        scene_description=scene_description,
+        tutor.name or "there", tutor.level, tutor.bg_lang,
+        target_lang=tutor.target_lang,
         turn_count=user.get("turn_count", 0),
-        calendar_events=events or None,
+        knowledge_profile=tutor.knowledge_profile or None,
+        free_conv=True,
+        telegram=True,
     )
-    lang_voices   = VOICES_BY_LANG.get(user["language"], {})
-    voice_id      = lang_voices.get(user["voice_label"]) or next(iter(lang_voices.values()))
-    char_voice_id = next((v for v in lang_voices.values() if v != voice_id), voice_id)
-    lang_code     = TTS_LANG_CODE.get(user["language"], "da")
-    return system, voice_id, char_voice_id, lang_code, "claude-haiku-4-5-20251001"
+    return system, tutor.voice_id, tutor.tl_lang_code, tutor.model_id
 
 
 def _claude_sync(system: str, user_text: str, chat: list, model: str) -> str:
-    """Call Claude and return the raw response text (no TTS)."""
-    sess     = get_session()
+    """Call Claude and return the plain-text reply.
+
+    Uses a fresh session per call — no shared state with the profile-update timer.
+    No structured output: the Telegram system prompt instructs Claude to reply in
+    plain text, so we just return content[0]["text"] directly.
+    """
     messages = [{"role": m["role"], "content": m["content"]}
                 for m in chat if m["role"] in {"user", "assistant"} and m["content"]]
     messages.append({"role": "user", "content": user_text})
-    resp = sess.post(
-        "https://api.anthropic.com/v1/messages",
-        headers={"x-api-key": CLAUDE_KEY, "anthropic-version": "2023-06-01",
-                 "Content-Type": "application/json"},
-        json={"model": model, "max_tokens": 220, "temperature": 0.3,
-              "stream": True, "system": system, "messages": messages,
-              "output_config": {"format": {"type": "json_schema",
-                                           "schema": VERDICT_SCHEMA}}},
-        stream=True, timeout=30,
-    )
+    with requests.Session() as sess:
+        resp = sess.post(
+            "https://api.anthropic.com/v1/messages",
+            headers={"x-api-key": CLAUDE_KEY, "anthropic-version": "2023-06-01",
+                     "Content-Type": "application/json"},
+            json={"model": model, "max_tokens": 600, "temperature": 0.7,
+                  "system": system, "messages": messages},
+            timeout=30,
+        )
     resp.raise_for_status()
-    raw = ""
-    for line in resp.iter_lines():
-        line = line.decode() if isinstance(line, bytes) else line
-        if not line.startswith("data: "):
-            continue
-        payload = line[6:]
-        if payload.strip() in ("[DONE]", ""):
-            continue
+    raw = resp.json()["content"][0]["text"].strip()
+    # Safety net: if Claude returned JSON despite the plain-text instruction, extract the text field
+    if raw.startswith("{"):
         try:
-            ev = json.loads(payload)
+            import json as _j
+            obj = _j.loads(raw)
+            if isinstance(obj, dict) and obj.get("text"):
+                return str(obj["text"]).strip()
         except Exception:
-            continue
-        if ev.get("type") == "content_block_delta":
-            raw += ev.get("delta", {}).get("text", "")
+            pass
     return raw
 
 
-def _tts_sync(spoken_text: str, speaker: str,
-              voice_id: str, char_voice_id: str, lang_code: str) -> bytes:
-    """Generate TTS using a low-bitrate format for faster transfer and conversion."""
-    tts_voice = char_voice_id if speaker == "character" else voice_id
-    tts_lang  = lang_code     if speaker == "character" else "en"
-    from pipeline import TTS_MODEL
-    r = get_session().post(
-        f"https://api.elevenlabs.io/v1/text-to-speech/{tts_voice}/stream"
-        f"?output_format=mp3_22050_32",
-        headers={"xi-api-key": ELEVEN_KEY, "Content-Type": "application/json"},
-        json={
-            "text": clean_for_tts(spoken_text),
-            "model_id": TTS_MODEL.get(tts_lang, "eleven_turbo_v2_5"),
-            "language_code": tts_lang,
-            "voice_settings": {"stability": 0.4, "similarity_boost": 0.75, "speed": 0.92},
-        },
-        stream=True, timeout=30,
-    )
-    r.raise_for_status()
-    return b"".join(r.iter_content(4096))
+def _tts_sync(spoken_text: str, voice_id: str, lang_code: str) -> bytes:
+    """Generate TTS audio bytes (MP3) for the tutor voice.
+
+    Uses tts_tutor_mixed to handle English prose that may contain embedded
+    target-language phrases in quotes — correctly pronounced via lang_code.
+    """
+    return tts_tutor_mixed(clean_for_tts(spoken_text), voice_id, ELEVEN_KEY,
+                           tl_lang_code=lang_code)
 
 
 async def _process_message(
@@ -833,12 +400,8 @@ async def _process_message(
     Text is sent as soon as Claude responds (~2s).
     Voice note follows after TTS + conversion (~2s more).
     """
-    if not user.get("scene_key"):
-        await update.effective_message.reply_text("Use /scene to pick a scene first!")
-        return
-
     loop = asyncio.get_running_loop()
-    system, voice_id, char_voice_id, lang_code, model = _build_context(user, chat_id)
+    system, voice_id, lang_code, model = _build_context(user)
 
     # ── Step 1: Claude (show typing indicator while waiting) ──────────────────
     async def _keep_typing():
@@ -859,38 +422,34 @@ async def _process_message(
     finally:
         typing_task.cancel()
 
-    spoken_text, _, scene_done, is_correct, correction, speaker = parse_claude_response(raw_claude)
+    spoken_text = raw_claude
 
     # Update conversation state
     user["chat"].extend([
         {"role": "user",      "content": user_text},
         {"role": "assistant", "content": spoken_text},
     ])
-    user["turn_count"] = user.get("turn_count", 0) + 1
-    user.setdefault("correct_log", []).append({"who": speaker, "text": spoken_text})
-    if correction:
-        user.setdefault("coaching_log", []).append(
-            {"student": user_text, "correct_form": correction}
-        )
     save_user(chat_id, user)
+    # Persist chat history to Supabase so it survives app restarts
+    if user.get("sb_user_id"):
+        try:
+            from db import save_bot_chat_history
+            save_bot_chat_history(chat_id, user["chat"])
+        except Exception:
+            pass
 
     # ── Step 2: Send text reply immediately ───────────────────────────────────
-    scene      = next((s for s in SCENE_CATALOG if s["key"] == user["scene_key"]), None)
-    char_label = scene["char_name"] if scene else "Character"
     tutor_name = get_tutor_name(user["language"])
-    label      = char_label if speaker == "character" else f"💡 {tutor_name}"
     await update.effective_message.reply_text(
-        f"*{label}:* {spoken_text}", parse_mode="Markdown"
+        f"*💡 {tutor_name}:* {spoken_text}", parse_mode="Markdown"
     )
-    if correction and not is_correct:
-        await update.effective_message.reply_text(f"_✏️ {correction}_", parse_mode="Markdown")
 
     # ── Step 3: TTS + OGG conversion (show upload indicator while waiting) ────
     await context.bot.send_chat_action(chat_id, "upload_voice")
     try:
         mp3_bytes = await loop.run_in_executor(
             _executor,
-            lambda: _tts_sync(spoken_text, speaker, voice_id, char_voice_id, lang_code)
+            lambda: _tts_sync(spoken_text, voice_id, lang_code)
         )
         ogg_bytes = await loop.run_in_executor(
             _executor, lambda: _mp3_to_ogg_opus(mp3_bytes)
@@ -903,10 +462,8 @@ async def _process_message(
         log.exception("TTS/audio error for chat %s", chat_id)
         # Text was already sent — audio failure is non-fatal
 
-    if scene_done:
-        await update.effective_message.reply_text(
-            "🎉 Scene complete! Use /stop to review corrections, or /scene for a new one."
-        )
+    # Start/reset the inactivity timer — profile is saved after 2 min of silence
+    _reset_profile_timer(chat_id)
 
 
 # ── Message handlers ──────────────────────────────────────────────────────────
@@ -915,25 +472,15 @@ async def text_handler(
     update: Update, context: ContextTypes.DEFAULT_TYPE
 ) -> None:
     chat_id = update.effective_chat.id
-    user    = load_user(chat_id)
-
-    if user.get("setup_step"):
-        await _handle_setup_text(update, user, chat_id)
-    else:
-        await _process_message(update, context, update.message.text.strip(), user, chat_id)
+    user    = load_user_synced(chat_id)
+    await _process_message(update, context, update.message.text.strip(), user, chat_id)
 
 
 async def voice_handler(
     update: Update, context: ContextTypes.DEFAULT_TYPE
 ) -> None:
     chat_id = update.effective_chat.id
-    user    = load_user(chat_id)
-
-    if user.get("setup_step"):
-        await update.message.reply_text(
-            "Please finish setup first — use the buttons above or /start."
-        )
-        return
+    user    = load_user_synced(chat_id)
 
     await context.bot.send_chat_action(chat_id, "typing")
 
@@ -974,16 +521,8 @@ def build_app() -> Application:
             "TELEGRAM_BOT_TOKEN not set. Add it to keys.env and try again."
         )
     app = Application.builder().token(BOT_TOKEN).build()
-    app.add_handler(CommandHandler("start",                cmd_start))
-    app.add_handler(CommandHandler("scene",                cmd_scene))
-    app.add_handler(CommandHandler("level",                cmd_level))
-    app.add_handler(CommandHandler("stop",                 cmd_stop))
-    app.add_handler(CommandHandler("help",                 cmd_help))
-    app.add_handler(CommandHandler("reset",                cmd_reset))
-    app.add_handler(CommandHandler("link",                 cmd_link))
-    app.add_handler(CommandHandler("calendar",             cmd_calendar))
-    app.add_handler(CommandHandler("calendar_disconnect",  cmd_calendar_disconnect))
-    app.add_handler(CallbackQueryHandler(callback_handler))
+    app.add_handler(CommandHandler("help", cmd_help))
+    app.add_handler(CommandHandler("link", cmd_link))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, text_handler))
     app.add_handler(MessageHandler(filters.VOICE, voice_handler))
     return app

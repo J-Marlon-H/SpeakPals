@@ -121,6 +121,80 @@ def sign_out(access_token: str) -> None:
         pass
 
 
+def send_reset_email(email: str, redirect_to: str = "") -> str | None:
+    """Send a password-reset email via Supabase. Returns error string or None on success."""
+    try:
+        options = {"redirect_to": redirect_to} if redirect_to else {}
+        _client().auth.reset_password_for_email(email, options=options)
+        return None
+    except Exception as e:
+        return str(e)
+
+
+def verify_recovery_token(token_hash: str) -> tuple[dict | None, str | None]:
+    """Exchange a Supabase recovery token_hash (from the reset-link URL) for a session.
+    Returns (session_dict, error_str)."""
+    try:
+        res = _client().auth.verify_otp({"token_hash": token_hash, "type": "recovery"})
+        if res.session and res.user:
+            return {
+                "access_token":  res.session.access_token,
+                "refresh_token": res.session.refresh_token,
+                "user_id":       res.user.id,
+                "email":         res.user.email or "",
+            }, None
+        return None, "Recovery failed — please request a new reset link."
+    except Exception as e:
+        return None, str(e)
+
+
+def exchange_code_for_session(code: str) -> tuple[dict | None, str | None]:
+    """Exchange a PKCE auth code (from ?code= in the reset-link redirect) for a session.
+    Returns (session_dict, error_str)."""
+    try:
+        res = _client().auth.exchange_code_for_session({"auth_code": code})
+        if res.session and res.user:
+            return {
+                "access_token":  res.session.access_token,
+                "refresh_token": res.session.refresh_token,
+                "user_id":       res.user.id,
+                "email":         res.user.email or "",
+            }, None
+        return None, "Could not exchange code — please request a new reset link."
+    except Exception as e:
+        return None, str(e)
+
+
+def session_from_tokens(access_token: str, refresh_token: str = "") -> tuple[dict | None, str | None]:
+    """Build a session dict from an existing access_token + refresh_token.
+    Used when Supabase implicit flow delivers tokens via the URL hash fragment."""
+    try:
+        import base64 as _b64
+        payload = access_token.split(".")[1]
+        # Fix base64 padding
+        payload += "=" * (-len(payload) % 4)
+        claims = _json.loads(_b64.urlsafe_b64decode(payload))
+        return {
+            "access_token":  access_token,
+            "refresh_token": refresh_token,
+            "user_id":       claims.get("sub", ""),
+            "email":         claims.get("email", ""),
+        }, None
+    except Exception as exc:
+        return None, str(exc)
+
+
+def update_password(access_token: str, new_password: str, refresh_token: str = "") -> str | None:
+    """Update the authenticated user's password. Returns error string or None on success."""
+    try:
+        c = create_client(SUPABASE_URL, SUPABASE_KEY)  # type: ignore[name-defined]
+        c.auth.set_session(access_token, refresh_token)
+        c.auth.update_user({"password": new_password})
+        return None
+    except Exception as e:
+        return str(e)
+
+
 def get_user_email(access_token: str) -> str:
     """Return the email address for the authenticated user, or '' on failure."""
     try:
@@ -290,6 +364,140 @@ def save_knowledge_profile(user_id: str, access_token: str, profile: dict) -> No
          .execute())
     except Exception:
         pass
+
+
+def save_feedback(user_id: str, access_token: str, text: str) -> None:
+    """Append a feedback entry to user_knowledge_profiles.feedback (JSONB array)."""
+    import datetime as _dt
+    try:
+        client = _client(access_token)
+        res = (client
+               .table("user_knowledge_profiles")
+               .select("feedback")
+               .eq("user_id", user_id)
+               .maybe_single()
+               .execute())
+        existing: list = []
+        if res and res.data:
+            f = res.data.get("feedback")
+            if isinstance(f, list):
+                existing = list(f)
+            elif isinstance(f, str) and f:
+                try:
+                    existing = _json.loads(f)
+                    if not isinstance(existing, list):
+                        existing = []
+                except Exception:
+                    existing = []
+        existing.append({
+            "text":       text,
+            "created_at": _dt.datetime.utcnow().isoformat() + "Z",
+        })
+        (client
+         .table("user_knowledge_profiles")
+         .upsert({
+             "user_id":  user_id,
+             "feedback": existing,
+         })
+         .execute())
+    except Exception:
+        pass
+
+
+def save_knowledge_profile_for_bot(chat_id: int, profile: dict) -> None:
+    """Upsert a user's knowledge profile from the Telegram bot (no user JWT needed).
+
+    Uses the upsert_knowledge_profile_by_chat_id RPC (SECURITY DEFINER).
+
+    Required SQL (run once in Supabase SQL editor):
+
+        CREATE OR REPLACE FUNCTION upsert_knowledge_profile_by_chat_id(
+            p_chat_id BIGINT, p_profile JSONB)
+        RETURNS VOID LANGUAGE plpgsql SECURITY DEFINER AS $$
+        DECLARE v_uid UUID; BEGIN
+          SELECT id INTO v_uid FROM users WHERE telegram_chat_id = p_chat_id;
+          IF NOT FOUND THEN RETURN; END IF;
+          INSERT INTO user_knowledge_profiles (user_id, profile, updated_at)
+          VALUES (v_uid, p_profile, now())
+          ON CONFLICT (user_id) DO UPDATE
+            SET profile = p_profile, updated_at = now();
+        END; $$;
+    """
+    try:
+        _client().rpc("upsert_knowledge_profile_by_chat_id",
+                      {"p_chat_id": chat_id,
+                       "p_profile": _json.dumps(profile, ensure_ascii=False)}).execute()
+    except Exception:
+        pass
+
+
+def load_knowledge_profile_for_bot(chat_id: int) -> dict:
+    """Load a user's knowledge profile from the Telegram bot (no user JWT needed).
+
+    Uses the get_knowledge_profile_by_chat_id RPC (SECURITY DEFINER) — same
+    pattern as get_telegram_profile.  Returns {} if not linked or no profile yet.
+    """
+    try:
+        res = (_client()
+               .rpc("get_knowledge_profile_by_chat_id", {"p_chat_id": chat_id})
+               .execute())
+        data = res.data
+        if not data:
+            return {}
+        return data if isinstance(data, dict) else _json.loads(data)
+    except Exception:
+        return {}
+
+
+def save_bot_chat_history(chat_id: int, messages: list) -> None:
+    """Persist the bot's conversation history for a linked user (no JWT needed).
+
+    Uses the save_bot_chat_history RPC (SECURITY DEFINER).
+    Only saves the last 40 messages to keep the payload small.
+
+    Required SQL (run once in Supabase SQL editor):
+
+        ALTER TABLE users ADD COLUMN IF NOT EXISTS bot_chat_history JSONB DEFAULT '[]'::jsonb;
+
+        CREATE OR REPLACE FUNCTION save_bot_chat_history(p_chat_id BIGINT, p_messages JSONB)
+        RETURNS VOID LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+        BEGIN
+          UPDATE users SET bot_chat_history = p_messages WHERE telegram_chat_id = p_chat_id;
+        END; $$;
+    """
+    try:
+        trimmed = messages[-40:] if len(messages) > 40 else messages
+        _client().rpc("save_bot_chat_history",
+                      {"p_chat_id": chat_id,
+                       "p_messages": _json.dumps(trimmed, ensure_ascii=False)}).execute()
+    except Exception:
+        pass
+
+
+def load_bot_chat_history(chat_id: int) -> list:
+    """Load the bot's conversation history for a linked user (no JWT needed).
+
+    Uses the load_bot_chat_history RPC (SECURITY DEFINER).
+    Returns [] if not linked or no history yet.
+
+    Required SQL (run once in Supabase SQL editor):
+
+        CREATE OR REPLACE FUNCTION load_bot_chat_history(p_chat_id BIGINT)
+        RETURNS JSONB LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+        DECLARE v_messages JSONB;
+        BEGIN
+          SELECT bot_chat_history INTO v_messages FROM users WHERE telegram_chat_id = p_chat_id;
+          RETURN COALESCE(v_messages, '[]'::jsonb);
+        END; $$;
+    """
+    try:
+        res = _client().rpc("load_bot_chat_history", {"p_chat_id": chat_id}).execute()
+        data = res.data
+        if not data:
+            return []
+        return data if isinstance(data, list) else _json.loads(data)
+    except Exception:
+        return []
 
 
 def delete_knowledge_profile(user_id: str, access_token: str) -> None:

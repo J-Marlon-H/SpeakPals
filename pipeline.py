@@ -1,4 +1,4 @@
-import requests, urllib3, base64, json, re, time, threading
+import requests, urllib3, base64, json, re, time
 import streamlit as st
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
@@ -43,8 +43,9 @@ def tts_chunk(text, voice_id, eleven_key, lang_code="da"):
     r.raise_for_status()
 
 
-# Matches single- or double-quoted spans (straight and curly quotes), max 80 chars
-_QUOTED_RE = re.compile(r'["\u2018\u2019\u201c\u201d]([^"\u2018\u2019\u201c\u201d]{1,80})["\u2018\u2019\u201c\u201d]')
+# Matches single- or double-quoted spans (straight ' " and curly quotes), max 80 chars.
+# Straight apostrophe (0x27) included so Claude outputs like Try 'Nej tak' are caught.
+_QUOTED_RE = re.compile(r"['\"\u2018\u2019\u201c\u201d]([^'\"\u2018\u2019\u201c\u201d]{1,80})['\"\u2018\u2019\u201c\u201d]")
 
 
 def tts_tutor_mixed(text: str, voice_id: str, eleven_key: str, tl_lang_code: str) -> bytes:
@@ -78,20 +79,39 @@ def tts_tutor_mixed(text: str, voice_id: str, eleven_key: str, tl_lang_code: str
 
 
 def generate_language_tip(conversation_lines: list, bg_lang: str, claude_key: str,
-                          model: str = "claude-haiku-4-5-20251001") -> str:
+                          model: str = "claude-haiku-4-5-20251001",
+                          bg_context: str = "") -> str:
     """Generate a conversation-specific language tip for a given background language.
-    Returns plain text (2-3 sentences). Raises on API error."""
+
+    bg_context — optional known facts about {bg_lang} → Danish patterns (cognates,
+    false friends, grammar traps). Used as a reference so the model grounds its tip
+    in verified patterns rather than guessing.
+
+    Returns plain text (2-3 sentences). Raises on API error.
+    """
     conv_text = "\n".join(
         f"{'Character' if e['who'] == 'character' else 'Student'}: {e['text']}"
         for e in conversation_lines
     )
+    context_block = (
+        f"\n\nKnown {bg_lang}→Danish patterns for reference (use ONLY if relevant "
+        f"to the conversation above):\n{bg_context}"
+        if bg_context else ""
+    )
     prompt = (
         f"A student whose native language is {bg_lang} just completed this short Danish conversation:\n\n"
-        f"{conv_text}\n\n"
-        f"Write a short tip (2–3 sentences max) specifically for {bg_lang} speakers, based only on "
-        f"the words that appear in this conversation. Focus on: cognates (Danish words that look or "
-        f"sound similar to {bg_lang}), false friends, or notable pronunciation differences. "
-        f"Reference specific words from the conversation. Plain text only — no markdown, no bullet points."
+        f"{conv_text}"
+        f"{context_block}\n\n"
+        f"Write a short tip (2–3 sentences max) specifically for {bg_lang} speakers.\n\n"
+        f"STRICT RULES:\n"
+        f"- Only mention patterns that are DIRECTLY VISIBLE in the conversation above.\n"
+        f"- Every word you reference MUST appear verbatim in the conversation text.\n"
+        f"- You may draw on the known patterns above only when those patterns appear in "
+        f"the actual conversation words — do not bring in patterns that are not demonstrated.\n"
+        f"- Do NOT invent cognates, false friends, or linguistic connections you cannot "
+        f"verify from the conversation or the reference above.\n"
+        f"- If there is nothing genuinely noteworthy, reply with an empty string only.\n"
+        f"Plain text only — no markdown, no bullet points."
     )
     r = get_session().post(
         "https://api.anthropic.com/v1/messages",
@@ -144,9 +164,9 @@ def extract_vocabulary(conversation_lines: list, bg_lang: str, level: str,
 
 
 SETTINGS_DEFAULTS = {
-    "s_name":        "Marlon",
-    "s_level":       "A1",
-    "s_bg_lang":     "German",
+    "s_name":        "",
+    "s_level":       "",
+    "s_bg_lang":     "",
     "s_language":    "Danish",
     "s_voice_label": "Mathias — male baritone",
     "s_model_label": "Haiku 4.5 — fastest",
@@ -335,7 +355,7 @@ LESSON_STATE_KEYS = [
     "pipeline_error", "pending_student", "avatar_thinking",
     "correct_log", "coaching_log", "lesson_started",
     "tutor_play_seq", "char_play_seq", "replay_char_seq",
-    "current_session_id", "knowledge_profile",
+    "current_session_id",
 ]
 
 # ── Structured output schema ────────────────────────────────────────────────────
@@ -357,12 +377,17 @@ VERDICT_SCHEMA = {
 
 def run_pipeline_stream(system, user_input, history, voice_id, claude_key, eleven_key,
                         model="claude-sonnet-4-6", use_structured=False, lang_code="da",
-                        char_voice_id=None):
+                        char_voice_id=None, tl_lang_code=None):
     """Generator: yields (raw_claude_text, chunk_b64, speaker).
     Streams Claude fully, then makes a single TTS call for the complete response.
-    When use_structured=True, enforces VERDICT_SCHEMA via the structured outputs API,
-    extracts the "text" field for TTS, and picks the voice based on "speaker":
-    "character" → char_voice_id (falls back to voice_id); "tutor" → voice_id.
+
+    voice_id     — tutor voice (used for all tutor/onboarding speech)
+    char_voice_id — character voice in scene roleplay (falls back to voice_id)
+    lang_code    — target language TTS code for character speech (e.g. "da", "pt")
+    tl_lang_code — target language code for embedded phrases in tutor English speech;
+                   defaults to lang_code when not set. Passed to tts_tutor_mixed so
+                   quoted Danish/Portuguese words are pronounced correctly inside
+                   English sentences across onboarding, free conv, and lesson hints.
     """
     sess = get_session()
     messages = [{"role": m["role"], "content": m["content"]}
@@ -378,31 +403,47 @@ def run_pipeline_stream(system, user_input, history, voice_id, claude_key, eleve
             "format": {"type": "json_schema", "schema": VERDICT_SCHEMA}
         }
 
-    resp = sess.post(
-        "https://api.anthropic.com/v1/messages",
-        headers={"x-api-key": claude_key, "anthropic-version": "2023-06-01",
-                 "Content-Type": "application/json"},
-        json=body,
-        stream=True, timeout=30,
-    )
-    resp.raise_for_status()
-
+    _max_attempts = 3
     raw_claude = ""
-    for raw in resp.iter_lines():
-        if not raw:
-            continue
-        line = raw.decode() if isinstance(raw, bytes) else raw
-        if not line.startswith("data: "):
-            continue
-        payload = line[6:]
-        if payload.strip() in ("[DONE]", ""):
-            continue
-        try:
-            ev = json.loads(payload)
-        except Exception:
-            continue
-        if ev.get("type") == "content_block_delta":
-            raw_claude += ev.get("delta", {}).get("text", "")
+    for _ in range(_max_attempts):
+        resp = sess.post(
+            "https://api.anthropic.com/v1/messages",
+            headers={"x-api-key": claude_key, "anthropic-version": "2023-06-01",
+                     "Content-Type": "application/json"},
+            json=body,
+            stream=True, timeout=30,
+        )
+        resp.raise_for_status()
+
+        raw_claude = ""
+        for raw in resp.iter_lines():
+            if not raw:
+                continue
+            line = raw.decode() if isinstance(raw, bytes) else raw
+            if not line.startswith("data: "):
+                continue
+            payload = line[6:]
+            if payload.strip() in ("[DONE]", ""):
+                continue
+            try:
+                ev = json.loads(payload)
+            except Exception:
+                continue
+            if ev.get("type") == "content_block_delta":
+                raw_claude += ev.get("delta", {}).get("text", "")
+
+        # If structured, validate JSON — retry on malformed response
+        if use_structured:
+            stripped = raw_claude.strip()
+            if not stripped or stripped in ("{", "}", "null"):
+                continue  # retry
+            try:
+                _parsed = json.loads(stripped)
+                if not _parsed.get("text", "").strip():
+                    continue  # retry on empty text
+            except Exception:
+                continue  # retry on parse failure
+        break  # success
 
     # Extract spoken text and speaker — use JSON fields if structured, else full text
     tts_text = None
@@ -420,16 +461,24 @@ def run_pipeline_stream(system, user_input, history, voice_id, claude_key, eleve
     if tts_text is None:
         tts_text = clean_for_tts(raw_claude)
 
-    tts_voice = (char_voice_id or voice_id) if speaker == "character" else voice_id
+    # Effective target-language code for mixed tutor speech
+    _tl = tl_lang_code if tl_lang_code is not None else lang_code
+
+    tts_voice = (char_voice_id or voice_id) if (speaker == "character" and use_structured) else voice_id
 
     if tts_text:
-        if speaker == "character":
-            # Character speaks target language only — lock to target lang_code
+        if speaker == "character" and use_structured:
+            # Scene character: speaks target language only — lock to target lang_code
             audio = tts_chunk(tts_text, tts_voice, eleven_key, lang_code=lang_code)
         else:
-            # Tutor speaks English with embedded target-language phrases in quotes.
-            # Split on quoted spans so each segment gets the correct lang_code.
-            audio = tts_tutor_mixed(tts_text, tts_voice, eleven_key, tl_lang_code=lang_code)
+            # Tutor path — covers:
+            #   • lesson tutor hints (structured, speaker="tutor")
+            #   • free conversation (structured, speaker="tutor")
+            #   • onboarding (unstructured — speaker always defaults to "character"
+            #     but it IS the tutor, so route here too)
+            # Splits on quoted target-language phrases so Danish/Portuguese words
+            # inside English sentences are pronounced with the correct lang_code.
+            audio = tts_tutor_mixed(tts_text, tts_voice, eleven_key, tl_lang_code=_tl)
         yield raw_claude, base64.b64encode(audio).decode(), speaker
     else:
         yield raw_claude, "", speaker
@@ -441,13 +490,6 @@ _SCENE_RE  = re.compile(r'<scene>(.*?)</scene>', re.DOTALL)
 _OK_RE     = re.compile(r'<ok\s*/>', re.IGNORECASE)
 _OK_AT_END = re.compile(r'<ok\s*/>\s*$', re.IGNORECASE)
 
-_IMAGE_STYLE = (
-    "photorealistic, ultra-realistic, first-person immersive view, "
-    "person facing directly toward the viewer with full eye contact, "
-    "as if someone is looking right at you and waiting for a response, "
-    "realistic Danish everyday setting, natural lighting, "
-    "no text, no labels, "
-)
 
 
 def strip_ok_tag(text: str) -> tuple[str, bool]:
@@ -524,23 +566,3 @@ def character_tts_b64(text: str, voice_id: str, eleven_key: str, lang_code: str 
         return None
 
 
-def generate_scene_image(scene_prompt: str, fal_key: str, callback) -> None:
-    """Spawn a background thread; calls callback(url: str) when the image is ready."""
-    def _run():
-        import os
-        os.environ["FAL_KEY"] = fal_key
-        try:
-            import fal_client
-            result = fal_client.run(
-                "fal-ai/flux/schnell",
-                arguments={
-                    "prompt": _IMAGE_STYLE + scene_prompt,
-                    "image_size": "landscape_16_9",
-                    "num_images": 1,
-                },
-            )
-            url = result["images"][0]["url"]
-            callback(url)
-        except Exception:
-            callback(None)
-    threading.Thread(target=_run, daemon=True).start()

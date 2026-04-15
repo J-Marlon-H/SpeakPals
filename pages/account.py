@@ -1,7 +1,7 @@
 import streamlit as st
 from pipeline import (VOICES, VOICES_BY_LANG, MODELS, LESSON_STATE_KEYS, SCENE_CATALOG,
                       SETTINGS_DEFAULTS, SCENE_PRIMARY_VOICE)
-from db import require_auth, upsert_profile, load_profile, load_knowledge_profile, get_user_email
+from db import require_auth, upsert_profile, load_profile, load_knowledge_profile, delete_knowledge_profile, get_user_email, update_password
 
 require_auth()
 
@@ -21,8 +21,7 @@ st.set_page_config(page_title="Settings — SpeakPals", page_icon="⚙", layout=
                    initial_sidebar_state="collapsed")
 
 st.markdown("""<style>
-  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
-  html,body{font-family:'Inter',sans-serif!important}
+  html,body{font-family:system-ui,-apple-system,BlinkMacSystemFont,Roboto,sans-serif!important}
   #MainMenu,footer,[data-testid="stToolbar"]{visibility:hidden}
   [data-testid="stHeader"],header,.stAppHeader{display:none!important}
   [data-testid="collapsedControl"],[data-testid="stSidebarCollapseButton"],
@@ -64,7 +63,7 @@ st.markdown("""<style>
   div[data-testid="stVerticalBlock"]{gap:0.5rem!important}
 
   .sec-div{height:1px;background:rgba(17,24,39,.1);margin:22px 0 18px}
-  .sec-label{font:700 10px 'Inter',sans-serif;letter-spacing:2px;
+  .sec-label{font:700 10px system-ui,-apple-system,BlinkMacSystemFont,Roboto,sans-serif;letter-spacing:2px;
     color:rgba(17,24,39,.4);text-transform:uppercase;margin:0 0 10px}
 
   /* Profile expander cards */
@@ -76,7 +75,7 @@ st.markdown("""<style>
     box-shadow:0 3px 12px rgba(13,148,136,.12)!important;
     border-color:rgba(13,148,136,.25)!important}
   [data-testid="stExpander"] summary{
-    padding:14px 16px!important;font:600 13px Inter,sans-serif!important;color:#111827!important}
+    padding:14px 16px!important;font:600 13px system-ui,-apple-system,BlinkMacSystemFont,Roboto,sans-serif!important;color:#111827!important}
   [data-testid="stExpander"] summary:hover{background:rgba(13,148,136,.04)!important}
   [data-testid="stExpanderDetails"]{
     padding:0 16px 16px!important;border-top:1px solid rgba(17,24,39,.07)!important}
@@ -85,9 +84,9 @@ st.markdown("""<style>
 # ── Page header ────────────────────────────────────────────────────────────────
 st.markdown("""
 <div style='padding:4px 0 28px'>
-  <div style='font:800 26px/1 Inter,sans-serif;color:#111827;letter-spacing:-.5px;
+  <div style='font:800 26px/1 system-ui,-apple-system,BlinkMacSystemFont,Roboto,sans-serif;color:#111827;letter-spacing:-.5px;
               margin-bottom:6px'>⚙ Settings</div>
-  <div style='font:400 13px Inter;color:rgba(17,24,39,.55)'>
+  <div style='font:400 13px system-ui;color:rgba(17,24,39,.55)'>
     Personalise your SpeakPals experience
   </div>
 </div>""", unsafe_allow_html=True)
@@ -95,16 +94,48 @@ st.markdown("""
 # ── Student profile ────────────────────────────────────────────────────────────
 st.markdown("<div class='sec-label'>Student Profile</div>", unsafe_allow_html=True)
 
-name     = st.text_input("Name", value=st.session_state.get("s_name", ""))
-level    = st.selectbox("Level", ["A1", "A2", "B1", "B2"],
-                        index=["A1", "A2", "B1", "B2"].index(
-                            st.session_state.get("s_level", "A1")))
-bg_langs = ["English", "German", "Spanish", "French", "Dutch", "Swedish"]
-bg_lang  = st.selectbox("Your language background", bg_langs,
-                        index=bg_langs.index(
-                            st.session_state.get("s_bg_lang", "English")
-                            if st.session_state.get("s_bg_lang", "English") in bg_langs
-                            else "English"))
+name = st.text_input("Name", value=st.session_state.get("s_name", ""))
+
+_cefr = ["A1", "A2", "B1", "B2", "C1", "C2"]
+_saved_level = st.session_state.get("s_level", "A1")
+level = st.selectbox(
+    "CEFR Level",
+    _cefr,
+    index=_cefr.index(_saved_level) if _saved_level in _cefr else 0,
+    help=(
+        "Your current level in the language you are learning.\n\n"
+        "A1 — complete beginner\n"
+        "A2 — basic phrases\n"
+        "B1 — can handle simple conversations\n"
+        "B2 — comfortable in most situations\n"
+        "C1 — advanced, near-fluent\n"
+        "C2 — mastery, near-native"
+    ),
+)
+
+_bg_opts = ["English", "German", "Spanish", "French", "Dutch", "Swedish", "Other"]
+_saved_bg = st.session_state.get("s_bg_lang", "English")
+_bg_idx   = _bg_opts.index(_saved_bg) if _saved_bg in _bg_opts else _bg_opts.index("Other")
+_bg_sel   = st.selectbox(
+    "Main language background",
+    _bg_opts,
+    index=_bg_idx,
+    help=(
+        "The language you speak best — your native tongue or the language you are most "
+        "fluent in. Your tutor uses this to explain concepts in a way that makes sense "
+        "for someone with your background, and to spot typical mistakes speakers of your "
+        "language tend to make."
+    ),
+)
+if _bg_sel == "Other":
+    _other_val = _saved_bg if _saved_bg not in _bg_opts[:-1] else ""
+    bg_lang = st.text_input(
+        "Specify your language",
+        value=_other_val,
+        placeholder="e.g. Turkish, Arabic, Hindi…",
+    )
+else:
+    bg_lang = _bg_sel
 
 st.markdown("<div class='sec-div'></div>", unsafe_allow_html=True)
 
@@ -112,13 +143,15 @@ st.markdown("<div class='sec-div'></div>", unsafe_allow_html=True)
 st.markdown("<div class='sec-label'>Preferences</div>", unsafe_allow_html=True)
 
 languages = ["Danish", "Portuguese (Brazilian)"]
+_LANG_LABELS = {"Portuguese (Brazilian)": "Portuguese (Brazilian) - beta"}
 language  = st.selectbox(
     "Language to learn",
     languages,
     index=languages.index(
         st.session_state.get("s_language", "Danish")
         if st.session_state.get("s_language", "Danish") in languages else "Danish"
-    )
+    ),
+    format_func=lambda x: _LANG_LABELS.get(x, x),
 )
 
 lang_voices = VOICES_BY_LANG.get(language, VOICES)
@@ -135,20 +168,14 @@ affected = [s["title"] for s in SCENE_CATALOG if scene_primary.get(s["key"]) == 
 if affected:
     st.markdown(
         f"<div style='background:rgba(13,148,136,.07);border:1px solid rgba(13,148,136,.2);"
-        f"border-radius:10px;padding:10px 14px;margin-top:4px;font:400 12px Inter;"
+        f"border-radius:10px;padding:10px 14px;margin-top:4px;margin-bottom:16px;font:400 12px system-ui;"
         f"color:rgba(17,24,39,.65)'>"
         f"Auto-swap: <span style='color:#0d9488'>{', '.join(affected)}</span> "
         f"will use a different character voice to avoid your tutor voice.</div>",
         unsafe_allow_html=True
     )
 
-model_keys  = list(MODELS.keys())
-model_label = st.selectbox(
-    "AI model",
-    model_keys,
-    index=model_keys.index(
-        st.session_state.get("s_model_label", "Haiku 4.5 — fastest"))
-)
+model_label = "Haiku 4.5 — fastest"  # fixed — not user-configurable
 
 st.markdown("<div class='sec-div'></div>", unsafe_allow_html=True)
 
@@ -160,10 +187,10 @@ if _is_new_user:
 <div style='background:linear-gradient(135deg,rgba(13,148,136,.1),rgba(13,148,136,.04));
             border:1px solid rgba(13,148,136,.3);border-radius:14px;
             padding:16px 18px;margin-bottom:16px'>
-  <div style='font:700 13px Inter;color:#0d9488;margin-bottom:6px'>
+  <div style='font:700 13px system-ui;color:#0d9488;margin-bottom:6px'>
     👋 One more step — connect your tools
   </div>
-  <div style='font:400 13px/1.65 Inter;color:rgba(17,24,39,.65)'>
+  <div style='font:400 13px/1.65 system-ui;color:rgba(17,24,39,.65)'>
     Link your <strong>Telegram</strong> to get lessons on the go, and connect
     <strong>Google Calendar</strong> so your tutor can build conversations around your upcoming
     events. Both are optional — but they make SpeakPals much more personal.
@@ -171,7 +198,7 @@ if _is_new_user:
 </div>""", unsafe_allow_html=True)
 else:
     st.markdown(
-        "<div style='font:400 12px/1.6 Inter;color:rgba(17,24,39,.5);margin-bottom:12px'>"
+        "<div style='font:400 12px/1.6 system-ui;color:rgba(17,24,39,.5);margin-bottom:12px'>"
         "Connect Telegram for lessons on the go, and Google Calendar so your tutor can "
         "build conversations around your real life.</div>",
         unsafe_allow_html=True
@@ -188,14 +215,25 @@ st.markdown("<div class='sec-label'>Your Learning Profile</div>", unsafe_allow_h
 st.markdown("""
 <div style='background:linear-gradient(135deg,rgba(13,148,136,.08),rgba(13,148,136,.03));
             border:1px solid rgba(13,148,136,.22);border-radius:14px;
-            padding:16px 18px;margin-bottom:20px'>
-  <div style='font:700 13px Inter;color:#0d9488;margin-bottom:6px'>
+            padding:16px 18px;margin-bottom:14px'>
+  <div style='font:700 13px system-ui;color:#0d9488;margin-bottom:6px'>
     🧠 Your tutor remembers you
   </div>
-  <div style='font:400 13px/1.65 Inter;color:rgba(17,24,39,.65)'>
+  <div style='font:400 13px/1.65 system-ui;color:rgba(17,24,39,.65)'>
     Every session, SpeakPals builds a richer picture of who you are and how you learn.
-    Below is <strong>everything we store about you</strong> — fully transparent, always
-    up to date. The more you practise, the more personalised your experience becomes.
+    Below is <strong>everything we store about you</strong> — fully transparent, always up to date.
+  </div>
+</div>
+
+<div style='background:rgba(245,158,11,.07);border:1px solid rgba(245,158,11,.3);
+            border-radius:12px;padding:12px 16px;margin-bottom:20px;
+            display:flex;gap:10px;align-items:flex-start'>
+  <span style='font-size:16px;flex-shrink:0'>🔒</span>
+  <div style='font:400 12px/1.6 system-ui;color:rgba(17,24,39,.65)'>
+    <strong style='color:#92400e'>Your data stays yours.</strong>
+    This profile is stored securely and used exclusively to personalise your experience
+    inside SpeakPals. It is never shared with third parties, never sold, and never used
+    to train AI models. You can reset it at any time.
   </div>
 </div>""", unsafe_allow_html=True)
 
@@ -206,8 +244,8 @@ else:
 
 _CATEGORIES = [
     (
-        "language_level", "📊", "Language Level",
-        "Your current proficiency — vocabulary and grammar mastered, where you struggle, and how your level is progressing.",
+        "language_level", "📊", "CEFR Level",
+        "Your current proficiency on the A1–C2 scale (Common European Framework of Reference) — vocabulary and grammar mastered, where you struggle, and how your level is progressing.",
     ),
     (
         "learning_motivation", "🎯", "Learning Motivation",
@@ -253,19 +291,15 @@ for _key, _icon, _label, _desc in _CATEGORIES:
 
     with st.expander(f"{_icon} **{_label}** &nbsp; {_dot} *{_status}*", expanded=False):
         st.markdown(
-            f"<div style='font:400 12px/1.6 Inter;color:rgba(17,24,39,.5);"
-            f"margin:10px 0 14px;font-style:italic'>{_desc}</div>",
+            f"<div style='font:400 12px/1.6 system-ui;color:rgba(17,24,39,.5);"
+            f"margin:4px 0 10px;font-style:italic'>{_desc}</div>",
             unsafe_allow_html=True,
         )
         if _filled:
-            st.markdown(
-                f"<div style='font:400 13px/1.7 Inter;color:#111827;"
-                f"white-space:pre-wrap'>{_content}</div>",
-                unsafe_allow_html=True,
-            )
+            st.markdown(_content)   # renders bullet lists, bold, etc. natively
         else:
             st.markdown(
-                "<div style='font:400 13px Inter;color:rgba(17,24,39,.35);"
+                "<div style='font:400 13px system-ui;color:rgba(17,24,39,.35);"
                 "font-style:italic;padding:4px 0'>"
                 "Nothing recorded yet — this fills up as you practise and chat with your tutor."
                 "</div>",
@@ -276,7 +310,7 @@ _known_keys = {c[0] for c in _CATEGORIES}
 _custom     = {k: v for k, v in _kp.items() if k not in _known_keys}
 if _custom:
     st.markdown(
-        "<div style='font:700 10px Inter;letter-spacing:2px;text-transform:uppercase;"
+        "<div style='font:700 10px system-ui;letter-spacing:2px;text-transform:uppercase;"
         "color:rgba(17,24,39,.3);margin:18px 0 8px'>Also noted by your tutor</div>",
         unsafe_allow_html=True,
     )
@@ -286,11 +320,43 @@ if _custom:
         _ts      = (_val.get("updated_at", "") if isinstance(_val, dict) else "")
         _exp_label = f"✨ **{_label}**" + (f"  ·  *{_ts[:10]}*" if _ts else "")
         with st.expander(_exp_label, expanded=False):
-            st.markdown(
-                f"<div style='font:400 13px/1.7 Inter;color:#111827;"
-                f"white-space:pre-wrap'>{_content or '—'}</div>",
-                unsafe_allow_html=True,
-            )
+            st.markdown(_content or "—")
+
+# ── Delete knowledge ──────────────────────────────────────────────────────────
+st.markdown("<br>", unsafe_allow_html=True)
+
+if not st.session_state.get("_confirm_delete_profile"):
+    if st.button("🗑 Delete all my learning data", use_container_width=True):
+        st.session_state["_confirm_delete_profile"] = True
+        st.rerun()
+else:
+    st.markdown("""
+<div style='background:rgba(220,38,38,.07);border:1px solid rgba(220,38,38,.25);
+            border-radius:12px;padding:14px 16px;margin-bottom:12px'>
+  <div style='font:700 13px system-ui;color:#dc2626;margin-bottom:4px'>⚠ Are you sure?</div>
+  <div style='font:400 12px/1.6 system-ui;color:rgba(17,24,39,.6)'>
+    This will permanently delete everything SpeakPals knows about you —
+    your learning history, personal context, and all tutor observations.
+    Your account and lesson settings are not affected.
+    This cannot be undone.
+  </div>
+</div>""", unsafe_allow_html=True)
+    _col_yes, _col_no = st.columns(2)
+    with _col_yes:
+        if st.button("Yes, delete everything", use_container_width=True):
+            if "sb_user_id" in st.session_state:
+                delete_knowledge_profile(
+                    st.session_state.sb_user_id,
+                    st.session_state.sb_access_token,
+                )
+            st.session_state.pop("knowledge_profile", None)
+            st.session_state.pop("_confirm_delete_profile", None)
+            st.success("Your learning data has been deleted.")
+            st.rerun()
+    with _col_no:
+        if st.button("Cancel", use_container_width=True):
+            st.session_state.pop("_confirm_delete_profile", None)
+            st.rerun()
 
 st.markdown("<div class='sec-div'></div>", unsafe_allow_html=True)
 
@@ -314,10 +380,45 @@ if not _email and "sb_access_token" in st.session_state:
         st.session_state["sb_email"] = _email
 
 st.markdown(
-    f"<div style='font:400 12px Inter;color:rgba(17,24,39,.5);margin-bottom:10px'>"
+    f"<div style='font:400 12px system-ui;color:rgba(17,24,39,.5);margin-bottom:10px'>"
     f"Signed in as <strong>{_email or '—'}</strong></div>",
     unsafe_allow_html=True
 )
+if not st.session_state.get("_show_change_pw"):
+    if st.button("Change password", use_container_width=True):
+        st.session_state["_show_change_pw"] = True
+        st.rerun()
+else:
+    with st.form("change_pw_form"):
+        new_pw     = st.text_input("New password", type="password", placeholder="At least 6 characters")
+        confirm_pw = st.text_input("Confirm new password", type="password", placeholder="••••••••")
+        _col_save, _col_cancel = st.columns(2)
+        with _col_save:
+            pw_submitted = st.form_submit_button("Update password", use_container_width=True)
+        with _col_cancel:
+            cancelled = st.form_submit_button("Cancel", use_container_width=True)
+
+    if cancelled:
+        st.session_state.pop("_show_change_pw", None)
+        st.rerun()
+    if pw_submitted:
+        if len(new_pw) < 6:
+            st.error("Password must be at least 6 characters.")
+        elif new_pw != confirm_pw:
+            st.error("Passwords don't match.")
+        else:
+            _err = update_password(
+                st.session_state.sb_access_token,
+                new_pw,
+                st.session_state.get("sb_refresh_token", ""),
+            )
+            if _err:
+                st.error(f"Could not update password: {_err}")
+            else:
+                st.session_state.pop("_show_change_pw", None)
+                st.success("Password updated.")
+                st.rerun()
+
 if st.button("Sign out", use_container_width=True):
     from db import sign_out
     sign_out(st.session_state.get("sb_access_token", ""))
@@ -357,6 +458,6 @@ with col_lesson:
         _save()
         st.switch_page("pages/lesson.py")
 with col_ob:
-    if st.button("👋 Onboarding", use_container_width=True):
+    if st.button("👋 Redo Onboarding", use_container_width=True):
         _save()
         st.switch_page("pages/onboarding.py")

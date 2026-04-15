@@ -29,36 +29,82 @@ def _start_telegram_bot():
 
 _start_telegram_bot()
 
+# ── Navigation setup (must happen before any st.switch_page call) ─────────────
+pages = [
+    st.Page("pages/home.py",              title="Home",           default=True),
+    st.Page("pages/login.py",             title="Login",          visibility="hidden"),
+    st.Page("pages/reset_password.py",    title="Reset Password", visibility="hidden"),
+    st.Page("pages/account.py",           title="Account",        visibility="hidden"),
+    st.Page("pages/telegram_settings.py", title="Telegram",       visibility="hidden"),
+    st.Page("pages/scene_select.py",      title="Scene Select",   visibility="hidden"),
+    st.Page("pages/lesson.py",            title="Lesson",         visibility="hidden"),
+    st.Page("pages/feedback.py",          title="Feedback",       visibility="hidden"),
+    st.Page("pages/onboarding.py",        title="Onboarding",     visibility="hidden"),
+]
+pg = st.navigation(pages, position="hidden")
+
+# ── Intercept password-reset redirect before session restore ───────────────────
+# Supabase redirects back with ?code= (PKCE) or ?token_hash=&type=recovery.
+# Route to the dedicated reset page. Guard pg.title to prevent looping.
+# NOTE: st.switch_page changes the URL and drops query params, so we stash the
+# code/token_hash in session state so reset_password.py can still read them.
+_qp = st.query_params
+_reset_code = _qp.get("code")
+_reset_tok  = _qp.get("token_hash")
+_reset_type = _qp.get("type")
+if (_reset_code or (_reset_tok and _reset_type == "recovery")) \
+        and pg.title != "Reset Password":
+    if _reset_code:
+        st.session_state["_reset_code"] = _reset_code
+    if _reset_tok:
+        st.session_state["_reset_token_hash"] = _reset_tok
+    st.switch_page("pages/reset_password.py")
+
+# ── Cookie controller (needed for both restore-on-load and persist-after-login) ─
+# st.rerun() and st.stop() raise subclasses of Exception — they MUST stay
+# outside any try/except block or they get silently swallowed.
+#
+# Skip CookieController entirely on the login page. The component triggers
+# multiple reruns on init (ready signal + data), which causes a double flash
+# on the login form. Cookie restoration always happens on the page that loads
+# *before* the login redirect (home → require_auth → login), so login never
+# needs the controller for restoration. After a successful login the user is
+# switched away from this page, so cookie persistence is handled by app.py on
+# the destination page.
+_cookies = None
+if pg.title != "Login":
+    try:
+        from streamlit_cookies_controller import CookieController
+        _cookies = CookieController(key="sp_ctrl")
+    except Exception:
+        pass
+
 # ── Session restore from cookie ───────────────────────────────────────────────
 # Cookie components need one render cycle to initialize before data is readable.
 # We do a single controlled rerun the first time, then read on the second pass.
 if "sb_user_id" not in st.session_state:
-    # st.rerun() and st.stop() raise subclasses of Exception — they MUST stay
-    # outside any try/except block or they get silently swallowed.
     _stored_token = None
     _session_restored = False
-    _cookie_controller_ok = False
-    try:
-        from streamlit_cookies_controller import CookieController
-        from db import refresh_session
-        _cookies = CookieController(key="sp_ctrl")
-        _cookie_controller_ok = True
-        _stored_token = _cookies.get("sp_refresh_token")
-        if _stored_token:
-            _sess, _err = refresh_session(_stored_token)
-            if _sess:
-                st.session_state.sb_access_token  = _sess["access_token"]
-                st.session_state.sb_refresh_token = _sess["refresh_token"]
-                st.session_state.sb_user_id       = _sess["user_id"]
-                st.session_state.sb_email         = _sess["email"]
-                _cookies.set("sp_refresh_token", _sess["refresh_token"])
-                _session_restored = True
-    except Exception:
-        pass
+
+    if _cookies is not None:
+        try:
+            from db import refresh_session
+            _stored_token = _cookies.get("sp_refresh_token")
+            if _stored_token:
+                _sess, _err = refresh_session(_stored_token)
+                if _sess:
+                    st.session_state.sb_access_token  = _sess["access_token"]
+                    st.session_state.sb_refresh_token = _sess["refresh_token"]
+                    st.session_state.sb_user_id       = _sess["user_id"]
+                    st.session_state.sb_email         = _sess["email"]
+                    _session_restored = True
+        except Exception:
+            pass
 
     if _session_restored:
+        st.session_state.pop("_cookie_restoring", None)  # clear before rerun so it never lingers
         st.rerun()
-    elif _cookie_controller_ok and _stored_token is None and not st.session_state.get("_cookie_init_done"):
+    elif _cookies is not None and _stored_token is None and not st.session_state.get("_cookie_init_done"):
         # First render — component hasn't sent back cookie data yet.
         # Set a flag so require_auth() waits (via st.stop()) instead of
         # redirecting to login. Only set when the component actually loaded;
@@ -69,15 +115,32 @@ if "sb_user_id" not in st.session_state:
         # Cookie init is complete (token found-and-restored, or no cookie at all).
         st.session_state.pop("_cookie_restoring", None)
 
-pages = [
-    st.Page("pages/home.py",              title="Home",         default=True),
-    st.Page("pages/login.py",             title="Login",        visibility="hidden"),
-    st.Page("pages/account.py",           title="Account",      visibility="hidden"),
-    st.Page("pages/telegram_settings.py", title="Telegram",     visibility="hidden"),
-    st.Page("pages/scene_select.py",      title="Scene Select", visibility="hidden"),
-    st.Page("pages/lesson.py",            title="Lesson",       visibility="hidden"),
-    st.Page("pages/feedback.py",          title="Feedback",     visibility="hidden"),
-    st.Page("pages/onboarding.py",        title="Onboarding",   visibility="hidden"),
-]
-pg = st.navigation(pages, position="hidden")
+# ── Persist refresh token to cookie after login (or after token rotation) ─────
+# The login/onboarding pages set sb_refresh_token in session state but can't
+# write cookies directly. app.py runs on every render so we catch it here.
+# _last_written_token guards against re-writing the same value every render.
+elif _cookies is not None and "sb_refresh_token" in st.session_state:
+    _current_rt = st.session_state.sb_refresh_token
+    if st.session_state.get("_last_written_token") != _current_rt:
+        try:
+            _cookies.set("sp_refresh_token", _current_rt)
+            st.session_state["_last_written_token"] = _current_rt
+        except Exception:
+            pass  # CookieController not ready yet — will retry on next render
+
+# ── Load knowledge profile once per login session ────────────────────────────
+# knowledge_profile is NOT in LESSON_STATE_KEYS so it persists across lessons.
+# Load it here once so every page (lesson, free conv) can read it from session
+# state without a DB round-trip on every render.  feedback.py keeps it fresh
+# by writing the updated profile back to session state after each lesson.
+if "knowledge_profile" not in st.session_state and "sb_user_id" in st.session_state:
+    try:
+        from db import load_knowledge_profile
+        st.session_state["knowledge_profile"] = load_knowledge_profile(
+            st.session_state.sb_user_id,
+            st.session_state.sb_access_token,
+        )
+    except Exception:
+        st.session_state["knowledge_profile"] = {}
+
 pg.run()
