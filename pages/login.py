@@ -86,8 +86,9 @@ with tab_login:
                 st.switch_page("pages/home.py")
 
 # ── Create account ────────────────────────────────────────────────────────────
-_BG_LANGS   = ["English", "German", "Spanish", "French", "Dutch", "Swedish", "Other"]
+_BG_LANGS    = ["English", "German", "Spanish", "French", "Dutch", "Swedish", "Other"]
 _CEFR_LEVELS = ["A1", "A2", "B1", "B2", "C1", "C2"]
+_TARGET_LANGS = ["Danish", "Portuguese (Brazilian) — beta"]
 
 with tab_register:
     # Note: intentionally NOT using st.form here — forms batch widget interactions,
@@ -99,37 +100,42 @@ with tab_register:
     reg_confirm  = st.text_input("Confirm password *", key="reg_confirm", type="password",
                                  placeholder="••••••••")
     reg_bg_sel   = st.selectbox(
-        "Main language background *",
+        "Your native language *",
         _BG_LANGS,
         help=(
-            "The language you speak best — your native tongue or the language you are "
-            "most fluent in. Your tutor uses this to explain concepts in a way that "
-            "makes sense for someone with your background, and to spot typical mistakes "
-            "speakers of your language tend to make."
+            "The language you grew up speaking or feel most fluent in. "
+            "Your tutor uses this to explain new concepts in a familiar way "
+            "and to spot the typical mistakes speakers of your language tend to make."
         ),
         key="reg_bg_sel",
     )
     if reg_bg_sel == "Other":
         reg_bg_other = st.text_input(
-            "Specify your language *",
+            "Specify your native language *",
             key="reg_bg_other",
             placeholder="e.g. Turkish, Arabic, Hindi…",
         )
     else:
         reg_bg_other = ""
+    reg_target   = st.selectbox(
+        "Language you want to learn *",
+        _TARGET_LANGS,
+        help="The language your tutor will teach you.",
+        key="reg_target",
+    )
     reg_level    = st.selectbox(
-        "Estimated language level (CEFR) *",
+        "Your current level in that language *",
         _CEFR_LEVELS,
         help=(
-            "Your current level in the language you want to learn, on the Common "
-            "European Framework of Reference scale.\n\n"
-            "A1 — complete beginner\n"
-            "A2 — basic phrases\n"
+            "How much of the language you want to learn do you already know? "
+            "Based on the CEFR scale:\n\n"
+            "A1 — complete beginner, little to no knowledge\n"
+            "A2 — know some basic phrases\n"
             "B1 — can handle simple conversations\n"
-            "B2 — comfortable in most situations\n"
+            "B2 — comfortable in most everyday situations\n"
             "C1 — advanced, near-fluent\n"
             "C2 — mastery, near-native\n\n"
-            "An educated guess is fine — your tutor will adapt."
+            "An educated guess is fine — your tutor will adapt from there."
         ),
         key="reg_level",
     )
@@ -141,7 +147,9 @@ with tab_register:
     reg_submitted = st.button("Create account", use_container_width=True, key="btn_register")
 
     if reg_submitted:
-        _bg_lang_val = reg_bg_other.strip() if reg_bg_sel == "Other" else reg_bg_sel
+        _bg_lang_val  = reg_bg_other.strip() if reg_bg_sel == "Other" else reg_bg_sel
+        # Strip the "— beta" label before saving
+        _target_val   = reg_target.replace(" — beta", "").strip()
         if not reg_name.strip():
             st.error("First name is required.")
         elif not reg_email.strip():
@@ -151,7 +159,7 @@ with tab_register:
         elif not reg_confirm:
             st.error("Please confirm your password.")
         elif reg_bg_sel == "Other" and not reg_bg_other.strip():
-            st.error("Please specify your language in the field above.")
+            st.error("Please specify your native language in the field above.")
         elif len(reg_password) < 6:
             st.error("Password must be at least 6 characters.")
         elif reg_password != reg_confirm:
@@ -171,13 +179,15 @@ with tab_register:
                     st.session_state.sb_email         = session["email"]
                     st.session_state["s_name"]        = reg_name.strip()
                     st.session_state["s_bg_lang"]     = _bg_lang_val
+                    st.session_state["s_language"]    = _target_val
                     st.session_state["s_level"]       = reg_level
                     st.session_state["is_new_user"]   = True
                     # Persist to DB so tutors and settings see these values immediately
                     upsert_profile(session["user_id"], session["access_token"], {
-                        "s_name":    reg_name.strip(),
-                        "s_bg_lang": _bg_lang_val,
-                        "s_level":   reg_level,
+                        "s_name":     reg_name.strip(),
+                        "s_bg_lang":  _bg_lang_val,
+                        "s_language": _target_val,
+                        "s_level":    reg_level,
                     })
                     st.switch_page("pages/onboarding.py")
                 else:
