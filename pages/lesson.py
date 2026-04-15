@@ -185,8 +185,12 @@ current_scene     = scene_list[st.session_state.scene_idx] if scene_list else No
 scene_description = current_scene["description"] if current_scene else ""
 _scene_src_raw    = current_scene["src"] if current_scene else ""
 is_free_conv      = current_scene.get("free_conv", False) if current_scene else False
-# stt_lang_code stays as "" (Scribe auto-detect) for all modes — handles English and
-# Danish words in the same utterance. VAD AudioContext fixes prevent echo-biasing.
+# Free conversation: user talks to the tutor in any language (English, target, or both).
+# Scribe v2 auto-detect (empty string) handles code-switching natively.
+# Scene mode: lock to the target-language code so Danish/Portuguese words are never
+# mis-read as English.
+if is_free_conv:
+    stt_lang_code = ""
 scene_idx_1based  = st.session_state.scene_idx + 1
 
 # Convert local images to base64; FAL URLs pass through as-is
