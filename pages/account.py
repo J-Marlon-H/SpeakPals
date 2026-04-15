@@ -1,7 +1,8 @@
 import streamlit as st
 from pipeline import (VOICES, VOICES_BY_LANG, MODELS, LESSON_STATE_KEYS, SCENE_CATALOG,
-                      SETTINGS_DEFAULTS, SCENE_PRIMARY_VOICE)
-from db import require_auth, upsert_profile, load_profile, load_knowledge_profile, delete_knowledge_profile, get_user_email, update_password
+                      SETTINGS_DEFAULTS, SCENE_PRIMARY_VOICE, LANG_PROFILE_KEY)
+from db import (require_auth, upsert_profile, load_profile, load_knowledge_profile,
+                delete_knowledge_profile, get_user_email, update_password)
 
 require_auth()
 
@@ -220,8 +221,8 @@ st.markdown("""
     🧠 Your tutor remembers you
   </div>
   <div style='font:400 13px/1.65 system-ui;color:rgba(17,24,39,.65)'>
-    Every session, SpeakPals builds a richer picture of who you are and how you learn.
-    Below is <strong>everything we store about you</strong> — fully transparent, always up to date.
+    Every session, SpeakPals builds a richer picture of who you are and how you learn —
+    separately for each language. Below is <strong>everything we store about you</strong>.
   </div>
 </div>
 
@@ -242,85 +243,90 @@ if "sb_user_id" in st.session_state:
 else:
     _kp = {}
 
-_CATEGORIES = [
-    (
-        "language_level", "📊", "CEFR Level",
-        "Your current proficiency on the A1–C2 scale (Common European Framework of Reference) — vocabulary and grammar mastered, where you struggle, and how your level is progressing.",
-    ),
-    (
-        "learning_motivation", "🎯", "Learning Motivation",
-        "Why you're learning this language. Your personal goals and dreams — this shapes what topics your tutor brings up.",
-    ),
-    (
-        "personal_use_context", "🌍", "Where You'll Use It",
-        "Real-life situations where you need the language — work, a partner, travel, living abroad, daily errands.",
-    ),
-    (
-        "common_errors", "🔍", "Errors & Patterns",
-        "Mistakes your tutor has noticed across sessions — wrong words, grammar slips, falling back to English.",
-    ),
-    (
-        "conversation_history", "💬", "Conversation History",
-        "A running diary of what we've covered — scenes practised, topics discussed, moments worth remembering.",
-    ),
-    (
-        "personal_facts", "👤", "Personal Facts",
-        "Facts you've shared about yourself — where you live, your job, people in your life.",
-    ),
-    (
-        "tutor_observations", "💡", "Tutor Observations",
-        "Anything else your tutor has noticed — learning style, confidence patterns, breakthroughs, pacing preferences.",
-    ),
-]
+# Which language the user currently has selected (drives the profile tab shown)
+_selected_lang = st.session_state.get("s_language", "Danish")
+_lang_key      = LANG_PROFILE_KEY.get(_selected_lang, "danish")
+_lang_section  = _kp.get(_lang_key, {})
+_shared        = _kp.get("shared", {})
 
-for _key, _icon, _label, _desc in _CATEGORIES:
-    _val     = _kp.get(_key, {})
+# Helper — render one profile expander row
+def _render_expander(key, icon, label, desc, section_dict):
+    _val     = section_dict.get(key, {})
     _content = (_val.get("content", "") if isinstance(_val, dict) else str(_val)).strip()
     _ts      = (_val.get("updated_at", "") if isinstance(_val, dict) else "")
     _filled  = bool(_content)
-
-    if _filled and _ts:
-        _status = f"Updated {_ts[:10]}"
-        _dot    = "🟢"
-    elif _filled:
-        _status = "Updated"
-        _dot    = "🟢"
-    else:
-        _status = "Not yet filled"
-        _dot    = "⚪"
-
-    with st.expander(f"{_icon} **{_label}** &nbsp; {_dot} *{_status}*", expanded=False):
+    _dot, _status = ("🟢", f"Updated {_ts[:10]}") if (_filled and _ts) else \
+                    ("🟢", "Updated")              if _filled else \
+                    ("⚪", "Not yet filled")
+    with st.expander(f"{icon} **{label}** &nbsp; {_dot} *{_status}*", expanded=False):
         st.markdown(
             f"<div style='font:400 12px/1.6 system-ui;color:rgba(17,24,39,.5);"
-            f"margin:4px 0 10px;font-style:italic'>{_desc}</div>",
+            f"margin:4px 0 10px;font-style:italic'>{desc}</div>",
             unsafe_allow_html=True,
         )
         if _filled:
-            st.markdown(_content)   # renders bullet lists, bold, etc. natively
+            st.markdown(_content)
         else:
             st.markdown(
                 "<div style='font:400 13px system-ui;color:rgba(17,24,39,.35);"
                 "font-style:italic;padding:4px 0'>"
-                "Nothing recorded yet — this fills up as you practise and chat with your tutor."
-                "</div>",
+                "Nothing recorded yet — this fills up as you practise.</div>",
                 unsafe_allow_html=True,
             )
 
-_known_keys = {c[0] for c in _CATEGORIES}
-_custom     = {k: v for k, v in _kp.items() if k not in _known_keys}
-if _custom:
+# ── Language-specific section ─────────────────────────────────────────────────
+st.markdown(
+    f"<div style='font:700 10px system-ui;letter-spacing:2px;text-transform:uppercase;"
+    f"color:rgba(17,24,39,.4);margin:0 0 10px'>{_selected_lang} — Language Profile</div>",
+    unsafe_allow_html=True,
+)
+
+_LANG_CATEGORIES = [
+    ("language_level",       "📊", "CEFR Level",
+     "Proficiency on the A1–C2 scale — vocabulary mastered, grammar strengths, and where you struggle."),
+    ("learning_motivation",  "🎯", "Learning Motivation",
+     f"Why you're learning {_selected_lang}. Your personal goals shape what topics your tutor brings up."),
+    ("personal_use_context", "🌍", "Where You'll Use It",
+     f"Real-life situations where you need {_selected_lang} — work, a partner, travel, daily life."),
+    ("common_errors",        "🔍", "Errors & Patterns",
+     "Mistakes your tutor has noticed — wrong words, grammar slips, falling back to English."),
+    ("conversation_history", "💬", "Conversation History",
+     "A running diary of what we've covered — scenes practised, topics discussed, breakthroughs."),
+    ("tutor_observations",   "💡", "Tutor Observations",
+     "Learning style, confidence patterns, pacing, cultural curiosity — anything worth remembering."),
+]
+
+for _key, _icon, _label, _desc in _LANG_CATEGORIES:
+    _render_expander(_key, _icon, _label, _desc, _lang_section)
+
+# Any AI-added custom keys in the language section
+_known_lang_keys = {c[0] for c in _LANG_CATEGORIES}
+_custom_lang = {k: v for k, v in _lang_section.items() if k not in _known_lang_keys}
+if _custom_lang:
     st.markdown(
         "<div style='font:700 10px system-ui;letter-spacing:2px;text-transform:uppercase;"
-        "color:rgba(17,24,39,.3);margin:18px 0 8px'>Also noted by your tutor</div>",
+        "color:rgba(17,24,39,.3);margin:14px 0 8px'>Also noted by your tutor</div>",
         unsafe_allow_html=True,
     )
-    for _key, _val in _custom.items():
+    for _key, _val in _custom_lang.items():
         _label   = _key.replace("_", " ").title()
         _content = (_val.get("content", "") if isinstance(_val, dict) else str(_val)).strip()
         _ts      = (_val.get("updated_at", "") if isinstance(_val, dict) else "")
-        _exp_label = f"✨ **{_label}**" + (f"  ·  *{_ts[:10]}*" if _ts else "")
-        with st.expander(_exp_label, expanded=False):
+        with st.expander(f"✨ **{_label}**" + (f"  ·  *{_ts[:10]}*" if _ts else ""), expanded=False):
             st.markdown(_content or "—")
+
+# ── Shared / personal section ─────────────────────────────────────────────────
+st.markdown(
+    "<div style='font:700 10px system-ui;letter-spacing:2px;text-transform:uppercase;"
+    "color:rgba(17,24,39,.4);margin:22px 0 10px'>About You — Across All Languages</div>",
+    unsafe_allow_html=True,
+)
+_render_expander(
+    "personal_facts", "👤", "Personal Facts",
+    "Facts you've shared about yourself — where you live, your job, people in your life. "
+    "These carry into every language you learn.",
+    _shared,
+)
 
 # ── Delete knowledge ──────────────────────────────────────────────────────────
 st.markdown("<br>", unsafe_allow_html=True)

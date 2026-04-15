@@ -355,8 +355,55 @@ def unlink_telegram(user_id: str, access_token: str) -> None:
 
 # ── User knowledge profile ────────────────────────────────────────────────────
 
+# Top-level keys that identify the new nested structure.
+# A profile that lacks ALL of these is a legacy flat profile.
+_NESTED_KEYS = {"shared", "danish", "portuguese_brazilian"}
+
+
+def _migrate_legacy_profile(profile: dict) -> tuple[dict, bool]:
+    """Migrate a flat (pre-language-split) profile to the nested structure.
+
+    All existing data moves to the "danish" section (the only language that
+    existed at the time of the initial implementation).
+
+    Returns (migrated_profile, was_migrated).
+    """
+    if not profile or any(k in profile for k in _NESTED_KEYS):
+        return profile, False
+    migrated = {
+        "shared": {
+            "personal_facts": profile.pop("personal_facts",
+                                          {"content": "", "updated_at": ""}),
+        },
+        "danish": profile,
+    }
+    return migrated, True
+
+
+def get_active_profile(full_profile: dict, target_lang: str) -> dict:
+    """Return a merged flat dict of shared + language-specific categories.
+
+    Falls back to the dict as-is for legacy flat profiles so callers are never
+    silently handed an empty dict.
+    """
+    from pipeline import LANG_PROFILE_KEY
+    if not any(k in full_profile for k in _NESTED_KEYS):
+        return full_profile  # legacy flat profile — pass through unchanged
+    lang_key = LANG_PROFILE_KEY.get(target_lang,
+                                    target_lang.lower().replace(" ", "_")
+                                                        .replace("(", "")
+                                                        .replace(")", ""))
+    shared       = full_profile.get("shared", {})
+    lang_section = full_profile.get(lang_key, {})
+    return {**shared, **lang_section}
+
+
 def load_knowledge_profile(user_id: str, access_token: str) -> dict:
-    """Return the user's knowledge profile JSON, or {} if none exists yet."""
+    """Return the user's full knowledge profile JSON (nested structure), or {} if none.
+
+    Automatically migrates legacy flat profiles to the nested structure and
+    persists the result so the migration only runs once.
+    """
     try:
         res = (_client(access_token)
                .table("user_knowledge_profiles")
@@ -368,7 +415,11 @@ def load_knowledge_profile(user_id: str, access_token: str) -> dict:
             p = res.data.get("profile")
             if not p:
                 return {}
-            return p if isinstance(p, dict) else _json.loads(p)
+            profile = p if isinstance(p, dict) else _json.loads(p)
+            migrated, was_migrated = _migrate_legacy_profile(profile)
+            if was_migrated:
+                save_knowledge_profile(user_id, access_token, migrated)
+            return migrated
         return {}
     except Exception:
         return {}

@@ -1,30 +1,62 @@
-"""profile.py — User knowledge profile: Claude-powered post-session update."""
+"""profile.py — User knowledge profile: Claude-powered post-session update.
+
+Profile JSON structure (nested, per-language):
+{
+  "shared": {
+    "personal_facts": {"content": "...", "updated_at": "..."}
+  },
+  "danish": {
+    "language_level":       {"content": "...", "updated_at": "..."},
+    "learning_motivation":  {"content": "...", "updated_at": "..."},
+    "personal_use_context": {"content": "...", "updated_at": "..."},
+    "common_errors":        {"content": "...", "updated_at": "..."},
+    "conversation_history": {"content": "...", "updated_at": "..."},
+    "tutor_observations":   {"content": "...", "updated_at": "..."}
+  },
+  "portuguese_brazilian": { ... }
+}
+
+Shared facts (personal_facts) travel to every language context.
+All other categories are per-language — level, motivation, errors, and history
+may be completely different between Danish and Portuguese.
+"""
 from __future__ import annotations
 import json
 import re
 import datetime
-import requests
-from pipeline import get_session as _get_pipeline_session
+from pipeline import get_session as _get_pipeline_session, LANG_PROFILE_KEY
 
-# ── Predefined category keys ───────────────────────────────────────────────────
+# ── Category definitions ───────────────────────────────────────────────────────
 
-REQUIRED_CATEGORIES = [
+# Keys that live inside each language section
+LANG_REQUIRED = [
     "language_level",
     "learning_motivation",
     "personal_use_context",
     "common_errors",
     "conversation_history",
-    "personal_facts",
     "tutor_observations",
+]
+
+# Keys that live in the "shared" section (language-agnostic personal facts)
+SHARED_REQUIRED = [
+    "personal_facts",
 ]
 
 # ── Claude prompt ──────────────────────────────────────────────────────────────
 
 _UPDATE_PROMPT = """\
-You are a language learning analyst. Update a learner's knowledge profile based on a completed session.
+You are a language learning analyst. Update a learner's knowledge profile after a completed session.
 
-## Current profile (JSON)
-{current_profile_json}
+The profile has TWO sections:
+- "shared"   — personal facts about the student that apply to ALL languages they learn
+- "language" — learning data specific to {target_lang} only
+
+## Current SHARED profile
+{shared_json}
+
+## Current {target_lang} profile
+{lang_json}
 
 ## Session data
 
@@ -33,50 +65,82 @@ Student: {name}  |  Level: {level}  |  Target language: {target_lang}  |  Native
 ### Conversation log
 {conversation_text}
 
-### Error log (mistakes noted during the session)
+### Error log (mistakes noted during this session)
 {error_text}
 
 ## Your task
 
-Return an updated profile JSON object that incorporates what you learned about this student.
+Return a JSON object with exactly two top-level keys: "shared" and "language".
 
 **Tone: concise, human-readable, like notes a good tutor would write.**
-Use bullet points where listing multiple items. Use short prose for single observations.
-No padding, no filler, no generic statements. Every word should be signal.
+Use bullet points where listing multiple items. Short prose for single observations.
+No padding, no filler. Every word should be signal.
 
-Rules:
-1. Always include exactly these 7 keys — no more, no fewer:
-   language_level, learning_motivation, personal_use_context, common_errors,
-   conversation_history, personal_facts, tutor_observations.
-2. Do NOT create new keys. If an observation does not fit the first 6 categories,
-   add it to tutor_observations instead.
-3. Each category value must be a JSON object with exactly two fields:
-   - "content": Updated notes about the learner. Style rules per category:
-     • conversation_history — Markdown bullet list, one entry per session, date prefix required.
-       Format: "- YYYY-MM-DD: what was covered, practised, or discussed (be specific)."
-       Use today's date {today_date} for this session. Keep all prior dated entries — never delete.
-       Sort newest first. Max 1–2 lines per session bullet.
-     • personal_facts — Markdown bullet list, one confirmed fact per line.
-       E.g. "- Lives in Copenhagen", "- Partner is Danish", "- Works at Tryg as an engineer".
-       Only include what the user explicitly stated. Never infer. Accumulate across sessions.
-     • tutor_observations — Markdown bullet list, one observation per line.
-       Include meaningful patterns: learning style, confidence, pacing, breakthroughs,
-       cultural curiosity, frustration points, pronunciation notes, cultural interests —
-       anything a good tutor would want to remember that doesn't fit another category.
-       Skip anything generic or obvious.
-     • common_errors — Short bullets listing specific patterns:
-       e.g. "- Drops definite articles (-en/-et)", "- Reverts to English under pressure".
-       Update with new patterns; keep all prior entries that are still relevant.
-     • language_level — 2–4 sentences or short bullets. State level, what they can do,
-       what they struggle with. Be specific (e.g. "knows 'hej', 'tak', 'undskyld'" not just "A1").
-     • learning_motivation — 1–3 sentences. Capture the personal 'why' specifically.
-     • personal_use_context — 1–3 sentences or bullets. Specific real-life situations.
-   - "updated_at": ISO 8601 UTC timestamp "{now_iso}" if content changed; keep old timestamp if unchanged.
-4. If a session reveals nothing new for a category, keep existing content and timestamp unchanged.
-5. First session (empty profile): populate all 7 keys. Use "" for categories with no evidence yet.
-6. Reply with only the JSON object — no markdown, no explanation, no text outside {{ }}.
+─────────────────────────────────────────────────────
+RULES FOR "shared"
+─────────────────────────────────────────────────────
+Allowed key: personal_facts only. No other keys.
 
-Reply with only the JSON object, starting with {{ and ending with }}.
+personal_facts rules:
+- Markdown bullet list, one confirmed fact per line.
+  E.g. "- Lives in Copenhagen", "- Partner is Danish", "- Works at Tryg as an engineer".
+- Only include what the student explicitly stated. Never infer.
+- Accumulate across sessions — never delete existing facts.
+- If nothing new was shared, keep existing content and timestamp unchanged.
+
+─────────────────────────────────────────────────────
+RULES FOR "language" — {target_lang}-specific section
+─────────────────────────────────────────────────────
+Required keys (exactly these 6, no more):
+  language_level, learning_motivation, personal_use_context,
+  common_errors, conversation_history, tutor_observations
+
+Style rules per key:
+
+conversation_history — Markdown bullet list, one entry per session, date prefix REQUIRED.
+  Format: "- YYYY-MM-DD: what was covered, practised, or discussed (be specific)."
+  Today's date is {today_date}. Use it for this session's entry.
+  IMPORTANT: Keep ALL prior dated entries — never delete any. Sort newest first. Max 1–2 lines per entry.
+
+personal_use_context — 1–3 sentences or bullets. Specific real-life situations where
+  the student will use {target_lang}. E.g. workplace, partner's family, travel.
+
+common_errors — Short bullets listing specific patterns.
+  E.g. "- Drops definite articles (-en/-et)", "- Reverts to English under pressure".
+  Update with new patterns; keep all prior entries that are still relevant.
+
+language_level — 2–4 sentences or short bullets. State level, what they can do,
+  what they struggle with. Be specific (e.g. "knows 'hej', 'tak', 'undskyld'" not just "A1").
+
+learning_motivation — 1–3 sentences. Capture the personal 'why' for THIS language specifically.
+
+tutor_observations — Markdown bullet list, one observation per line.
+  Include meaningful patterns: learning style, confidence, pacing, breakthroughs,
+  cultural curiosity, frustration points, pronunciation notes — anything a good tutor
+  would want to remember for {target_lang} sessions. Skip generic/obvious items.
+
+─────────────────────────────────────────────────────
+GENERAL RULES
+─────────────────────────────────────────────────────
+- Each value must be: {{"content": "<text>", "updated_at": "{now_iso}"}}
+  Use "{now_iso}" if content changed; keep the old timestamp if content is unchanged.
+- First session (empty sections): populate all keys; use "" for categories with no evidence yet.
+- Reply with ONLY the JSON object — no markdown, no explanation, no text outside {{ }}.
+
+Required output shape:
+{{
+  "shared": {{
+    "personal_facts": {{"content": "...", "updated_at": "..."}}
+  }},
+  "language": {{
+    "language_level":       {{"content": "...", "updated_at": "..."}},
+    "learning_motivation":  {{"content": "...", "updated_at": "..."}},
+    "personal_use_context": {{"content": "...", "updated_at": "..."}},
+    "common_errors":        {{"content": "...", "updated_at": "..."}},
+    "conversation_history": {{"content": "...", "updated_at": "..."}},
+    "tutor_observations":   {{"content": "...", "updated_at": "..."}}
+  }}
+}}
 """
 
 
@@ -101,6 +165,19 @@ def _format_errors(coaching_log: list[dict]) -> str:
     return "\n".join(lines)
 
 
+def _merge_conversation_history(old_content: str, new_content: str) -> str:
+    """Ensure no prior dated history entries are lost if Claude drops them."""
+    if not old_content or not old_content.strip():
+        return new_content
+    _date_re = re.compile(r'^-\s*\d{4}-\d{2}-\d{2}:')
+    old_entries = [l.strip() for l in old_content.splitlines() if _date_re.match(l.strip())]
+    new_entries = [l.strip() for l in new_content.splitlines() if _date_re.match(l.strip())]
+    missing = [e for e in old_entries if not any(e[:30] in n for n in new_entries)]
+    if missing:
+        return (new_content.strip() + "\n" + "\n".join(missing)).strip()
+    return new_content
+
+
 # ── Main function ──────────────────────────────────────────────────────────────
 
 def update_knowledge_profile(
@@ -115,16 +192,27 @@ def update_knowledge_profile(
     model: str = "claude-haiku-4-5-20251001",
     http_session=None,
 ) -> dict:
-    """
-    Call Claude to produce an updated knowledge profile dict.
+    """Call Claude to update the knowledge profile for `target_lang`.
 
-    Returns the updated profile dict on success, or the unchanged current_profile
-    on any error — data is never lost.
+    Reads the language-specific section and the shared section from
+    `current_profile`, sends both to Claude, then merges the result back
+    into the full profile and returns it.
+
+    Returns the unchanged `current_profile` on any error — data is never lost.
     """
+    lang_key   = LANG_PROFILE_KEY.get(target_lang,
+                                      target_lang.lower().replace(" ", "_")
+                                                          .replace("(", "")
+                                                          .replace(")", ""))
     now_iso    = datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
     today_date = datetime.date.today().isoformat()
+
+    current_shared = current_profile.get("shared", {})
+    current_lang   = current_profile.get(lang_key, {})
+
     prompt = _UPDATE_PROMPT.format(
-        current_profile_json=json.dumps(current_profile, ensure_ascii=False, indent=2),
+        shared_json=json.dumps(current_shared, ensure_ascii=False, indent=2),
+        lang_json=json.dumps(current_lang, ensure_ascii=False, indent=2),
         name=name,
         level=level,
         target_lang=target_lang,
@@ -154,51 +242,47 @@ def update_knowledge_profile(
         )
         r.raise_for_status()
         raw = r.json()["content"][0]["text"].strip()
-
-        # Strip optional markdown code fence
         raw = re.sub(r"^```[a-z]*\s*", "", raw)
         raw = re.sub(r"\s*```$", "", raw)
 
         updated = json.loads(raw)
-
         if not isinstance(updated, dict):
             return current_profile
 
-        # Ensure all required keys are present
-        for key in REQUIRED_CATEGORIES:
-            if key not in updated:
-                updated[key] = {"content": "", "updated_at": now_iso}
+        # ── Validate and fill missing keys ─────────────────────────────────────
+        updated_shared = updated.get("shared", {})
+        updated_lang   = updated.get("language", {})
 
-        # Remove any extra keys Claude may have added despite instructions
-        for k in [k for k in updated if k not in REQUIRED_CATEGORIES]:
-            del updated[k]
+        if not isinstance(updated_shared, dict):
+            updated_shared = {}
+        if not isinstance(updated_lang, dict):
+            updated_lang = {}
 
-        # ── Programmatically protect conversation_history from accidental deletion ──
-        # Claude may replace the full history with only the current session's entry
-        # despite being told to preserve all prior entries. We merge here to be safe:
-        # any dated bullet from the current_profile that is NOT in Claude's output
-        # gets prepended back.
-        _old_hist = (current_profile.get("conversation_history") or {}).get("content", "")
-        _new_hist = (updated.get("conversation_history") or {}).get("content", "")
-        if _old_hist and _old_hist.strip():
-            # Collect dated entries (lines starting with "- YYYY-MM-DD:") from old content
-            import re as _re2
-            _date_re = _re2.compile(r'^-\s*\d{4}-\d{2}-\d{2}:')
-            _old_entries = [l.strip() for l in _old_hist.splitlines()
-                            if _date_re.match(l.strip())]
-            _new_entries = [l.strip() for l in _new_hist.splitlines()
-                            if _date_re.match(l.strip())]
-            # Detect entries that are in the old profile but missing from Claude's output
-            _missing = [e for e in _old_entries if not any(
-                e[:30] in n for n in _new_entries)]
-            if _missing:
-                # Append missing old entries below the new ones (already sorted newest-first)
-                merged = _new_hist.strip() + "\n" + "\n".join(_missing)
-                updated["conversation_history"]["content"] = merged.strip()
+        for key in SHARED_REQUIRED:
+            if key not in updated_shared:
+                updated_shared[key] = current_shared.get(key, {"content": "", "updated_at": now_iso})
 
-        return updated
+        for key in LANG_REQUIRED:
+            if key not in updated_lang:
+                updated_lang[key] = current_lang.get(key, {"content": "", "updated_at": now_iso})
+
+        # Remove any extra keys Claude may have added
+        updated_shared = {k: v for k, v in updated_shared.items() if k in SHARED_REQUIRED}
+        updated_lang   = {k: v for k, v in updated_lang.items()   if k in LANG_REQUIRED}
+
+        # ── Protect conversation_history from accidental truncation ────────────
+        _old_hist = (current_lang.get("conversation_history") or {}).get("content", "")
+        _new_hist = (updated_lang.get("conversation_history") or {}).get("content", "")
+        merged_hist = _merge_conversation_history(_old_hist, _new_hist)
+        if merged_hist != _new_hist:
+            updated_lang["conversation_history"]["content"] = merged_hist
+
+        # ── Merge back into the full profile ───────────────────────────────────
+        result = dict(current_profile)   # preserve any other language sections
+        result["shared"]  = updated_shared
+        result[lang_key]  = updated_lang
+        return result
 
     except Exception as _err:
-        # Store last error so callers can surface it for debugging.
         update_knowledge_profile.last_error = str(_err)
         return current_profile

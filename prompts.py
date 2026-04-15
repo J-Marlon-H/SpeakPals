@@ -2,6 +2,27 @@ from __future__ import annotations
 import pathlib
 import re as _re
 import datetime as _dt
+from pipeline import LANG_PROFILE_KEY as _LANG_PROFILE_KEY
+
+
+_NESTED_KEYS = {"shared", "danish", "portuguese_brazilian"}
+
+
+def _active_profile(full_profile: dict, target_lang: str) -> dict:
+    """Merge shared + language-specific sections into a flat dict for prompt injection.
+
+    Falls back to returning the dict as-is for legacy flat profiles that may still
+    be in session state before the DB migration has run.
+    """
+    if not any(k in full_profile for k in _NESTED_KEYS):
+        return full_profile  # legacy flat profile — pass through unchanged
+    lang_key = _LANG_PROFILE_KEY.get(
+        target_lang,
+        target_lang.lower().replace(" ", "_").replace("(", "").replace(")", ""),
+    )
+    shared       = full_profile.get("shared", {})
+    lang_section = full_profile.get(lang_key, {})
+    return {**shared, **lang_section}
 
 # ── Short display name used inside prompts (avoids "Portuguese (Brazilian)") ────
 _LANG_DISPLAY = {
@@ -347,9 +368,15 @@ def build_system_prompt(name: str, level: str, bg_lang: str,
         except FileNotFoundError:
             pass
 
-    if knowledge_profile:
+    # Flatten the nested profile (shared + this language) into a single dict
+    # so the injection logic below works identically for both old and new structures.
+    _flat_profile = (
+        _active_profile(knowledge_profile, target_lang)
+        if knowledge_profile else {}
+    )
+    if _flat_profile:
         _nonempty = {
-            k: v for k, v in knowledge_profile.items()
+            k: v for k, v in _flat_profile.items()
             if isinstance(v, dict) and v.get("content", "").strip()
         }
         if _nonempty:

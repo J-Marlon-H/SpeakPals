@@ -221,6 +221,13 @@ TTS_MODEL = {
     "pt": "eleven_multilingual_v2",   # better Portuguese pronunciation
 }
 
+# Maps the full language display name → the key used inside the knowledge profile JSON.
+# Used by profile.py, prompts.py, and account.py to read/write per-language sections.
+LANG_PROFILE_KEY = {
+    "Danish":                 "danish",
+    "Portuguese (Brazilian)": "portuguese_brazilian",
+}
+
 # ── Scene catalog — single source of truth for all scenes ──────────────────────
 SCENE_CATALOG = [
     {
