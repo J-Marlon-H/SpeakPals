@@ -7,8 +7,7 @@ st.set_page_config(page_title="Reset Password — SpeakPals", page_icon="🔑",
                    layout="centered", initial_sidebar_state="collapsed")
 
 st.markdown("""<style>
-  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
-  html,body{font-family:'Inter',sans-serif!important}
+  html,body{font-family:system-ui,-apple-system,BlinkMacSystemFont,Roboto,sans-serif!important}
   #MainMenu,footer,[data-testid="stToolbar"]{visibility:hidden}
   [data-testid="stHeader"],header,.stAppHeader{display:none!important}
   [data-testid="collapsedControl"],[data-testid="stSidebarCollapseButton"],
@@ -35,11 +34,11 @@ st.markdown("""<style>
 
 st.markdown("""
 <div style='text-align:center;padding:32px 0 28px'>
-  <div style='font:800 28px/1 Inter,sans-serif;color:#111827;letter-spacing:-.5px;margin-bottom:8px'>
+  <div style='font:800 28px/1 system-ui,-apple-system,BlinkMacSystemFont,Roboto,sans-serif;color:#111827;letter-spacing:-.5px;margin-bottom:8px'>
     SpeakPals
   </div>
-  <div style='font:700 16px Inter;color:#111827;margin-bottom:4px'>Set a new password</div>
-  <div style='font:400 13px Inter;color:rgba(17,24,39,.5)'>
+  <div style='font:700 16px system-ui;color:#111827;margin-bottom:4px'>Set a new password</div>
+  <div style='font:400 13px system-ui;color:rgba(17,24,39,.5)'>
     Enter a new password for your account.
   </div>
 </div>""", unsafe_allow_html=True)
@@ -102,7 +101,7 @@ if "reset_session" not in st.session_state:
     else:
         # JS hasn't finished yet (first render before iframe executes) — wait
         st.markdown(
-            "<div style='text-align:center;color:rgba(17,24,39,.45);font:400 13px Inter'>"
+            "<div style='text-align:center;color:rgba(17,24,39,.45);font:400 13px system-ui'>"
             "Verifying reset link…</div>",
             unsafe_allow_html=True,
         )
