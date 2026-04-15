@@ -287,6 +287,30 @@ def consume_link_code(code: str, chat_id: int) -> str | None:
         return None
 
 
+def get_sb_user_id_by_chat_id(chat_id: int) -> str | None:
+    """Return the Supabase user UUID linked to this Telegram chat_id, or None.
+
+    Uses the get_sb_user_id_by_chat_id RPC (SECURITY DEFINER — no JWT needed).
+    Required SQL (run once in Supabase SQL editor):
+
+        CREATE OR REPLACE FUNCTION get_sb_user_id_by_chat_id(p_chat_id BIGINT)
+        RETURNS UUID LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+        DECLARE v_uid UUID;
+        BEGIN
+          SELECT id INTO v_uid FROM users WHERE telegram_chat_id = p_chat_id;
+          RETURN v_uid;
+        END; $$;
+    """
+    try:
+        res = (_client()
+               .rpc("get_sb_user_id_by_chat_id", {"p_chat_id": chat_id})
+               .execute())
+        uid = res.data
+        return str(uid) if uid else None
+    except Exception:
+        return None
+
+
 def get_telegram_profile(chat_id: int) -> dict:
     """Return the user profile keyed by plain DB column names (name, level, …).
     Uses the get_telegram_profile RPC (SECURITY DEFINER — no JWT needed).

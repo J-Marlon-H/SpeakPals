@@ -190,9 +190,11 @@ def load_user_synced(chat_id: int) -> dict:
         from db import get_telegram_profile, load_knowledge_profile_for_bot, load_bot_chat_history
         profile = get_telegram_profile(chat_id)
         if profile:
-            # Re-establish the link flag in case the local file was wiped after a restart
-            if not user.get("sb_user_id"):
-                user["sb_user_id"] = True  # used as a boolean; all RPCs use chat_id
+            # Re-establish the real UUID in case the local file was wiped after a restart
+            if not user.get("sb_user_id") or user.get("sb_user_id") is True:
+                from db import get_sb_user_id_by_chat_id
+                real_uid = get_sb_user_id_by_chat_id(chat_id)
+                user["sb_user_id"] = real_uid or True
             for key in _PROFILE_KEYS:
                 if profile.get(key):
                     user[key] = profile[key]
@@ -333,7 +335,14 @@ async def cmd_link(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 def _build_context(user: dict) -> tuple[str, str, str, str]:
     """Return (system_prompt, voice_id, lang_code, model)."""
+    import gcal as _gcal
     tutor = Tutor.from_bot_user(user)
+
+    cal_events: list[str] = []
+    sb_uid = user.get("sb_user_id")
+    if sb_uid and sb_uid is not True:
+        cal_events = _gcal.get_upcoming_events(f"web_{sb_uid}") or []
+
     system = build_system_prompt(
         tutor.name or "there", tutor.level, tutor.bg_lang,
         target_lang=tutor.target_lang,
@@ -341,6 +350,7 @@ def _build_context(user: dict) -> tuple[str, str, str, str]:
         knowledge_profile=tutor.knowledge_profile or None,
         free_conv=True,
         telegram=True,
+        calendar_events=cal_events or None,
     )
     return system, tutor.voice_id, tutor.tl_lang_code, tutor.model_id
 

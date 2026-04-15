@@ -14,6 +14,7 @@ from prompts import build_system_prompt, get_tutor_name
 from tutor import Tutor
 from ws_proxy import start_in_thread, PROXY_PORT, scribe_token as _scribe_token
 from db import require_auth, load_knowledge_profile, _secret
+import gcal as _gcal
 
 load_dotenv("keys.env")
 
@@ -210,6 +211,12 @@ turn_count = st.session_state.turn_count
 _lang_openers = SCENE_OPENERS_BY_LANG.get(target_lang, SCENE_OPENERS_BY_LANG["Danish"])
 opener_line   = _lang_openers.get(sk, "") if (sk and not is_free_conv) else ""
 
+_cal_events: list[str] = []
+if is_free_conv:
+    _sb_uid = st.session_state.get("sb_user_id")
+    if _sb_uid:
+        _cal_events = _gcal.get_upcoming_events(f"web_{_sb_uid}") or []
+
 system = build_system_prompt(
     name, scene_level, bg_lang,
     target_lang=target_lang,
@@ -217,6 +224,7 @@ system = build_system_prompt(
     turn_count=turn_count,
     knowledge_profile=st.session_state.get("knowledge_profile"),
     free_conv=is_free_conv,
+    calendar_events=_cal_events or None,
 )
 
 # Load opener TTS once at lesson start
