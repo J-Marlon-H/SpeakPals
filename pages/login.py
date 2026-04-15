@@ -12,8 +12,7 @@ if "sb_user_id" in st.session_state:
     st.switch_page("pages/home.py")
 
 st.markdown("""<style>
-  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
-  html,body{font-family:'Inter',sans-serif!important}
+  html,body{font-family:system-ui,-apple-system,BlinkMacSystemFont,Roboto,sans-serif!important}
   #MainMenu,footer,[data-testid="stToolbar"]{visibility:hidden}
   [data-testid="stHeader"],header,.stAppHeader{display:none!important}
   [data-testid="collapsedControl"],[data-testid="stSidebarCollapseButton"],
@@ -41,7 +40,7 @@ st.markdown("""<style>
   .stTabs [data-baseweb="tab-list"]{
     gap:0;border-bottom:1px solid #e5e5e5!important;background:transparent!important}
   .stTabs [data-baseweb="tab"]{
-    font:600 14px Inter,sans-serif!important;color:rgba(17,24,39,.45)!important;
+    font:600 14px system-ui,-apple-system,BlinkMacSystemFont,Roboto,sans-serif!important;color:rgba(17,24,39,.45)!important;
     border:none!important;background:transparent!important;
     padding:10px 24px!important;border-radius:0!important}
   .stTabs [aria-selected="true"]{
@@ -53,10 +52,10 @@ st.markdown("""<style>
 # ── Header ────────────────────────────────────────────────────────────────────
 st.markdown("""
 <div style='text-align:center;padding:32px 0 28px'>
-  <div style='font:800 28px/1 Inter,sans-serif;color:#111827;letter-spacing:-.5px;margin-bottom:8px'>
+  <div style='font:800 28px/1 system-ui,-apple-system,BlinkMacSystemFont,Roboto,sans-serif;color:#111827;letter-spacing:-.5px;margin-bottom:8px'>
     SpeakPals
   </div>
-  <div style='font:400 14px Inter;color:rgba(17,24,39,.5)'>
+  <div style='font:400 14px system-ui;color:rgba(17,24,39,.5)'>
     Your AI language tutor
   </div>
 </div>""", unsafe_allow_html=True)
@@ -135,7 +134,7 @@ with tab_register:
         key="reg_level",
     )
     st.markdown(
-        "<div style='font:400 11px Inter;color:rgba(17,24,39,.4);margin-top:2px;"
+        "<div style='font:400 11px system-ui;color:rgba(17,24,39,.4);margin-top:2px;"
         "margin-bottom:12px'>* Required field</div>",
         unsafe_allow_html=True,
     )
@@ -190,7 +189,7 @@ with tab_register:
 # ── Forgot password ───────────────────────────────────────────────────────────
 with tab_forgot:
     st.markdown(
-        "<div style='font:400 13px Inter;color:rgba(17,24,39,.55);margin-bottom:16px'>"
+        "<div style='font:400 13px system-ui;color:rgba(17,24,39,.55);margin-bottom:16px'>"
         "We'll send a reset link to your email address.</div>",
         unsafe_allow_html=True,
     )
