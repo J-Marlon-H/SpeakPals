@@ -1,4 +1,4 @@
-import requests, urllib3, base64, json, re, time, threading
+import requests, urllib3, base64, json, re, time
 import streamlit as st
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
@@ -164,9 +164,9 @@ def extract_vocabulary(conversation_lines: list, bg_lang: str, level: str,
 
 
 SETTINGS_DEFAULTS = {
-    "s_name":        "Marlon",
-    "s_level":       "A1",
-    "s_bg_lang":     "German",
+    "s_name":        "",
+    "s_level":       "",
+    "s_bg_lang":     "",
     "s_language":    "Danish",
     "s_voice_label": "Mathias — male baritone",
     "s_model_label": "Haiku 4.5 — fastest",
@@ -474,13 +474,6 @@ _SCENE_RE  = re.compile(r'<scene>(.*?)</scene>', re.DOTALL)
 _OK_RE     = re.compile(r'<ok\s*/>', re.IGNORECASE)
 _OK_AT_END = re.compile(r'<ok\s*/>\s*$', re.IGNORECASE)
 
-_IMAGE_STYLE = (
-    "photorealistic, ultra-realistic, first-person immersive view, "
-    "person facing directly toward the viewer with full eye contact, "
-    "as if someone is looking right at you and waiting for a response, "
-    "realistic Danish everyday setting, natural lighting, "
-    "no text, no labels, "
-)
 
 
 def strip_ok_tag(text: str) -> tuple[str, bool]:
@@ -557,23 +550,3 @@ def character_tts_b64(text: str, voice_id: str, eleven_key: str, lang_code: str 
         return None
 
 
-def generate_scene_image(scene_prompt: str, fal_key: str, callback) -> None:
-    """Spawn a background thread; calls callback(url: str) when the image is ready."""
-    def _run():
-        import os
-        os.environ["FAL_KEY"] = fal_key
-        try:
-            import fal_client
-            result = fal_client.run(
-                "fal-ai/flux/schnell",
-                arguments={
-                    "prompt": _IMAGE_STYLE + scene_prompt,
-                    "image_size": "landscape_16_9",
-                    "num_images": 1,
-                },
-            )
-            url = result["images"][0]["url"]
-            callback(url)
-        except Exception:
-            callback(None)
-    threading.Thread(target=_run, daemon=True).start()

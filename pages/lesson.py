@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 import json as _json
 from pipeline import (VOICES, VOICES_BY_LANG, VOICE_GENDER,
                       SCENE_CATALOG, SETTINGS_DEFAULTS, STT_LANG_CODE,
-                      parse_claude_response, generate_scene_image, character_tts_b64,
+                      parse_claude_response, character_tts_b64,
                       SCENE_OPENERS_BY_LANG, SCENE_CHAR_GENDER)
 from prompts import build_system_prompt, get_tutor_name
 from tutor import Tutor
@@ -18,14 +18,6 @@ load_dotenv("keys.env")
 
 CLAUDE_KEY = _secret("CLAUDE_API_KEY")
 ELEVEN_KEY = _secret("ELEVENLABS_API_KEY")
-FAL_KEY    = _secret("FAL_KEY")
-
-SCENE_NEXT_PROMPT = {
-    "supermarket": (
-        "interior of a Danish bakery, a friendly baker facing directly toward you "
-        "behind the counter with eye contact, warm morning light, pastries on display"
-    )
-}
 
 # Build scene lookup from catalog
 _SCENE_BY_KEY = {s["key"]: s for s in SCENE_CATALOG}
@@ -153,7 +145,7 @@ lang_voices  = VOICES_BY_LANG.get(target_lang, VOICES)
 
 for k, v in [
     ("chat", []), ("last_chunks", None), ("last_response", None), ("last_id", None),
-    ("scene_images", []), ("scene_idx", 0), ("scene_loading", False),
+    ("scene_images", []), ("scene_idx", 0),
     ("turn_count", 0), ("opener_loaded", False), ("scene_complete", False), ("char_audio", []),
     ("pipeline_error", None), ("pending_student", None), ("avatar_thinking", False),
     ("correct_log", []), ("coaching_log", []), ("lesson_started", False),
@@ -358,21 +350,10 @@ with st.sidebar:
 
 # ── VAD / scene component ──────────────────────────────────────────────────────
 
-def _make_image_ready_cb(next_prompt):
-    def _cb(url):
-        if url:
-            st.session_state.scene_images.append({"description": next_prompt, "src": url})
-            st.session_state.scene_idx  += 1
-            st.session_state.turn_count  = 0
-            st.session_state.opener_loaded = False
-        st.session_state.scene_loading = False
-    return _cb
-
 from vad_helper import mic
 
 chunks  = st.session_state.last_chunks or []
-caption = ("Generating next scene…" if st.session_state.scene_loading
-           else f"Scene {scene_idx_1based}")
+caption = f"Scene {scene_idx_1based}"
 
 mic_props = dict(
     lang              = stt_lang_code,
@@ -482,12 +463,6 @@ if student_text:
         # ── Handle scene done ─────────────────────────────────────────────────
         if scene_done:
             st.session_state.scene_complete = True
-            if not is_free_conv and st.session_state.scene_idx < 4 and FAL_KEY:
-                next_prompt = SCENE_NEXT_PROMPT.get(sk, "")
-                if next_prompt:
-                    st.session_state.scene_loading = True
-                    generate_scene_image(next_prompt, FAL_KEY,
-                                         _make_image_ready_cb(next_prompt))
 
     except Exception as e:
         st.session_state.avatar_thinking = False
