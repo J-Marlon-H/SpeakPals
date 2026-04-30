@@ -8,6 +8,16 @@ html,body{width:100%;height:100%;background:#0a0a0a;
 .video-wrap{position:relative;flex:1;min-height:0;overflow:hidden}
 video{width:100%;height:100%;object-fit:cover;border-radius:14px;display:block}
 
+/* ── Tap-to-play overlay (autoplay blocked fallback) ─────────────────────── */
+.play-gate{
+  position:absolute;inset:0;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;
+  background:rgba(0,0,0,.45);border-radius:14px;cursor:pointer}
+.play-gate-icon{font-size:52px;line-height:1}
+.play-gate-lbl{font:600 13px system-ui;color:rgba(255,255,255,.7);
+  margin-top:10px;letter-spacing:.3px}
+.play-gate.hidden{display:none}
+
 .scene-badge{
   position:absolute;top:12px;left:12px;
   background:rgba(13,148,136,.25);border:1px solid rgba(13,148,136,.4);
@@ -66,6 +76,10 @@ video{width:100%;height:100%;object-fit:cover;border-radius:14px;display:block}
     <div class="scene-badge" id="badge"></div>
     <div class="prompt-overlay" id="promptOverlay"></div>
     <div class="feedback-overlay" id="feedbackOverlay"></div>
+    <div class="play-gate hidden" id="playGate" onclick="gateClick()">
+      <div class="play-gate-icon">▶</div>
+      <div class="play-gate-lbl">Tap to watch</div>
+    </div>
   </div>
   <div class="mic-bar" id="micBar">
     <button class="mic-btn" id="micBtn" onclick="toggleMic()">🎤</button>
@@ -82,11 +96,12 @@ function send(val){
 window.parent.postMessage({isStreamlitMessage:true,type:"streamlit:componentReady",apiVersion:1},"*");
 
 // ── DOM refs ────────────────────────────────────────────────────────────────
-var vid      = document.getElementById("vid");
-var badge    = document.getElementById("badge");
-var promptOv = document.getElementById("promptOverlay");
-var feedbackOv=document.getElementById("feedbackOverlay");
-var micBar   = document.getElementById("micBar");
+var vid       = document.getElementById("vid");
+var badge     = document.getElementById("badge");
+var promptOv  = document.getElementById("promptOverlay");
+var feedbackOv= document.getElementById("feedbackOverlay");
+var playGate  = document.getElementById("playGate");
+var micBar    = document.getElementById("micBar");
 var micBtn   = document.getElementById("micBtn");
 var micLbl   = document.getElementById("micLbl");
 var hintBtn  = document.getElementById("hintBtn");
@@ -112,7 +127,6 @@ window.addEventListener("message", function(e) {
   if (!started && a.started) {
     started = true;
     scenes  = a.scenes || [];
-    prewarmMic();   // request mic permission early
     playScene(0);
   }
 
@@ -125,6 +139,8 @@ window.addEventListener("message", function(e) {
 });
 
 // ── Scene playback ──────────────────────────────────────────────────────────
+var pendingScene = null;  // held while waiting for gate click
+
 function playScene(idx) {
   sceneIdx = idx;
   if (idx >= scenes.length) { send({type:"complete"}); return; }
@@ -136,19 +152,30 @@ function playScene(idx) {
   feedbackOv.classList.remove("on");
   hintText.classList.remove("on");
   hintBtn.classList.remove("on");
+  playGate.classList.add("hidden");
   badge.textContent = "Scene " + (idx+1) + " / " + scenes.length;
 
   var origin = window.location.origin;
   vid.src = origin + "/app/static/restaurant/" + scene.video;
-  vid.play().catch(function(){});
 
   vid.onended = function() {
-    if (scene.user_turn) {
-      showMic(scene);
-    } else {
-      setTimeout(function(){ playScene(idx + 1); }, 300);
-    }
+    if (scene.user_turn) { showMic(scene); }
+    else { setTimeout(function(){ playScene(idx + 1); }, 300); }
   };
+
+  vid.play().catch(function() {
+    // Autoplay blocked — show a tap overlay inside the iframe
+    // (clicking it grants user activation, allowing all subsequent plays)
+    pendingScene = scene;
+    playGate.classList.remove("hidden");
+  });
+}
+
+function gateClick() {
+  playGate.classList.add("hidden");
+  vid.play().catch(function(){});
+  // prewarm mic after first interaction so getUserMedia is ready
+  prewarmMic();
 }
 
 // ── Mic phase ───────────────────────────────────────────────────────────────
