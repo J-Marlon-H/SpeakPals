@@ -91,7 +91,25 @@ def _token_file(user_key: str) -> pathlib.Path:
     return TOKENS_DIR / f"{user_key}_gcal.json"
 
 
+def _user_id_from_key(user_key: str) -> str | None:
+    """Extract the Supabase user UUID from a user_key like 'web_<uuid>'."""
+    if user_key.startswith("web_"):
+        return user_key[4:]
+    return None
+
+
 def load_token(user_key: str) -> dict | None:
+    # Try Supabase first (survives app restarts on Streamlit Cloud)
+    uid = _user_id_from_key(user_key)
+    if uid:
+        try:
+            from db import load_gcal_token
+            token = load_gcal_token(uid)
+            if token:
+                return token
+        except Exception:
+            pass
+    # Fallback: local file (local dev)
     f = _token_file(user_key)
     if f.exists():
         try:
@@ -102,18 +120,36 @@ def load_token(user_key: str) -> dict | None:
 
 
 def save_token(user_key: str, token: dict) -> None:
+    # Save to Supabase (primary — survives restarts)
+    uid = _user_id_from_key(user_key)
+    if uid:
+        try:
+            from db import save_gcal_token
+            save_gcal_token(uid, token)
+        except Exception:
+            pass
+    # Also save to local file (local dev fallback)
     TOKENS_DIR.mkdir(exist_ok=True)
     _token_file(user_key).write_text(json.dumps(token, indent=2))
 
 
 def revoke_token(user_key: str) -> None:
+    # Clear from Supabase
+    uid = _user_id_from_key(user_key)
+    if uid:
+        try:
+            from db import delete_gcal_token
+            delete_gcal_token(uid)
+        except Exception:
+            pass
+    # Clear local file
     f = _token_file(user_key)
     if f.exists():
         f.unlink()
 
 
 def is_connected(user_key: str) -> bool:
-    return _token_file(user_key).exists()
+    return load_token(user_key) is not None
 
 
 # ── Device flow ───────────────────────────────────────────────────────────────

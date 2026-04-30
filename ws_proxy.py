@@ -131,8 +131,14 @@ async def _run():
         await asyncio.Future()
 
 
+_proxy_started = False
+
 def start_in_thread():
-    """Call once from Streamlit; runs proxy in a daemon thread."""
+    """Start the proxy in a daemon thread. Safe to call multiple times."""
+    global _proxy_started
+    if _proxy_started:
+        return
+    _proxy_started = True
     import threading
     loop = asyncio.new_event_loop()
 
