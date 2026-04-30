@@ -11,7 +11,7 @@ from db import _secret
 load_dotenv("keys.env")
 
 ELEVEN_KEY = _secret("ELEVENLABS_API_KEY")
-VOICE_ID   = "ygiXC2Oa1BiHksD3WkJZ"  # Mathias — male baritone
+VOICE_ID   = "V34B5u5UbLdNJVEkcgXp"  # Noam
 
 LINES = {
     "scene1": "Hej! Velkommen! Vil du sidde ved baren eller ved vinduet?",
