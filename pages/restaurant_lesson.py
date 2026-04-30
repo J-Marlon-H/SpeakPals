@@ -25,6 +25,7 @@ SCENES = [
     {
         "index":       0,
         "video":       "scene1.mp4",
+        "duration":    7.0,
         "user_turn":   True,
         "en_prompt":   "The waiter is asking: bar or window?",
         "da_target":   "Ved vinduet",
@@ -34,6 +35,7 @@ SCENES = [
     {
         "index":       1,
         "video":       "scene2.mp4",
+        "duration":    14.5,
         "user_turn":   True,
         "en_prompt":   "Order the ramen from the menu.",
         "da_target":   "Jeg vil gerne have ramen",
@@ -43,12 +45,14 @@ SCENES = [
     {
         "index":       2,
         "video":       "scene3.mp4",
+        "duration":    6.5,
         "user_turn":   False,
         "en_prompt":   "",
     },
     {
         "index":       3,
         "video":       "scene4.mp4",
+        "duration":    4.0,
         "user_turn":   True,
         "en_prompt":   "The ramen arrived! Thank the waiter and ask for a fork.",
         "da_target":   "Tak! Må jeg få en gaffel?",
@@ -58,12 +62,14 @@ SCENES = [
     {
         "index":       4,
         "video":       "scene5.mp4",
+        "duration":    6.0,
         "user_turn":   False,
         "en_prompt":   "",
     },
     {
         "index":       5,
         "video":       "scene6.mp4",
+        "duration":    10.7,
         "user_turn":   True,
         "en_prompt":   "The meal was great. Ask for the bill.",
         "da_target":   "Må jeg bede om regningen?",
@@ -197,13 +203,16 @@ if sb_user_id and sb_token and not knowledge_profile:
 
 # ── Session state ──────────────────────────────────────────────────────────────
 
+_RS_KEYS = ["rs_scene_idx","rs_watching","rs_chat","rs_tutor_mode",
+            "rs_complete","rs_show_hint","rs_started"]
 for k, v in [
-    ("rs_scene_idx",    0),
-    ("rs_watching",     True),   # True = video phase, False = answer phase
-    ("rs_chat",         []),
-    ("rs_tutor_mode",   False),
-    ("rs_complete",     False),
-    ("rs_show_hint",    False),
+    ("rs_started",   False),
+    ("rs_scene_idx", 0),
+    ("rs_watching",  True),   # True = video phase, False = answer/mic phase
+    ("rs_chat",      []),
+    ("rs_tutor_mode",False),
+    ("rs_complete",  False),
+    ("rs_show_hint", False),
 ]:
     if k not in st.session_state:
         st.session_state[k] = v
@@ -216,49 +225,67 @@ scene     = SCENES[scene_idx] if scene_idx < len(SCENES) else None
 col_video, col_sidebar = st.columns([3, 1], gap="medium")
 
 with col_video:
-    st.markdown(f"""
-    <div style='display:flex;align-items:center;gap:10px;padding:0 0 10px'>
-      <div style='font:800 20px/1 system-ui;color:#f1f5f9;letter-spacing:-.3px'>🍜 At the Restaurant</div>
-      <div class='scene-badge'>Scene {scene_idx + 1} / {len(SCENES)}</div>
-    </div>""", unsafe_allow_html=True)
 
-    if st.session_state.rs_complete:
+    # ── Start screen ───────────────────────────────────────────────────────────
+    if not st.session_state.rs_started:
+        st.markdown("""
+        <div style='text-align:center;padding:60px 20px 30px'>
+          <div style='font-size:56px;margin-bottom:16px'>🍜</div>
+          <div style='font:800 26px/1.2 system-ui;color:#f1f5f9;margin-bottom:10px'>
+            At the Restaurant</div>
+          <div style='font:400 14px/1.6 system-ui;color:rgba(255,255,255,.5);
+            max-width:340px;margin:0 auto 32px'>
+            A video lesson set in a ramen restaurant. Watch the scenes and
+            speak your Danish answers — Lars will guide you through.</div>
+        </div>""", unsafe_allow_html=True)
+        _, btn_col, _ = st.columns([2, 2, 2])
+        with btn_col:
+            if st.button("▶  Start Lesson", use_container_width=True, type="primary"):
+                st.session_state.rs_started  = True
+                st.session_state.rs_watching = True
+                st.rerun()
+
+    # ── Scene header ───────────────────────────────────────────────────────────
+    elif st.session_state.rs_complete:
+        st.markdown("""<div style='display:flex;align-items:center;gap:10px;padding:0 0 10px'>
+          <div style='font:800 20px/1 system-ui;color:#f1f5f9'>🍜 At the Restaurant</div>
+        </div>""", unsafe_allow_html=True)
         st.success(f"🎉 Lesson complete! Great work, {name}!")
         if st.button("← Back to Home", use_container_width=True):
-            for k in ["rs_scene_idx","rs_watching","rs_chat","rs_tutor_mode","rs_complete","rs_show_hint"]:
+            for k in _RS_KEYS:
                 st.session_state.pop(k, None)
             st.switch_page("pages/home.py")
 
     elif scene:
+        st.markdown(f"""
+        <div style='display:flex;align-items:center;gap:10px;padding:0 0 10px'>
+          <div style='font:800 20px/1 system-ui;color:#f1f5f9;letter-spacing:-.3px'>🍜 At the Restaurant</div>
+          <div class='scene-badge'>Scene {scene_idx + 1} / {len(SCENES)}</div>
+        </div>""", unsafe_allow_html=True)
+
         video_path = VIDEO_DIR / scene["video"]
 
-        # ── Video phase ────────────────────────────────────────────────────────
+        # ── Video phase — plays then auto-transitions ──────────────────────────
         if st.session_state.rs_watching:
             if video_path.exists():
                 st.video(str(video_path), autoplay=True)
             else:
                 st.warning(f"Video file not found: {scene['video']}")
 
-            st.markdown("<br>", unsafe_allow_html=True)
-
-            if not scene["user_turn"]:
-                # Auto-advance scenes (3 and 5) — no user input needed
-                if st.button("▶ Continue", use_container_width=True, type="primary",
-                             key=f"continue_{scene_idx}"):
-                    next_idx = scene_idx + 1
-                    if next_idx >= len(SCENES):
-                        st.session_state.rs_complete = True
-                    else:
-                        st.session_state.rs_scene_idx = next_idx
-                        st.session_state.rs_watching  = True
-                    st.rerun()
+            # Sleep for the video duration, then auto-transition
+            time.sleep(scene["duration"])
+            if scene["user_turn"]:
+                st.session_state.rs_watching = False   # → mic phase
             else:
-                if st.button("🎤 I'm ready to answer", use_container_width=True, type="primary",
-                             key=f"ready_{scene_idx}"):
-                    st.session_state.rs_watching = False
-                    st.rerun()
+                next_idx = scene_idx + 1               # auto-advance scene
+                if next_idx >= len(SCENES):
+                    st.session_state.rs_complete = True
+                else:
+                    st.session_state.rs_scene_idx = next_idx
+                    st.session_state.rs_watching  = True
+            st.rerun()
 
-        # ── Answer phase ───────────────────────────────────────────────────────
+        # ── Mic phase ─────────────────────────────────────────────────────────
         else:
             if video_path.exists():
                 st.video(str(video_path))
@@ -267,7 +294,6 @@ with col_video:
                 st.markdown(f"<div class='prompt-box'>💬 {scene['en_prompt']}</div>",
                             unsafe_allow_html=True)
 
-                # ── Mic + hint/tutor buttons ───────────────────────────────────
                 _, mic_col, _ = st.columns([2, 1, 2])
                 with mic_col:
                     mic_props: dict = {"lang": "da", "key": f"stt_{scene_idx}",
@@ -315,10 +341,10 @@ with col_video:
                     audio = _tts_b64(feedback, voice_id)
                     if audio:
                         _play_audio(audio)
-                    # Show feedback while TTS plays, then auto-advance
                     feedback_slot = st.empty()
                     feedback_slot.markdown(
-                        f"<div class='feedback-box'>💡 {feedback}</div>",
+                        f"<div class='prompt-box' style='border-color:rgba(13,148,136,.5)'>"
+                        f"💡 {feedback}</div>",
                         unsafe_allow_html=True)
                     words = len(feedback.split())
                     time.sleep(max(3.0, words / 2.5 + 0.8))
@@ -381,6 +407,6 @@ with col_sidebar:
 
     st.markdown("<br>", unsafe_allow_html=True)
     if st.button("🏠 Exit lesson", use_container_width=True):
-        for k in ["rs_scene_idx","rs_watching","rs_chat","rs_tutor_mode","rs_complete","rs_show_hint"]:
+        for k in _RS_KEYS:
             st.session_state.pop(k, None)
         st.switch_page("pages/home.py")
