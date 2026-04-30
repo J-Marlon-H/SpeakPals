@@ -182,13 +182,22 @@ with col_video:
 
     # ── Complete screen ────────────────────────────────────────────────────────
     elif st.session_state.rs_complete:
-        st.markdown("""<div style='font:800 20px/1 system-ui;color:#f1f5f9;
-          padding:0 0 16px'>🍜 At the Restaurant</div>""", unsafe_allow_html=True)
-        st.success(f"🎉 Lesson complete! Great work, {name}!")
-        if st.button("← Back to Home", use_container_width=True):
-            for k in _RS_KEYS:
-                st.session_state.pop(k, None)
-            st.switch_page("pages/home.py")
+        st.markdown(f"""
+        <div style='text-align:center;padding:50px 20px 24px'>
+          <div style='font-size:56px;margin-bottom:16px'>🎉</div>
+          <div style='font:800 26px/1.2 system-ui;color:#f1f5f9;margin-bottom:10px'>
+            Lesson Complete!</div>
+          <div style='font:400 14px/1.6 system-ui;color:rgba(255,255,255,.55);
+            max-width:360px;margin:0 auto 32px'>
+            Great work, {name}! You ordered ramen, asked for a fork, and got the
+            bill — all in Danish. 🍜</div>
+        </div>""", unsafe_allow_html=True)
+        _, btn_col, _ = st.columns([2, 2, 2])
+        with btn_col:
+            if st.button("← Back to Home", use_container_width=True, type="primary"):
+                for k in _RS_KEYS:
+                    st.session_state.pop(k, None)
+                st.switch_page("pages/home.py")
 
     # ── Active lesson — unified component ─────────────────────────────────────
     else:
