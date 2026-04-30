@@ -273,6 +273,52 @@ with col_scenes:
                     unsafe_allow_html=True,
                 )
 
+# ── Video Lessons ──────────────────────────────────────────────────────────────
+with col_scenes:
+    _restaurant_img = _img_b64("restaurant.webp") or _img_b64("restaurant.jpg")
+    _restaurant_bg  = (
+        f"background-image:url('{_restaurant_img}');"
+        "background-size:cover;background-position:top center"
+        if _restaurant_img else
+        "background:linear-gradient(135deg,#7c2d12,#9a3412)"
+    )
+    st.markdown("""<style>
+      .st-key-btn_restaurant_lesson button{
+        display:block!important;width:100%!important;height:185px!important;
+        padding:0!important;margin:0!important;
+        border-radius:18px!important;overflow:hidden!important;border:none!important;
+        background-size:cover!important;background-position:top center!important;
+        box-shadow:0 4px 20px rgba(17,24,39,.18)!important;
+        cursor:pointer!important;position:relative!important;
+        transition:transform .22s cubic-bezier(.34,1.56,.64,1),box-shadow .22s ease!important}
+      .st-key-btn_restaurant_lesson button:hover{
+        transform:scale(1.035) translateY(-4px)!important;
+        box-shadow:0 16px 40px rgba(13,148,136,.3)!important}
+      .st-key-btn_restaurant_lesson button p{
+        position:absolute!important;bottom:0!important;left:0!important;right:0!important;
+        padding:28px 16px 14px!important;
+        background:linear-gradient(to top,rgba(10,10,20,.88) 0%,transparent 100%)!important;
+        border-radius:0 0 18px 18px!important;
+        text-align:left!important;font:800 19px/1.2 system-ui!important;
+        color:#fff!important;margin:0!important}
+    </style>""", unsafe_allow_html=True)
+    st.markdown(
+        f"<div class='section-head' style='margin-top:48px'>"
+        f"🎬 Video Lessons &nbsp;"
+        f"<span style='background:#7c3aed;color:#fff;font-size:10px;font-weight:700;"
+        f"letter-spacing:.5px;padding:2px 7px;border-radius:20px;vertical-align:middle'>"
+        f"New</span></div>",
+        unsafe_allow_html=True,
+    )
+    st.markdown(f"<style>.st-key-btn_restaurant_lesson button{{{_restaurant_bg}}}</style>",
+                unsafe_allow_html=True)
+    if st.button("🍜 At the Restaurant", key="btn_restaurant_lesson", use_container_width=True):
+        st.switch_page("pages/restaurant_lesson.py")
+    st.markdown(
+        "<div class='scene-desc'>Interactive video lesson — order ramen, ask for a fork, get the bill</div>",
+        unsafe_allow_html=True,
+    )
+
 # ── RIGHT: Tutor conversation card ────────────────────────────────────────────
 with col_tutor:
     st.markdown(
