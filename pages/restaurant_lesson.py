@@ -58,7 +58,7 @@ SCENES = [
     {
         "video":       "scene6.mp4",
         "user_turn":   True,
-        "en_prompt":   "The meal was great. Ask for the bill.",
+        "en_prompt":   "",
         "da_target":   "Må jeg bede om regningen?",
         "hint":        "Try 'Må jeg bede om regningen?' (May I have the bill?)",
     },

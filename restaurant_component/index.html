@@ -181,8 +181,10 @@ function gateClick() {
 // ── Mic phase ───────────────────────────────────────────────────────────────
 function showMic(scene) {
   phase = "mic";
-  promptOv.textContent = "💬 " + scene.en_prompt;
-  promptOv.classList.add("on");
+  if (scene.en_prompt) {
+    promptOv.textContent = "💬 " + scene.en_prompt;
+    promptOv.classList.add("on");
+  }
   micBar.classList.add("on");
   micLbl.textContent = "Tap to speak in Danish";
   if (scene.hint) {
