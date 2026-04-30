@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+* { margin:0; padding:0; box-sizing:border-box }
+html, body { width:100%; height:100%; background:#000; overflow:hidden }
+
+#player {
+  width:100%; height:100%;
+  object-fit:cover;
+  display:block;
+}
+
+#overlay {
+  display:none;
+  position:absolute; inset:0;
+  background:rgba(0,0,0,.55);
+  align-items:center; justify-content:center;
+  flex-direction:column; gap:14px;
+}
+#overlay.visible { display:flex }
+
+#your-turn {
+  font:700 18px/1 system-ui,-apple-system,sans-serif;
+  color:#fff; letter-spacing:.5px;
+  background:rgba(13,148,136,.85);
+  padding:12px 28px; border-radius:30px;
+}
+#prompt-text {
+  font:400 13px/1.5 system-ui,-apple-system,sans-serif;
+  color:rgba(255,255,255,.8);
+  text-align:center; max-width:320px;
+  background:rgba(0,0,0,.5);
+  padding:8px 16px; border-radius:8px;
+}
+</style>
+</head>
+<body>
+
+<video id="player" playsinline></video>
+
+<div id="overlay">
+  <div id="your-turn">🎤 Your turn</div>
+  <div id="prompt-text"></div>
+</div>
+
+<script>
+const player  = document.getElementById('player');
+const overlay = document.getElementById('overlay');
+const prompt  = document.getElementById('prompt-text');
+
+let currentSrc   = null;
+let currentScene = 0;
+
+function sendEvent(event, sceneIndex) {
+  Streamlit.setComponentValue({ event, scene_index: sceneIndex });
+}
+
+player.addEventListener('ended', () => {
+  sendEvent('ended', currentScene);
+});
+
+player.addEventListener('error', () => {
+  sendEvent('error', currentScene);
+});
+
+Streamlit.events.addEventListener(Streamlit.RENDER_EVENT, (ev) => {
+  const args = ev.detail.args;
+
+  const newSrc    = args.scene_url    ?? null;
+  const sceneIdx  = args.scene_index  ?? 0;
+  const autoplay  = args.autoplay     ?? true;
+  const userTurn  = args.user_turn    ?? false;
+  const promptTxt = args.prompt_text  ?? '';
+
+  // Show/hide the "your turn" overlay
+  if (userTurn) {
+    overlay.classList.add('visible');
+    prompt.textContent = promptTxt;
+  } else {
+    overlay.classList.remove('visible');
+  }
+
+  // Load and play a new scene
+  if (newSrc && newSrc !== currentSrc) {
+    currentSrc   = newSrc;
+    currentScene = sceneIdx;
+    player.src   = newSrc;
+    player.load();
+    if (autoplay) {
+      player.play().catch(() => {});
+    }
+  }
+
+  Streamlit.setFrameHeight(document.body.scrollHeight);
+});
+
+Streamlit.setComponentReady();
+</script>
+
+<script src="https://unpkg.com/streamlit-component-lib@2.0.0/dist/index.js"></script>
+</body>
+</html>

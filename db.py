@@ -524,6 +524,65 @@ def load_bot_chat_history(chat_id: int) -> list:
         return []
 
 
+def save_gcal_token(user_id: str, token: dict) -> None:
+    """Persist Google Calendar OAuth token to Supabase (survives app restarts).
+
+    Uses the save_gcal_token RPC (SECURITY DEFINER — no JWT needed).
+    Required SQL (run once in Supabase SQL editor):
+
+        ALTER TABLE users ADD COLUMN IF NOT EXISTS gcal_token JSONB DEFAULT NULL;
+
+        CREATE OR REPLACE FUNCTION save_gcal_token(p_user_id UUID, p_token JSONB)
+        RETURNS VOID LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+        BEGIN
+          UPDATE users SET gcal_token = p_token WHERE id = p_user_id;
+        END; $$;
+    """
+    try:
+        _client().rpc("save_gcal_token",
+                      {"p_user_id": user_id,
+                       "p_token": _json.dumps(token)}).execute()
+    except Exception:
+        pass
+
+
+def load_gcal_token(user_id: str) -> dict | None:
+    """Load Google Calendar OAuth token from Supabase.
+
+    Uses the load_gcal_token RPC (SECURITY DEFINER — no JWT needed).
+    Required SQL (run once in Supabase SQL editor):
+
+        CREATE OR REPLACE FUNCTION load_gcal_token(p_user_id UUID)
+        RETURNS JSONB LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+        DECLARE v_token JSONB;
+        BEGIN
+          SELECT gcal_token INTO v_token FROM users WHERE id = p_user_id;
+          RETURN v_token;
+        END; $$;
+    """
+    try:
+        res = _client().rpc("load_gcal_token", {"p_user_id": user_id}).execute()
+        data = res.data
+        if not data:
+            return None
+        return data if isinstance(data, dict) else _json.loads(data)
+    except Exception:
+        return None
+
+
+def delete_gcal_token(user_id: str) -> None:
+    """Clear the stored Google Calendar token (disconnect).
+
+    Uses the save_gcal_token RPC (sets token to NULL).
+    """
+    try:
+        _client().rpc("save_gcal_token",
+                      {"p_user_id": user_id,
+                       "p_token": None}).execute()
+    except Exception:
+        pass
+
+
 def delete_knowledge_profile(user_id: str, access_token: str) -> None:
     """Delete the user's knowledge profile row entirely."""
     try:

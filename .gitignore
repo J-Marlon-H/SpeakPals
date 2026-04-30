@@ -38,6 +38,10 @@ build/
 # Claude Code
 .claude/settings.local.json
 
+# Large video/audio assets (generated locally, not committed)
+static/restaurant/*.mp4
+assets/restaurant/*.mp3
+
 # OS
 .DS_Store
 Thumbs.db
