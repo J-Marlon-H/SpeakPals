@@ -2,7 +2,7 @@
 from __future__ import annotations
 import streamlit as st
 import streamlit.components.v1 as components
-import requests, json, base64, pathlib
+import requests, json, base64, pathlib, time
 from dotenv import load_dotenv
 from db import require_auth, load_knowledge_profile, _secret
 from pipeline import VOICES_BY_LANG, SETTINGS_DEFAULTS
@@ -175,8 +175,6 @@ st.markdown("""<style>
   .stButton button{border-radius:10px!important;font-weight:600!important;font-size:13px!important}
   .stButton button[kind="primary"]{
     background:#0d9488!important;color:#fff!important;border:none!important}
-  .feedback-box{background:rgba(13,148,136,.18);border:1px solid rgba(13,148,136,.4);
-    border-radius:14px;padding:14px 18px;color:#e2e8f0;font-size:14px;line-height:1.6;margin:10px 0}
   .mic-label{font:600 11px system-ui;color:rgba(255,255,255,.4);letter-spacing:1.5px;
     text-transform:uppercase;text-align:center;margin-top:4px}
   video{border-radius:16px;width:100%}
@@ -205,7 +203,6 @@ for k, v in [
     ("rs_chat",         []),
     ("rs_tutor_mode",   False),
     ("rs_complete",     False),
-    ("rs_last_feedback", None),
     ("rs_show_hint",    False),
 ]:
     if k not in st.session_state:
@@ -228,7 +225,7 @@ with col_video:
     if st.session_state.rs_complete:
         st.success(f"🎉 Lesson complete! Great work, {name}!")
         if st.button("← Back to Home", use_container_width=True):
-            for k in ["rs_scene_idx","rs_watching","rs_chat","rs_tutor_mode","rs_complete","rs_last_feedback","rs_show_hint"]:
+            for k in ["rs_scene_idx","rs_watching","rs_chat","rs_tutor_mode","rs_complete","rs_show_hint"]:
                 st.session_state.pop(k, None)
             st.switch_page("pages/home.py")
 
@@ -270,75 +267,69 @@ with col_video:
                 st.markdown(f"<div class='prompt-box'>💬 {scene['en_prompt']}</div>",
                             unsafe_allow_html=True)
 
-                # ── After speaking: show feedback + Continue ───────────────────
-                if st.session_state.rs_last_feedback:
-                    st.markdown(
-                        f"<div class='feedback-box'>💡 {st.session_state.rs_last_feedback}</div>",
-                        unsafe_allow_html=True)
-                    if st.button("▶ Continue", use_container_width=True, type="primary",
-                                 key=f"next_{scene_idx}"):
-                        st.session_state.rs_last_feedback = None
-                        st.session_state.rs_show_hint     = False
-                        next_idx = scene_idx + 1
-                        if next_idx >= len(SCENES):
-                            st.session_state.rs_complete = True
-                        else:
-                            st.session_state.rs_scene_idx = next_idx
-                            st.session_state.rs_watching  = True
-                        st.rerun()
-
                 # ── Mic + hint/tutor buttons ───────────────────────────────────
+                _, mic_col, _ = st.columns([2, 1, 2])
+                with mic_col:
+                    mic_props: dict = {"lang": "da", "key": f"stt_{scene_idx}",
+                                       "height": 90, "default": None}
+                    if IS_LOCAL:
+                        mic_props["proxy_port"] = PROXY_PORT
+                    else:
+                        tok = _scribe_token(ELEVEN_KEY)
+                        if tok:
+                            mic_props["ws_token"] = tok
+                    transcript = stt_mic(**mic_props)
+                st.markdown("<div class='mic-label'>Tap mic · Speak in Danish</div>",
+                            unsafe_allow_html=True)
+
+                if scene.get("tutor_break"):
+                    hc, tc = st.columns(2)
                 else:
-                    _, mic_col, _ = st.columns([2, 1, 2])
-                    with mic_col:
-                        mic_props: dict = {"lang": "da", "key": f"stt_{scene_idx}",
-                                           "height": 90, "default": None}
-                        if IS_LOCAL:
-                            mic_props["proxy_port"] = PROXY_PORT
-                        else:
-                            tok = _scribe_token(ELEVEN_KEY)
-                            if tok:
-                                mic_props["ws_token"] = tok
-                        transcript = stt_mic(**mic_props)
-                    st.markdown("<div class='mic-label'>Tap mic · Speak in Danish</div>",
+                    hc = st.columns(1)[0]
+                with hc:
+                    if st.button("Hint 💡", use_container_width=True,
+                                 key=f"hint_{scene_idx}"):
+                        st.session_state.rs_show_hint = not st.session_state.rs_show_hint
+                if scene.get("tutor_break"):
+                    with tc:
+                        if st.button("Ask Lars 🎓", use_container_width=True,
+                                     key=f"tutor_btn_{scene_idx}"):
+                            st.session_state.rs_tutor_mode = True
+                            st.rerun()
+
+                if st.session_state.rs_show_hint:
+                    st.markdown(f"<div class='hint-box'>💡 {scene['hint']}</div>",
                                 unsafe_allow_html=True)
 
-                    btn_cols = [1, 1] if scene.get("tutor_break") else [1]
-                    if scene.get("tutor_break"):
-                        hc, tc = st.columns(2)
+                if transcript:
+                    with st.spinner("Lars is listening…"):
+                        feedback = _claude_evaluate(
+                            transcript.strip(), scene,
+                            st.session_state.rs_chat,
+                            knowledge_profile, name, level, bg_lang,
+                        )
+                    st.session_state.rs_chat.extend([
+                        {"role": "user",      "content": transcript.strip()},
+                        {"role": "assistant", "content": feedback},
+                    ])
+                    audio = _tts_b64(feedback, voice_id)
+                    if audio:
+                        _play_audio(audio)
+                    # Show feedback while TTS plays, then auto-advance
+                    feedback_slot = st.empty()
+                    feedback_slot.markdown(
+                        f"<div class='feedback-box'>💡 {feedback}</div>",
+                        unsafe_allow_html=True)
+                    words = len(feedback.split())
+                    time.sleep(max(3.0, words / 2.5 + 0.8))
+                    st.session_state.rs_show_hint = False
+                    next_idx = scene_idx + 1
+                    if next_idx >= len(SCENES):
+                        st.session_state.rs_complete = True
                     else:
-                        hc = st.columns(1)[0]
-                    with hc:
-                        if st.button("Hint 💡", use_container_width=True,
-                                     key=f"hint_{scene_idx}"):
-                            st.session_state.rs_show_hint = not st.session_state.rs_show_hint
-                    if scene.get("tutor_break"):
-                        with tc:
-                            if st.button("Ask Lars 🎓", use_container_width=True,
-                                         key=f"tutor_btn_{scene_idx}"):
-                                st.session_state.rs_tutor_mode = True
-                                st.rerun()
-
-                    if st.session_state.rs_show_hint:
-                        st.markdown(f"<div class='hint-box'>💡 {scene['hint']}</div>",
-                                    unsafe_allow_html=True)
-
-                    if transcript:
-                        with st.spinner("Lars is listening…"):
-                            feedback = _claude_evaluate(
-                                transcript.strip(), scene,
-                                st.session_state.rs_chat,
-                                knowledge_profile, name, level, bg_lang,
-                            )
-                        st.session_state.rs_chat.extend([
-                            {"role": "user",      "content": transcript.strip()},
-                            {"role": "assistant", "content": feedback},
-                        ])
-                        st.session_state.rs_last_feedback = feedback
-                        audio = _tts_b64(feedback, voice_id)
-                        if audio:
-                            _play_audio(audio)
-                        st.rerun()
+                        st.session_state.rs_scene_idx = next_idx
+                        st.session_state.rs_watching  = True
+                    st.rerun()
 
 with col_sidebar:
     st.markdown("""<div style='font:700 10px system-ui;color:rgba(255,255,255,.4);
@@ -390,6 +381,6 @@ with col_sidebar:
 
     st.markdown("<br>", unsafe_allow_html=True)
     if st.button("🏠 Exit lesson", use_container_width=True):
-        for k in ["rs_scene_idx","rs_watching","rs_chat","rs_tutor_mode","rs_complete","rs_last_feedback","rs_show_hint"]:
+        for k in ["rs_scene_idx","rs_watching","rs_chat","rs_tutor_mode","rs_complete","rs_show_hint"]:
             st.session_state.pop(k, None)
         st.switch_page("pages/home.py")
