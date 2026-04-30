@@ -6,12 +6,18 @@ import requests, json, base64, pathlib
 from dotenv import load_dotenv
 from db import require_auth, load_knowledge_profile, _secret
 from pipeline import VOICES_BY_LANG, SETTINGS_DEFAULTS
+from stt_helper import stt_mic
+from ws_proxy import start_in_thread, PROXY_PORT, scribe_token as _scribe_token
 
 load_dotenv("keys.env")
 require_auth()
 
 CLAUDE_KEY = _secret("CLAUDE_API_KEY")
 ELEVEN_KEY = _secret("ELEVENLABS_API_KEY")
+IS_LOCAL   = pathlib.Path("keys.env").exists()
+
+if IS_LOCAL:
+    start_in_thread()
 
 # ── Scene definitions ──────────────────────────────────────────────────────────
 
@@ -262,9 +268,31 @@ with col_video:
                 st.markdown(f"<div class='prompt-box'>💬 {scene['en_prompt']}</div>",
                             unsafe_allow_html=True)
 
-                user_input = st.text_input("Your answer in Danish:",
-                                           key=f"answer_{scene_idx}",
-                                           placeholder="Type in Danish…")
+                # ── Mic + text input row ───────────────────────────────────────
+                mic_col, input_col = st.columns([1, 5], gap="small")
+
+                with mic_col:
+                    mic_props: dict = {"lang": "da", "key": f"stt_{scene_idx}",
+                                       "height": 90, "default": None}
+                    if IS_LOCAL:
+                        mic_props["proxy_port"] = PROXY_PORT
+                    else:
+                        tok = _scribe_token(ELEVEN_KEY)
+                        if tok:
+                            mic_props["ws_token"] = tok
+                    transcript = stt_mic(**mic_props)
+                    if transcript:
+                        st.session_state[f"rs_draft_{scene_idx}"] = transcript
+                        st.rerun()
+
+                with input_col:
+                    # Pre-fill with voice transcript if one just arrived
+                    draft_key = f"rs_draft_{scene_idx}"
+                    if draft_key in st.session_state:
+                        st.session_state[f"answer_{scene_idx}"] = st.session_state.pop(draft_key)
+                    user_input = st.text_input("Your answer in Danish:",
+                                               key=f"answer_{scene_idx}",
+                                               placeholder="Speak 🎤 or type here…")
 
                 c1, c2, c3 = st.columns([3, 1, 1])
                 with c1:
