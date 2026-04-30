@@ -196,6 +196,8 @@ function showMic(scene) {
 function toggleHint() { hintText.classList.toggle("on"); }
 
 // ── Feedback phase ──────────────────────────────────────────────────────────
+var ttsAudio = null;  // tracked so we can stop it before the next scene starts
+
 function showFeedback(ev) {
   phase = "feedback";
   micBar.classList.remove("on");
@@ -204,12 +206,13 @@ function showFeedback(ev) {
   feedbackOv.classList.add("on");
 
   if (ev.tts_b64) {
-    var audio = new Audio("data:audio/mpeg;base64," + ev.tts_b64);
-    audio.play().catch(function(){});
+    ttsAudio = new Audio("data:audio/mpeg;base64," + ev.tts_b64);
+    ttsAudio.play().catch(function(){});
   }
   var words = ev.text ? ev.text.split(" ").length : 5;
   var delay = Math.max(3000, words / 2.5 * 1000 + 800);
   setTimeout(function() {
+    if (ttsAudio) { ttsAudio.pause(); ttsAudio.currentTime = 0; ttsAudio = null; }
     feedbackOv.classList.remove("on");
     playScene(sceneIdx + 1);
   }, delay);
