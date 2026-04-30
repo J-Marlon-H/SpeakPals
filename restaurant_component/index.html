@@ -1,0 +1,312 @@
+<!DOCTYPE html><html><head><meta charset="utf-8"><style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%;background:#0a0a0a;
+  font-family:system-ui,-apple-system,BlinkMacSystemFont,sans-serif;overflow:hidden}
+.root{width:100%;height:100%;display:flex;flex-direction:column}
+
+/* ── Video area ─────────────────────────────────────────────────────────── */
+.video-wrap{position:relative;flex:1;min-height:0;overflow:hidden}
+video{width:100%;height:100%;object-fit:cover;border-radius:14px;display:block}
+
+.scene-badge{
+  position:absolute;top:12px;left:12px;
+  background:rgba(13,148,136,.25);border:1px solid rgba(13,148,136,.4);
+  color:#2dd4bf;font:600 10px system-ui;letter-spacing:1.5px;text-transform:uppercase;
+  padding:3px 10px;border-radius:20px;pointer-events:none}
+
+.prompt-overlay{
+  position:absolute;bottom:0;left:0;right:0;
+  background:linear-gradient(transparent,rgba(0,0,0,.82));
+  padding:28px 18px 14px;border-radius:0 0 14px 14px;
+  font:14px/1.5 system-ui;color:#e2e8f0;text-align:center;
+  display:none}
+.prompt-overlay.on{display:block}
+
+.feedback-overlay{
+  position:absolute;bottom:0;left:0;right:0;
+  background:rgba(13,148,136,.22);border-top:1px solid rgba(13,148,136,.4);
+  padding:12px 18px;border-radius:0 0 14px 14px;
+  font:13px/1.5 system-ui;color:#e2e8f0;text-align:center;
+  display:none}
+.feedback-overlay.on{display:block}
+
+/* ── Mic bar ────────────────────────────────────────────────────────────── */
+.mic-bar{
+  display:none;flex-direction:column;align-items:center;
+  padding:14px 20px 10px;gap:7px;flex-shrink:0}
+.mic-bar.on{display:flex}
+
+.mic-btn{
+  width:60px;height:60px;border-radius:50%;border:none;cursor:pointer;
+  background:rgba(255,255,255,.12);color:#e2e8f0;font-size:22px;
+  display:flex;align-items:center;justify-content:center;
+  transition:background .2s,box-shadow .2s}
+.mic-btn.listening{
+  background:linear-gradient(135deg,#0d9488,#14b8a6);
+  box-shadow:0 4px 22px rgba(13,148,136,.65);
+  animation:pulse 1.1s ease-in-out infinite}
+@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.1)}}
+
+.mic-lbl{font:11px system-ui;color:rgba(255,255,255,.5);letter-spacing:.4px;text-align:center}
+.hint-btn{
+  background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.25);
+  color:#fcd34d;font:11px system-ui;padding:4px 12px;border-radius:8px;
+  cursor:pointer;display:none}
+.hint-btn.on{display:block}
+.hint-text{
+  font:12px/1.5 system-ui;color:#fcd34d;
+  background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.2);
+  border-radius:8px;padding:8px 12px;text-align:center;
+  display:none;max-width:340px}
+.hint-text.on{display:block}
+</style></head><body>
+<div class="root">
+  <div class="video-wrap">
+    <video id="vid" playsinline></video>
+    <div class="scene-badge" id="badge"></div>
+    <div class="prompt-overlay" id="promptOverlay"></div>
+    <div class="feedback-overlay" id="feedbackOverlay"></div>
+  </div>
+  <div class="mic-bar" id="micBar">
+    <button class="mic-btn" id="micBtn" onclick="toggleMic()">🎤</button>
+    <div class="mic-lbl" id="micLbl">Tap to speak in Danish</div>
+    <button class="hint-btn" id="hintBtn" onclick="toggleHint()">Hint 💡</button>
+    <div class="hint-text" id="hintText"></div>
+  </div>
+</div>
+<script>
+// ── Streamlit protocol ──────────────────────────────────────────────────────
+function send(val){
+  window.parent.postMessage({isStreamlitMessage:true,type:"streamlit:setComponentValue",value:val},"*");
+}
+window.parent.postMessage({isStreamlitMessage:true,type:"streamlit:componentReady",apiVersion:1},"*");
+
+// ── DOM refs ────────────────────────────────────────────────────────────────
+var vid      = document.getElementById("vid");
+var badge    = document.getElementById("badge");
+var promptOv = document.getElementById("promptOverlay");
+var feedbackOv=document.getElementById("feedbackOverlay");
+var micBar   = document.getElementById("micBar");
+var micBtn   = document.getElementById("micBtn");
+var micLbl   = document.getElementById("micLbl");
+var hintBtn  = document.getElementById("hintBtn");
+var hintText = document.getElementById("hintText");
+
+// ── App state ───────────────────────────────────────────────────────────────
+var scenes     = [];
+var proxyPort  = null;
+var wsToken    = null;
+var started    = false;
+var sceneIdx   = 0;
+var phase      = "idle";   // idle|video|mic|waiting|feedback
+var lastEvalIdx= -1;
+
+// ── Props from Python ───────────────────────────────────────────────────────
+window.addEventListener("message", function(e) {
+  if (!e.data || e.data.type !== "streamlit:render" || !e.data.args) return;
+  var a = e.data.args;
+
+  if (a.proxy_port != null) proxyPort = a.proxy_port;
+  if (a.ws_token   != null) wsToken   = a.ws_token;
+
+  if (!started && a.started) {
+    started = true;
+    scenes  = a.scenes || [];
+    prewarmMic();   // request mic permission early
+    playScene(0);
+  }
+
+  // Python sends evaluation after calling Claude
+  var ev = a.evaluation;
+  if (ev && ev.scene_idx !== lastEvalIdx && phase === "waiting") {
+    lastEvalIdx = ev.scene_idx;
+    showFeedback(ev);
+  }
+});
+
+// ── Scene playback ──────────────────────────────────────────────────────────
+function playScene(idx) {
+  sceneIdx = idx;
+  if (idx >= scenes.length) { send({type:"complete"}); return; }
+  var scene = scenes[idx];
+
+  phase = "video";
+  micBar.classList.remove("on");
+  promptOv.classList.remove("on");
+  feedbackOv.classList.remove("on");
+  hintText.classList.remove("on");
+  hintBtn.classList.remove("on");
+  badge.textContent = "Scene " + (idx+1) + " / " + scenes.length;
+
+  var origin = window.location.origin;
+  vid.src = origin + "/app/static/restaurant/" + scene.video;
+  vid.play().catch(function(){});
+
+  vid.onended = function() {
+    if (scene.user_turn) {
+      showMic(scene);
+    } else {
+      setTimeout(function(){ playScene(idx + 1); }, 300);
+    }
+  };
+}
+
+// ── Mic phase ───────────────────────────────────────────────────────────────
+function showMic(scene) {
+  phase = "mic";
+  promptOv.textContent = "💬 " + scene.en_prompt;
+  promptOv.classList.add("on");
+  micBar.classList.add("on");
+  micLbl.textContent = "Tap to speak in Danish";
+  if (scene.hint) {
+    hintText.textContent = "💡 " + scene.hint;
+    hintBtn.classList.add("on");
+  }
+}
+
+function toggleHint() { hintText.classList.toggle("on"); }
+
+// ── Feedback phase ──────────────────────────────────────────────────────────
+function showFeedback(ev) {
+  phase = "feedback";
+  micBar.classList.remove("on");
+  promptOv.classList.remove("on");
+  feedbackOv.textContent = "💡 " + ev.text;
+  feedbackOv.classList.add("on");
+
+  if (ev.tts_b64) {
+    var audio = new Audio("data:audio/mpeg;base64," + ev.tts_b64);
+    audio.play().catch(function(){});
+  }
+  var words = ev.text ? ev.text.split(" ").length : 5;
+  var delay = Math.max(3000, words / 2.5 * 1000 + 800);
+  setTimeout(function() {
+    feedbackOv.classList.remove("on");
+    playScene(sceneIdx + 1);
+  }, delay);
+}
+
+// ── PCM AudioWorklet ────────────────────────────────────────────────────────
+var WORKLET = `
+class PCMProcessor extends AudioWorkletProcessor {
+  constructor(){super();this._buf=[];this._samples=0;this._target=1600;}
+  process(inputs){
+    var ch=inputs[0][0];if(!ch||!ch.length)return true;
+    var pcm=new Int16Array(ch.length);
+    for(var i=0;i<ch.length;i++){var s=Math.max(-1,Math.min(1,ch[i]));pcm[i]=s<0?s*32768:s*32767;}
+    this._buf.push(pcm);this._samples+=pcm.length;
+    if(this._samples>=this._target){
+      var tot=new Int16Array(this._samples),off=0;
+      for(var j=0;j<this._buf.length;j++){tot.set(this._buf[j],off);off+=this._buf[j].length;}
+      this.port.postMessage(tot.buffer,[tot.buffer]);
+      this._buf=[];this._samples=0;
+    }
+    return true;
+  }
+}
+registerProcessor("pcm-processor",PCMProcessor);
+`;
+
+// ── Mic recording ───────────────────────────────────────────────────────────
+var micStream   = null;  // kept alive across scenes — no repeated permission prompt
+var workletNode = null, audioCtx = null, ws = null;
+var listening   = false, committed = false, lastPartial = "";
+
+function prewarmMic() {
+  if (!micStream) {
+    navigator.mediaDevices.getUserMedia({audio:true,video:false})
+      .then(function(s){ micStream = s; })
+      .catch(function(){});
+  }
+}
+
+function toggleMic() {
+  if (listening) { commitAndStop(); } else { startListening(); }
+}
+
+async function startListening() {
+  if (!micStream) {
+    try { micStream = await navigator.mediaDevices.getUserMedia({audio:true,video:false}); }
+    catch(e) { micLbl.textContent = "Mic blocked"; return; }
+  }
+  if (!proxyPort && !wsToken) { micLbl.textContent = "Not ready"; return; }
+
+  committed = false; lastPartial = "";
+  var lang = "da";
+  var wsUrl = proxyPort
+    ? "ws://localhost:" + proxyPort + "?lang=" + lang
+    : "wss://api.elevenlabs.io/v1/speech-to-text/realtime?token=" + wsToken + "&model_id=scribe_v2_realtime";
+
+  ws = new WebSocket(wsUrl);
+  ws.onopen  = function(){ if (proxyPort) ws.send(JSON.stringify({type:"init",lang:lang})); };
+  ws.onmessage = function(e) {
+    try {
+      var msg = JSON.parse(e.data);
+      var mt  = msg.message_type || msg.type || "";
+      if (mt === "partial_transcript" && msg.text) {
+        lastPartial = msg.text;
+        micLbl.textContent = msg.text.length > 42 ? "…"+msg.text.slice(-40) : msg.text;
+      }
+      if ((mt === "committed_transcript" || mt === "committed_transcript_with_timestamps") && msg.text) {
+        if (!committed) { committed = true; sendTranscript(msg.text); }
+        stopAudio();
+      }
+      if (mt === "error" || mt === "auth_error") { stopAudio(); }
+    } catch(_){}
+  };
+  ws.onerror = function(){ stopAudio(); };
+  ws.onclose = function(){ if (listening) commitAndStop(); };
+
+  audioCtx = new AudioContext({sampleRate:16000});
+  var blobUrl = URL.createObjectURL(new Blob([WORKLET],{type:"application/javascript"}));
+  await audioCtx.audioWorklet.addModule(blobUrl);
+  var src = audioCtx.createMediaStreamSource(micStream);
+  workletNode = new AudioWorkletNode(audioCtx,"pcm-processor");
+  src.connect(workletNode);
+  workletNode.port.onmessage = function(ev) {
+    if (ws && ws.readyState === WebSocket.OPEN) ws.send(ev.data);
+  };
+
+  listening = true;
+  micBtn.classList.add("listening");
+  micLbl.textContent = "Listening…";
+}
+
+function commitAndStop() {
+  if (!listening) return;
+  listening = false;
+  micBtn.classList.remove("listening");
+
+  if (workletNode){ workletNode.port.onmessage=null; workletNode.disconnect(); workletNode=null; }
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    if (proxyPort) ws.send(JSON.stringify({type:"commit"}));
+    else ws.send(JSON.stringify({message_type:"input_audio_chunk",audio_base_64:"",commit:true,sample_rate:16000}));
+  }
+  if (audioCtx){ audioCtx.close(); audioCtx=null; }
+  ws = null;
+  // micStream intentionally kept open — no repeated permission prompt next scene
+
+  if (lastPartial && !committed) {
+    committed = true;
+    sendTranscript(lastPartial);
+  } else if (!committed) {
+    micLbl.textContent = "Transcribing…";
+  }
+}
+
+function stopAudio() {
+  listening = false;
+  micBtn.classList.remove("listening");
+  if (workletNode){ workletNode.port.onmessage=null; workletNode.disconnect(); workletNode=null; }
+  if (audioCtx){ audioCtx.close(); audioCtx=null; }
+  ws = null;
+}
+
+function sendTranscript(text) {
+  phase = "waiting";
+  micBar.classList.remove("on");
+  promptOv.classList.remove("on");
+  micLbl.textContent = "✓ " + text.slice(0, 40);
+  send({type:"transcript", scene_idx:sceneIdx, text:text});
+}
+</script></body></html>

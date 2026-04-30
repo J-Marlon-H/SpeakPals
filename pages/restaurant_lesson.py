@@ -1,12 +1,11 @@
 # SpeakPals — Restaurant Video Lesson
 from __future__ import annotations
 import streamlit as st
-import streamlit.components.v1 as components
-import requests, json, base64, pathlib, time
+import requests, json, base64, pathlib
 from dotenv import load_dotenv
 from db import require_auth, load_knowledge_profile, _secret
 from pipeline import VOICES_BY_LANG, SETTINGS_DEFAULTS
-from stt_helper import stt_mic
+from restaurant_helper import restaurant_player
 from ws_proxy import start_in_thread, PROXY_PORT, scribe_token as _scribe_token
 
 load_dotenv("keys.env")
@@ -20,66 +19,50 @@ if IS_LOCAL:
     start_in_thread()
 
 # ── Scene definitions ──────────────────────────────────────────────────────────
+# Only include fields the component or Python evaluation actually needs.
 
 SCENES = [
     {
-        "index":       0,
         "video":       "scene1.mp4",
-        "duration":    7.0,
         "user_turn":   True,
         "en_prompt":   "The waiter is asking: bar or window?",
         "da_target":   "Ved vinduet",
         "hint":        "Try 'Ved vinduet tak' (by the window, please)",
-        "tutor_break": False,
     },
     {
-        "index":       1,
         "video":       "scene2.mp4",
-        "duration":    14.5,
         "user_turn":   True,
         "en_prompt":   "Order the ramen from the menu.",
         "da_target":   "Jeg vil gerne have ramen",
         "hint":        "Try 'Jeg vil gerne have ramen tak' (I'd like the ramen, please)",
-        "tutor_break": True,
     },
     {
-        "index":       2,
         "video":       "scene3.mp4",
-        "duration":    6.5,
         "user_turn":   False,
         "en_prompt":   "",
+        "hint":        "",
     },
     {
-        "index":       3,
         "video":       "scene4.mp4",
-        "duration":    4.0,
         "user_turn":   True,
         "en_prompt":   "The ramen arrived! Thank the waiter and ask for a fork.",
         "da_target":   "Tak! Må jeg få en gaffel?",
         "hint":        "Try 'Tak! Må jeg få en gaffel?' (Thanks! May I have a fork?)",
-        "tutor_break": False,
     },
     {
-        "index":       4,
         "video":       "scene5.mp4",
-        "duration":    6.0,
         "user_turn":   False,
         "en_prompt":   "",
+        "hint":        "",
     },
     {
-        "index":       5,
         "video":       "scene6.mp4",
-        "duration":    10.7,
         "user_turn":   True,
         "en_prompt":   "The meal was great. Ask for the bill.",
         "da_target":   "Må jeg bede om regningen?",
         "hint":        "Try 'Må jeg bede om regningen?' (May I have the bill?)",
-        "tutor_break": False,
-        "is_final":    True,
     },
 ]
-
-VIDEO_DIR = pathlib.Path(__file__).parent.parent / "static" / "restaurant"
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -109,27 +92,6 @@ def _claude_evaluate(user_text: str, scene: dict, history: list,
     r.raise_for_status()
     return r.json()["content"][0]["text"].strip()
 
-def _tutor_reply(question: str, knowledge_profile: dict,
-                 name: str, level: str, bg_lang: str) -> str:
-    system = (
-        f"You are Lars, a warm Danish tutor. The student ({name}, level {level}, "
-        f"native language: {bg_lang}) is mid-lesson at a restaurant. "
-        f"Answer their question helpfully in 1-2 sentences. Plain text only."
-    )
-    if knowledge_profile:
-        system += f"\n\nWhat you know about this student: {json.dumps(knowledge_profile)}"
-    r = requests.post(
-        "https://api.anthropic.com/v1/messages",
-        headers={"x-api-key": CLAUDE_KEY, "anthropic-version": "2023-06-01",
-                 "Content-Type": "application/json"},
-        json={"model": "claude-haiku-4-5-20251001", "max_tokens": 150,
-              "temperature": 0.6, "system": system,
-              "messages": [{"role": "user", "content": question}]},
-        timeout=20,
-    )
-    r.raise_for_status()
-    return r.json()["content"][0]["text"].strip()
-
 def _tts_b64(text: str, voice_id: str) -> str | None:
     try:
         r = requests.post(
@@ -145,14 +107,6 @@ def _tts_b64(text: str, voice_id: str) -> str | None:
     except Exception:
         return None
 
-def _play_audio(b64: str) -> None:
-    components.html(f"""<script>
-      (function(){{
-        const a = new Audio("data:audio/mpeg;base64,{b64}");
-        a.play().catch(()=>{{}});
-      }})();
-    </script>""", height=0)
-
 # ── Page config ────────────────────────────────────────────────────────────────
 
 st.set_page_config(page_title="Restaurant Lesson — SpeakPals", page_icon="🍜",
@@ -167,23 +121,12 @@ st.markdown("""<style>
   [data-testid="stAppViewContainer"],[data-testid="stMain"]{background:#0a0a0a!important}
   .block-container{padding:1rem 1.5rem!important;max-width:100%!important}
   div[data-testid="stVerticalBlock"]{gap:0.4rem!important}
-
-  .scene-badge{display:inline-block;padding:3px 10px;border-radius:20px;
-    font:600 11px system-ui;letter-spacing:1px;text-transform:uppercase;
-    background:rgba(13,148,136,.2);color:#2dd4bf;border:1px solid rgba(13,148,136,.3)}
-  .prompt-box{background:rgba(13,148,136,.12);border:1px solid rgba(13,148,136,.3);
-    border-radius:12px;padding:12px 16px;color:#e2e8f0;font-size:14px;margin:8px 0}
-  .hint-box{background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.3);
-    border-radius:10px;padding:10px 14px;font-size:13px;color:#fcd34d;margin-top:6px}
   .chat-msg{padding:10px 14px;border-radius:12px;margin-bottom:6px;font-size:13px;line-height:1.5}
   .chat-user{background:rgba(13,148,136,.15);color:#e2e8f0;text-align:right}
   .chat-tutor{background:rgba(255,255,255,.07);color:#e2e8f0}
   .stButton button{border-radius:10px!important;font-weight:600!important;font-size:13px!important}
   .stButton button[kind="primary"]{
     background:#0d9488!important;color:#fff!important;border:none!important}
-  .mic-label{font:600 11px system-ui;color:rgba(255,255,255,.4);letter-spacing:1.5px;
-    text-transform:uppercase;text-align:center;margin-top:4px}
-  video{border-radius:16px;width:100%}
 </style>""", unsafe_allow_html=True)
 
 # ── User profile ───────────────────────────────────────────────────────────────
@@ -193,8 +136,7 @@ sb_token   = st.session_state.get("sb_access_token")
 name       = st.session_state.get("s_name")    or "there"
 level      = st.session_state.get("s_level")   or "A1"
 bg_lang    = st.session_state.get("s_bg_lang") or "English"
-target_lang = "Danish"
-lang_voices = VOICES_BY_LANG.get(target_lang, {})
+lang_voices = VOICES_BY_LANG.get("Danish", {})
 voice_label = st.session_state.get("s_voice_label", SETTINGS_DEFAULTS["s_voice_label"])
 voice_id    = lang_voices.get(voice_label, next(iter(lang_voices.values()), ""))
 knowledge_profile = st.session_state.get("knowledge_profile") or {}
@@ -203,22 +145,16 @@ if sb_user_id and sb_token and not knowledge_profile:
 
 # ── Session state ──────────────────────────────────────────────────────────────
 
-_RS_KEYS = ["rs_scene_idx","rs_watching","rs_chat","rs_tutor_mode",
-            "rs_complete","rs_show_hint","rs_started"]
+_RS_KEYS = ["rs_started","rs_complete","rs_chat","rs_evaluation","rs_last_eval_scene"]
 for k, v in [
-    ("rs_started",   False),
-    ("rs_scene_idx", 0),
-    ("rs_watching",  True),   # True = video phase, False = answer/mic phase
-    ("rs_chat",      []),
-    ("rs_tutor_mode",False),
-    ("rs_complete",  False),
-    ("rs_show_hint", False),
+    ("rs_started",        False),
+    ("rs_complete",       False),
+    ("rs_chat",           []),
+    ("rs_evaluation",     None),
+    ("rs_last_eval_scene",-1),
 ]:
     if k not in st.session_state:
         st.session_state[k] = v
-
-scene_idx = st.session_state.rs_scene_idx
-scene     = SCENES[scene_idx] if scene_idx < len(SCENES) else None
 
 # ── Layout ─────────────────────────────────────────────────────────────────────
 
@@ -241,169 +177,87 @@ with col_video:
         _, btn_col, _ = st.columns([2, 2, 2])
         with btn_col:
             if st.button("▶  Start Lesson", use_container_width=True, type="primary"):
-                st.session_state.rs_started  = True
-                st.session_state.rs_watching = True
+                st.session_state.rs_started = True
                 st.rerun()
 
-    # ── Scene header ───────────────────────────────────────────────────────────
+    # ── Complete screen ────────────────────────────────────────────────────────
     elif st.session_state.rs_complete:
-        st.markdown("""<div style='display:flex;align-items:center;gap:10px;padding:0 0 10px'>
-          <div style='font:800 20px/1 system-ui;color:#f1f5f9'>🍜 At the Restaurant</div>
-        </div>""", unsafe_allow_html=True)
+        st.markdown("""<div style='font:800 20px/1 system-ui;color:#f1f5f9;
+          padding:0 0 16px'>🍜 At the Restaurant</div>""", unsafe_allow_html=True)
         st.success(f"🎉 Lesson complete! Great work, {name}!")
         if st.button("← Back to Home", use_container_width=True):
             for k in _RS_KEYS:
                 st.session_state.pop(k, None)
             st.switch_page("pages/home.py")
 
-    elif scene:
-        st.markdown(f"""
-        <div style='display:flex;align-items:center;gap:10px;padding:0 0 10px'>
-          <div style='font:800 20px/1 system-ui;color:#f1f5f9;letter-spacing:-.3px'>🍜 At the Restaurant</div>
-          <div class='scene-badge'>Scene {scene_idx + 1} / {len(SCENES)}</div>
-        </div>""", unsafe_allow_html=True)
-
-        video_path = VIDEO_DIR / scene["video"]
-
-        # ── Video phase — plays then auto-transitions ──────────────────────────
-        if st.session_state.rs_watching:
-            if video_path.exists():
-                st.video(str(video_path), autoplay=True)
-            else:
-                st.warning(f"Video file not found: {scene['video']}")
-
-            # Sleep for the video duration, then auto-transition
-            time.sleep(scene["duration"])
-            if scene["user_turn"]:
-                st.session_state.rs_watching = False   # → mic phase
-            else:
-                next_idx = scene_idx + 1               # auto-advance scene
-                if next_idx >= len(SCENES):
-                    st.session_state.rs_complete = True
-                else:
-                    st.session_state.rs_scene_idx = next_idx
-                    st.session_state.rs_watching  = True
-            st.rerun()
-
-        # ── Mic phase ─────────────────────────────────────────────────────────
+    # ── Active lesson — unified component ─────────────────────────────────────
+    else:
+        comp_props: dict = {
+            "scenes":     SCENES,
+            "started":    True,
+            "evaluation": st.session_state.rs_evaluation,
+            "key":        "restaurant_player",
+            "height":     600,
+            "default":    None,
+        }
+        if IS_LOCAL:
+            comp_props["proxy_port"] = PROXY_PORT
         else:
-            if video_path.exists():
-                st.video(str(video_path))
+            tok = _scribe_token(ELEVEN_KEY)
+            if tok:
+                comp_props["ws_token"] = tok
 
-            if not st.session_state.rs_tutor_mode:
-                st.markdown(f"<div class='prompt-box'>💬 {scene['en_prompt']}</div>",
-                            unsafe_allow_html=True)
+        result = restaurant_player(**comp_props)
 
-                _, mic_col, _ = st.columns([2, 1, 2])
-                with mic_col:
-                    mic_props: dict = {"lang": "da", "key": f"stt_{scene_idx}",
-                                       "height": 90, "default": None}
-                    if IS_LOCAL:
-                        mic_props["proxy_port"] = PROXY_PORT
-                    else:
-                        tok = _scribe_token(ELEVEN_KEY)
-                        if tok:
-                            mic_props["ws_token"] = tok
-                    transcript = stt_mic(**mic_props)
-                st.markdown("<div class='mic-label'>Tap mic · Speak in Danish</div>",
-                            unsafe_allow_html=True)
-
-                if scene.get("tutor_break"):
-                    hc, tc = st.columns(2)
-                else:
-                    hc = st.columns(1)[0]
-                with hc:
-                    if st.button("Hint 💡", use_container_width=True,
-                                 key=f"hint_{scene_idx}"):
-                        st.session_state.rs_show_hint = not st.session_state.rs_show_hint
-                if scene.get("tutor_break"):
-                    with tc:
-                        if st.button("Ask Lars 🎓", use_container_width=True,
-                                     key=f"tutor_btn_{scene_idx}"):
-                            st.session_state.rs_tutor_mode = True
-                            st.rerun()
-
-                if st.session_state.rs_show_hint:
-                    st.markdown(f"<div class='hint-box'>💡 {scene['hint']}</div>",
-                                unsafe_allow_html=True)
-
-                if transcript:
-                    with st.spinner("Lars is listening…"):
+        if isinstance(result, dict):
+            if result.get("type") == "transcript":
+                scene_idx = result["scene_idx"]
+                # Deduplicate — same transcript fires on every rerun until component resets
+                if scene_idx != st.session_state.rs_last_eval_scene:
+                    scene    = SCENES[scene_idx]
+                    txt      = result.get("text", "").strip()
+                    with st.spinner("Lars is thinking…"):
                         feedback = _claude_evaluate(
-                            transcript.strip(), scene,
-                            st.session_state.rs_chat,
+                            txt, scene, st.session_state.rs_chat,
                             knowledge_profile, name, level, bg_lang,
                         )
+                    audio = _tts_b64(feedback, voice_id)
                     st.session_state.rs_chat.extend([
-                        {"role": "user",      "content": transcript.strip()},
+                        {"role": "user",      "content": txt},
                         {"role": "assistant", "content": feedback},
                     ])
-                    audio = _tts_b64(feedback, voice_id)
-                    if audio:
-                        _play_audio(audio)
-                    feedback_slot = st.empty()
-                    feedback_slot.markdown(
-                        f"<div class='prompt-box' style='border-color:rgba(13,148,136,.5)'>"
-                        f"💡 {feedback}</div>",
-                        unsafe_allow_html=True)
-                    words = len(feedback.split())
-                    time.sleep(max(3.0, words / 2.5 + 0.8))
-                    st.session_state.rs_show_hint = False
-                    next_idx = scene_idx + 1
-                    if next_idx >= len(SCENES):
-                        st.session_state.rs_complete = True
-                    else:
-                        st.session_state.rs_scene_idx = next_idx
-                        st.session_state.rs_watching  = True
+                    st.session_state.rs_evaluation     = {
+                        "scene_idx": scene_idx,
+                        "text":      feedback,
+                        "tts_b64":   audio or None,
+                    }
+                    st.session_state.rs_last_eval_scene = scene_idx
                     st.rerun()
+
+            elif result.get("type") == "complete":
+                st.session_state.rs_complete = True
+                st.rerun()
 
 with col_sidebar:
     st.markdown("""<div style='font:700 10px system-ui;color:rgba(255,255,255,.4);
       letter-spacing:2px;text-transform:uppercase;margin-bottom:12px'>
       💡 Lars · Tutor</div>""", unsafe_allow_html=True)
 
-    # ── Tutor break ────────────────────────────────────────────────────────────
-    if st.session_state.rs_tutor_mode:
-        st.markdown("""<div style='background:rgba(13,148,136,.15);border:1px solid
-          rgba(13,148,136,.3);border-radius:10px;padding:10px 12px;font-size:12px;
-          color:#2dd4bf;margin-bottom:10px'>Ask Lars anything — vocabulary, how to say something.</div>""",
-                    unsafe_allow_html=True)
-        q = st.text_input("Your question:", key="tutor_q",
-                          placeholder="How do I ask for a fork?")
-        if st.button("Ask", key="ask_tutor", type="primary"):
-            if q.strip():
-                with st.spinner("Lars is thinking…"):
-                    answer = _tutor_reply(q.strip(), knowledge_profile, name, level, bg_lang)
-                st.session_state.rs_chat.extend([
-                    {"role": "user",      "content": f"[Question] {q.strip()}"},
-                    {"role": "assistant", "content": answer},
-                ])
-                audio = _tts_b64(answer, voice_id)
-                if audio:
-                    _play_audio(audio)
-                st.rerun()
-        if st.button("← Back to lesson", key="back_lesson"):
-            st.session_state.rs_tutor_mode = False
-            st.rerun()
-        st.markdown("<hr style='border-color:rgba(255,255,255,.1);margin:12px 0'>",
-                    unsafe_allow_html=True)
-
-    # ── Transcript ─────────────────────────────────────────────────────────────
     if st.session_state.rs_chat:
         st.markdown("""<div style='font:700 10px system-ui;color:rgba(255,255,255,.3);
-          letter-spacing:1.5px;text-transform:uppercase;margin-bottom:8px'>Conversation</div>""",
-                    unsafe_allow_html=True)
+          letter-spacing:1.5px;text-transform:uppercase;margin-bottom:8px'>
+          Conversation</div>""", unsafe_allow_html=True)
         for msg in st.session_state.rs_chat:
-            content = msg["content"].removeprefix("[Question] ")
             if msg["role"] == "user":
-                st.markdown(f"<div class='chat-msg chat-user'>🧑 {content}</div>",
+                st.markdown(f"<div class='chat-msg chat-user'>🧑 {msg['content']}</div>",
                             unsafe_allow_html=True)
             else:
-                st.markdown(f"<div class='chat-msg chat-tutor'>💡 {content}</div>",
+                st.markdown(f"<div class='chat-msg chat-tutor'>💡 {msg['content']}</div>",
                             unsafe_allow_html=True)
     else:
-        st.markdown("""<div style='font:400 12px system-ui;color:rgba(255,255,255,.25);margin-top:8px'>
-          Your conversation will appear here.</div>""", unsafe_allow_html=True)
+        st.markdown("""<div style='font:400 12px system-ui;color:rgba(255,255,255,.25);
+          margin-top:8px'>Your conversation will appear here.</div>""",
+                    unsafe_allow_html=True)
 
     st.markdown("<br>", unsafe_allow_html=True)
     if st.button("🏠 Exit lesson", use_container_width=True):
