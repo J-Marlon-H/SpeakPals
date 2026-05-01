@@ -155,15 +155,11 @@ function playScene(idx) {
   playGate.classList.add("hidden");
   badge.textContent = "Scene " + (idx+1) + " / " + scenes.length;
 
-  // Build an ordered list of candidate URLs to try for the video.
-  // The component handler path works on local; the parent-origin absolute
-  // path is a fallback for Cloud where relative resolution may differ.
-  var compBase;
-  try { compBase = window.parent.location.origin; } catch(e) { compBase = window.location.origin; }
+  // Videos are served by Streamlit's static file handler at /app/static/.
+  // Root-relative path works from both local Tornado and Streamlit Cloud.
   var candidateUrls = [
-    "restaurant/" + scene.video,
-    compBase + "/component/restaurant_helper.restaurant_player/restaurant/" + scene.video,
-    compBase + "/app/static/restaurant/" + scene.video,
+    "/app/static/restaurant/" + scene.video,
+    window.location.origin + "/app/static/restaurant/" + scene.video,
   ];
   var urlIdx = 0;
 
