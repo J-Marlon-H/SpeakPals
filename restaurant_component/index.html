@@ -167,9 +167,9 @@ function playScene(idx) {
   console.log("[SpeakPals] Fetching:", videoUrl);
 
   var blobObjectUrl = null;
-  fetch(videoUrl, {cache: "no-store"})
+  fetch(videoUrl, {cache: "no-store", headers: {"Range": "bytes=0-"}})
     .then(function(r) {
-      if (!r.ok) throw new Error("HTTP " + r.status);
+      if (!r.ok && r.status !== 206) throw new Error("HTTP " + r.status);
       console.log("[SpeakPals] fetch content-type:", r.headers.get("content-type"));
       return r.blob();
     })
