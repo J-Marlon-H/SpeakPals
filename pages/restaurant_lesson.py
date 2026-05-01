@@ -305,28 +305,27 @@ with col_main:
 
     # ── Feedback phase ─────────────────────────────────────────────────────────
     elif rs_phase == "feedback":
-        ev        = st.session_state.rs_evaluation or {}
-        tts_b64   = ev.get("tts_b64", "")
-        lars_text = ev.get("text", "")
+        ev      = st.session_state.rs_evaluation or {}
+        tts_b64 = ev.get("tts_b64", "")
 
         st.markdown(
             f"<div style='font:700 10px system-ui;color:rgba(13,148,136,.8);"
-            f"letter-spacing:1.5px;text-transform:uppercase;margin-bottom:8px'>"
-            f"Scene {rs_scene_idx + 1} / {len(SCENES)} · Lars' feedback</div>",
+            f"letter-spacing:1.5px;text-transform:uppercase;margin-bottom:6px'>"
+            f"Scene {rs_scene_idx + 1} / {len(SCENES)}</div>",
             unsafe_allow_html=True,
         )
+        # Play Lars' TTS audio; feedback text is in the sidebar conversation
         if tts_b64:
             st.markdown(
                 f'<audio autoplay src="data:audio/mpeg;base64,{tts_b64}" style="display:none"></audio>',
                 unsafe_allow_html=True,
             )
-        st.markdown(
-            f"<div style='background:rgba(13,148,136,.15);border:1px solid rgba(13,148,136,.3);"
-            f"border-radius:12px;padding:14px 18px;font:14px/1.6 system-ui;color:#e2e8f0;"
-            f"margin-bottom:12px'>💡 {lars_text}</div>",
-            unsafe_allow_html=True,
-        )
+        # Show scene video for context while user listens to feedback
+        video_path = VIDEO_DIR / SCENES[rs_scene_idx]["video"]
+        if video_path.exists():
+            st.video(str(video_path), autoplay=False)
 
+        st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
         _, btn_col, _ = st.columns([1, 2, 1])
         with btn_col:
             next_idx = rs_scene_idx + 1
