@@ -155,8 +155,14 @@ function playScene(idx) {
   playGate.classList.add("hidden");
   badge.textContent = "Scene " + (idx+1) + " / " + scenes.length;
 
-  var origin = window.location.origin;
-  vid.src = origin + "/app/static/restaurant/" + scene.video;
+  vid.src = "/app/static/restaurant/" + scene.video;
+
+  vid.onerror = function() {
+    // Video failed to load (e.g. 404) — show the tap gate so the user
+    // gets feedback and can retry rather than seeing a silent blank screen.
+    pendingScene = scene;
+    playGate.classList.remove("hidden");
+  };
 
   vid.onended = function() {
     if (scene.user_turn) { showMic(scene); }
@@ -164,8 +170,8 @@ function playScene(idx) {
   };
 
   vid.play().catch(function() {
-    // Autoplay blocked — show a tap overlay inside the iframe
-    // (clicking it grants user activation, allowing all subsequent plays)
+    // Autoplay blocked — show tap overlay; clicking grants user activation
+    // for all subsequent vid.play() calls.
     pendingScene = scene;
     playGate.classList.remove("hidden");
   });
@@ -173,8 +179,10 @@ function playScene(idx) {
 
 function gateClick() {
   playGate.classList.add("hidden");
-  vid.play().catch(function(){});
-  // prewarm mic after first interaction so getUserMedia is ready
+  vid.play().catch(function() {
+    // If play still fails after user interaction (e.g. bad src), show gate again.
+    playGate.classList.remove("hidden");
+  });
   prewarmMic();
 }
 
