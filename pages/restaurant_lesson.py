@@ -57,10 +57,9 @@ SCENES = [
     },
     {
         "video":       "scene6.mp4",
-        "user_turn":   True,
+        "user_turn":   False,
         "en_prompt":   "",
-        "da_target":   "Må jeg bede om regningen?",
-        "hint":        "Try 'Må jeg bede om regningen?' (May I have the bill?)",
+        "hint":        "",
     },
 ]
 
@@ -164,6 +163,28 @@ for k, v in [
 rs_phase     = st.session_state.rs_phase
 rs_scene_idx = st.session_state.rs_scene_idx
 
+# ── Shared component props (always rendered to keep mic permission alive) ──────
+
+_scene_now = SCENES[rs_scene_idx] if rs_phase not in ("start", "complete") else {}
+_mic_visible = (rs_phase == "mic")
+
+_comp_base: dict = {
+    "visible":   _mic_visible,
+    "scene_idx": rs_scene_idx,
+    "lang_code": "da",
+    "label":     "Tap to speak in Danish",
+    "hint":      _scene_now.get("hint", ""),
+    "key":       "restaurant_mic",   # same key → same iframe across reruns
+    "height":    160 if _mic_visible else 2,
+    "default":   None,
+}
+if IS_LOCAL:
+    _comp_base["proxy_port"] = PROXY_PORT
+else:
+    _tok = _scribe_token(ELEVEN_KEY)
+    if _tok:
+        _comp_base["ws_token"] = _tok
+
 # ── Layout ─────────────────────────────────────────────────────────────────────
 
 col_main, col_sidebar = st.columns([3, 1], gap="medium")
@@ -262,6 +283,7 @@ with col_main:
     # ── Mic phase ──────────────────────────────────────────────────────────────
     elif rs_phase == "mic":
         scene = SCENES[rs_scene_idx]
+        video_path = VIDEO_DIR / scene["video"]
 
         st.markdown(
             f"<div style='font:700 10px system-ui;color:rgba(13,148,136,.8);"
@@ -269,54 +291,17 @@ with col_main:
             f"Scene {rs_scene_idx + 1} / {len(SCENES)} · Your turn</div>",
             unsafe_allow_html=True,
         )
+        # Show the video (without autoplay) so the scene stays visible
+        if video_path.exists():
+            st.video(str(video_path), autoplay=False)
+
         if scene.get("en_prompt"):
             st.markdown(
                 f"<div style='font:14px/1.5 system-ui;color:#e2e8f0;"
-                f"text-align:center;margin-bottom:10px'>"
+                f"text-align:center;margin:8px 0 4px'>"
                 f"💬 {scene['en_prompt']}</div>",
                 unsafe_allow_html=True,
             )
-
-        comp_props: dict = {
-            "scene_idx": rs_scene_idx,
-            "lang_code": "da",
-            "label":     "Tap to speak in Danish",
-            "hint":      scene.get("hint", ""),
-            "key":       "restaurant_mic",
-            "height":    180,
-            "default":   None,
-        }
-        if IS_LOCAL:
-            comp_props["proxy_port"] = PROXY_PORT
-        else:
-            tok = _scribe_token(ELEVEN_KEY)
-            if tok:
-                comp_props["ws_token"] = tok
-
-        result = restaurant_player(**comp_props)
-
-        if isinstance(result, dict) and result.get("type") == "transcript":
-            scene_idx = result["scene_idx"]
-            if scene_idx != st.session_state.rs_last_eval_scene:
-                txt = result.get("text", "").strip()
-                with st.spinner("Lars is thinking…"):
-                    feedback = _claude_evaluate(
-                        txt, scene, st.session_state.rs_chat,
-                        knowledge_profile, name, level, bg_lang,
-                    )
-                audio = _tts_b64(feedback, voice_id)
-                st.session_state.rs_chat.extend([
-                    {"role": "user",      "content": txt},
-                    {"role": "assistant", "content": feedback},
-                ])
-                st.session_state.rs_evaluation     = {
-                    "scene_idx": scene_idx,
-                    "text":      feedback,
-                    "tts_b64":   audio or None,
-                }
-                st.session_state.rs_last_eval_scene = scene_idx
-                st.session_state.rs_phase = "feedback"
-                st.rerun()
 
     # ── Feedback phase ─────────────────────────────────────────────────────────
     elif rs_phase == "feedback":
@@ -354,6 +339,32 @@ with col_main:
                     st.session_state.rs_scene_idx = next_idx
                     st.session_state.rs_phase = "video"
                 st.rerun()
+
+    # ── Mic component — always rendered so mic permission is never lost ─────────
+    _result = restaurant_player(**_comp_base)
+
+    if _mic_visible and isinstance(_result, dict) and _result.get("type") == "transcript":
+        _scene_idx = _result["scene_idx"]
+        if _scene_idx != st.session_state.rs_last_eval_scene:
+            _txt = _result.get("text", "").strip()
+            with st.spinner("Lars is thinking…"):
+                _feedback = _claude_evaluate(
+                    _txt, _scene_now, st.session_state.rs_chat,
+                    knowledge_profile, name, level, bg_lang,
+                )
+            _audio = _tts_b64(_feedback, voice_id)
+            st.session_state.rs_chat.extend([
+                {"role": "user",      "content": _txt},
+                {"role": "assistant", "content": _feedback},
+            ])
+            st.session_state.rs_evaluation     = {
+                "scene_idx": _scene_idx,
+                "text":      _feedback,
+                "tts_b64":   _audio or None,
+            }
+            st.session_state.rs_last_eval_scene = _scene_idx
+            st.session_state.rs_phase = "feedback"
+            st.rerun()
 
 with col_sidebar:
     st.markdown("""<div style='font:700 10px system-ui;color:rgba(255,255,255,.4);
