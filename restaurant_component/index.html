@@ -156,45 +156,45 @@ function playScene(idx) {
   playGate.classList.add("hidden");
   badge.textContent = "Scene " + (idx+1) + " / " + scenes.length;
 
-  // Videos are served by Streamlit's static file handler at /app/static/.
-  // Root-relative path works from both local Tornado and Streamlit Cloud.
-  var candidateUrls = [
-    "/app/static/restaurant/" + scene.video,
-    window.location.origin + "/app/static/restaurant/" + scene.video,
-  ];
-  var urlIdx = 0;
-
   vid.onended = function() {
     if (scene.user_turn) { showMic(scene); }
     else { setTimeout(function(){ playScene(idx + 1); }, 300); }
   };
 
-  function tryNextUrl() {
-    if (urlIdx >= candidateUrls.length) {
-      console.error("[SpeakPals] All video URLs failed — showing gate.");
-      pendingScene = scene;
-      playGate.classList.remove("hidden");
-      return;
-    }
-    var url = candidateUrls[urlIdx];
-    console.log("[SpeakPals] Trying video URL:", url);
-    vid.src = url;
-    vid.onerror = function() {
-      console.warn("[SpeakPals] onerror on", url, "code:", vid.error && vid.error.code);
-      urlIdx++;
-      tryNextUrl();
-    };
-    vid.play().catch(function(err) {
-      // Autoplay blocked (NotAllowedError) — show tap overlay.
-      // Any other error (bad src) will also fire onerror, so don't double-show gate.
-      if (err.name === "NotAllowedError" || err.name === "NotSupportedError") {
-        console.log("[SpeakPals] Autoplay blocked:", err.name, "— showing gate.");
+  // Fetch video as blob → blob: URL bypasses CSP media-src restrictions
+  // that Streamlit Cloud places on the component iframe document.
+  var videoUrl = "/app/static/restaurant/" + scene.video;
+  badge.textContent = "Scene " + (idx+1) + " / " + scenes.length + " · loading…";
+  console.log("[SpeakPals] Fetching video via blob:", videoUrl);
+
+  var blobObjectUrl = null;
+  fetch(videoUrl)
+    .then(function(r) {
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      return r.blob();
+    })
+    .then(function(blob) {
+      if (blobObjectUrl) URL.revokeObjectURL(blobObjectUrl);
+      blobObjectUrl = URL.createObjectURL(blob);
+      vid.src = blobObjectUrl;
+      badge.textContent = "Scene " + (idx+1) + " / " + scenes.length;
+      console.log("[SpeakPals] Blob ready, attempting play");
+      return vid.play();
+    })
+    .catch(function(err) {
+      console.log("[SpeakPals] blob play result:", err && err.name);
+      if (!err || err.name === "NotAllowedError") {
+        // Autoplay blocked — show tap-to-play gate; gateClick() will call vid.play()
+        pendingScene = scene;
+        playGate.classList.remove("hidden");
+      } else {
+        // Fetch or decode error — show gate with error hint
+        console.error("[SpeakPals] Video load error:", err);
+        badge.textContent = "Scene " + (idx+1) + " · load error";
         pendingScene = scene;
         playGate.classList.remove("hidden");
       }
     });
-  }
-  tryNextUrl();
 }
 
 function gateClick() {
