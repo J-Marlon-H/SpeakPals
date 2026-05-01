@@ -76,9 +76,9 @@ video{width:100%;height:100%;object-fit:cover;border-radius:14px;display:block}
     <div class="scene-badge" id="badge"></div>
     <div class="prompt-overlay" id="promptOverlay"></div>
     <div class="feedback-overlay" id="feedbackOverlay"></div>
-    <div class="play-gate hidden" id="playGate" onclick="gateClick()">
+    <div class="play-gate" id="playGate" onclick="gateClick()">
       <div class="play-gate-icon">▶</div>
-      <div class="play-gate-lbl">Tap to watch</div>
+      <div class="play-gate-lbl">Tap to start lesson</div>
     </div>
   </div>
   <div class="mic-bar" id="micBar">
@@ -155,14 +155,28 @@ function playScene(idx) {
   playGate.classList.add("hidden");
   badge.textContent = "Scene " + (idx+1) + " / " + scenes.length;
 
-  vid.src = "restaurant/" + scene.video;
+  // Build an ordered list of candidate URLs to try for the video.
+  // The component handler path works on local; the parent-origin absolute
+  // path is a fallback for Cloud where relative resolution may differ.
+  var compBase;
+  try { compBase = window.parent.location.origin; } catch(e) { compBase = window.location.origin; }
+  var candidateUrls = [
+    "restaurant/" + scene.video,
+    compBase + "/component/restaurant_helper.restaurant_player/restaurant/" + scene.video,
+    compBase + "/app/static/restaurant/" + scene.video,
+  ];
+  var urlIdx = 0;
 
-  vid.onerror = function() {
-    // Video failed to load (e.g. 404) — show the tap gate so the user
-    // gets feedback and can retry rather than seeing a silent blank screen.
-    pendingScene = scene;
-    playGate.classList.remove("hidden");
-  };
+  function tryNextUrl() {
+    if (urlIdx >= candidateUrls.length) {
+      pendingScene = scene;
+      playGate.classList.remove("hidden");
+      return;
+    }
+    vid.src = candidateUrls[urlIdx];
+    vid.onerror = function() { urlIdx++; tryNextUrl(); };
+  }
+  tryNextUrl();
 
   vid.onended = function() {
     if (scene.user_turn) { showMic(scene); }
