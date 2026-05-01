@@ -1,7 +1,8 @@
 # SpeakPals — Restaurant Video Lesson
 from __future__ import annotations
+import pathlib, json, base64
 import streamlit as st
-import requests, json, base64, pathlib
+import requests
 from dotenv import load_dotenv
 from db import require_auth, load_knowledge_profile, _secret
 from pipeline import VOICES_BY_LANG, SETTINGS_DEFAULTS
@@ -19,7 +20,6 @@ if IS_LOCAL:
     start_in_thread()
 
 # ── Scene definitions ──────────────────────────────────────────────────────────
-# Only include fields the component or Python evaluation actually needs.
 
 SCENES = [
     {
@@ -63,6 +63,8 @@ SCENES = [
         "hint":        "Try 'Må jeg bede om regningen?' (May I have the bill?)",
     },
 ]
+
+VIDEO_DIR = pathlib.Path("static/restaurant")
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -127,6 +129,9 @@ st.markdown("""<style>
   .stButton button{border-radius:10px!important;font-weight:600!important;font-size:13px!important}
   .stButton button[kind="primary"]{
     background:#0d9488!important;color:#fff!important;border:none!important}
+  /* Dark background for video widget */
+  [data-testid="stVideo"]{border-radius:14px;overflow:hidden}
+  video{border-radius:14px}
 </style>""", unsafe_allow_html=True)
 
 # ── User profile ───────────────────────────────────────────────────────────────
@@ -145,25 +150,28 @@ if sb_user_id and sb_token and not knowledge_profile:
 
 # ── Session state ──────────────────────────────────────────────────────────────
 
-_RS_KEYS = ["rs_started","rs_complete","rs_chat","rs_evaluation","rs_last_eval_scene"]
+_RS_KEYS = ["rs_phase","rs_scene_idx","rs_chat","rs_evaluation","rs_last_eval_scene"]
 for k, v in [
-    ("rs_started",         False),
-    ("rs_complete",        False),
-    ("rs_chat",            []),
-    ("rs_evaluation",      None),
-    ("rs_last_eval_scene", -1),
+    ("rs_phase",          "start"),
+    ("rs_scene_idx",      0),
+    ("rs_chat",           []),
+    ("rs_evaluation",     None),
+    ("rs_last_eval_scene",-1),
 ]:
     if k not in st.session_state:
         st.session_state[k] = v
 
+rs_phase     = st.session_state.rs_phase
+rs_scene_idx = st.session_state.rs_scene_idx
+
 # ── Layout ─────────────────────────────────────────────────────────────────────
 
-col_video, col_sidebar = st.columns([3, 1], gap="medium")
+col_main, col_sidebar = st.columns([3, 1], gap="medium")
 
-with col_video:
+with col_main:
 
     # ── Start screen ───────────────────────────────────────────────────────────
-    if not st.session_state.rs_started:
+    if rs_phase == "start":
         st.markdown("""
         <div style='text-align:center;padding:60px 20px 30px'>
           <div style='font-size:56px;margin-bottom:16px'>🍜</div>
@@ -171,27 +179,28 @@ with col_video:
             At the Restaurant</div>
           <div style='font:400 14px/1.6 system-ui;color:rgba(255,255,255,.5);
             max-width:340px;margin:0 auto 32px'>
-            A video lesson set in a ramen restaurant. Watch the scenes and
-            speak your Danish answers — Lars will guide you through.</div>
+            A video lesson set in a ramen restaurant. Watch each scene and
+            speak your Danish replies — Lars will guide you.</div>
         </div>""", unsafe_allow_html=True)
         _, btn_col, _ = st.columns([2, 2, 2])
         with btn_col:
             if st.button("▶  Start Lesson", use_container_width=True, type="primary"):
-                st.session_state.rs_started = True
+                st.session_state.rs_phase     = "video"
+                st.session_state.rs_scene_idx = 0
                 st.rerun()
 
     # ── Complete screen ────────────────────────────────────────────────────────
-    elif st.session_state.rs_complete:
-        last_eval   = st.session_state.rs_evaluation or {}
-        tts_b64     = last_eval.get("tts_b64", "")
-        lars_text   = last_eval.get("text", "")
-        audio_tag   = (f'<audio autoplay src="data:audio/mpeg;base64,{tts_b64}" '
-                       f'style="display:none"></audio>') if tts_b64 else ""
-        lars_block  = (f"<div style='background:rgba(13,148,136,.15);"
-                       f"border:1px solid rgba(13,148,136,.3);border-radius:10px;"
-                       f"padding:12px 16px;margin:0 auto 24px;max-width:380px;"
-                       f"font:13px/1.5 system-ui;color:#e2e8f0;text-align:left'>"
-                       f"💡 {lars_text}</div>") if lars_text else ""
+    elif rs_phase == "complete":
+        last_eval  = st.session_state.rs_evaluation or {}
+        tts_b64    = last_eval.get("tts_b64", "")
+        lars_text  = last_eval.get("text", "")
+        audio_tag  = (f'<audio autoplay src="data:audio/mpeg;base64,{tts_b64}" '
+                      f'style="display:none"></audio>') if tts_b64 else ""
+        lars_block = (f"<div style='background:rgba(13,148,136,.15);"
+                      f"border:1px solid rgba(13,148,136,.3);border-radius:10px;"
+                      f"padding:12px 16px;margin:0 auto 24px;max-width:380px;"
+                      f"font:13px/1.5 system-ui;color:#e2e8f0;text-align:left'>"
+                      f"💡 {lars_text}</div>") if lars_text else ""
         st.markdown(f"""
         {audio_tag}
         <div style='text-align:center;padding:50px 20px 24px'>
@@ -211,15 +220,71 @@ with col_video:
                     st.session_state.pop(k, None)
                 st.switch_page("pages/home.py")
 
-    # ── Active lesson — unified component ─────────────────────────────────────
-    else:
+    # ── Video phase ────────────────────────────────────────────────────────────
+    elif rs_phase == "video":
+        scene = SCENES[rs_scene_idx]
+        video_path = VIDEO_DIR / scene["video"]
+
+        st.markdown(
+            f"<div style='font:700 10px system-ui;color:rgba(13,148,136,.8);"
+            f"letter-spacing:1.5px;text-transform:uppercase;margin-bottom:6px'>"
+            f"Scene {rs_scene_idx + 1} / {len(SCENES)}</div>",
+            unsafe_allow_html=True,
+        )
+        if video_path.exists():
+            st.video(str(video_path), autoplay=True)
+        else:
+            st.warning(f"Video not found: {video_path}")
+
+        if scene.get("en_prompt"):
+            st.markdown(
+                f"<div style='font:13px/1.5 system-ui;color:rgba(255,255,255,.6);"
+                f"margin-top:8px;text-align:center'>{scene['en_prompt']}</div>",
+                unsafe_allow_html=True,
+            )
+
+        st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
+        _, btn_col, _ = st.columns([1, 2, 1])
+        with btn_col:
+            label = "🎤  Ready to respond in Danish" if scene["user_turn"] else "Continue  →"
+            if st.button(label, use_container_width=True, type="primary"):
+                if scene["user_turn"]:
+                    st.session_state.rs_phase = "mic"
+                else:
+                    next_idx = rs_scene_idx + 1
+                    if next_idx >= len(SCENES):
+                        st.session_state.rs_phase = "complete"
+                    else:
+                        st.session_state.rs_scene_idx = next_idx
+                        st.session_state.rs_phase = "video"
+                st.rerun()
+
+    # ── Mic phase ──────────────────────────────────────────────────────────────
+    elif rs_phase == "mic":
+        scene = SCENES[rs_scene_idx]
+
+        st.markdown(
+            f"<div style='font:700 10px system-ui;color:rgba(13,148,136,.8);"
+            f"letter-spacing:1.5px;text-transform:uppercase;margin-bottom:6px'>"
+            f"Scene {rs_scene_idx + 1} / {len(SCENES)} · Your turn</div>",
+            unsafe_allow_html=True,
+        )
+        if scene.get("en_prompt"):
+            st.markdown(
+                f"<div style='font:14px/1.5 system-ui;color:#e2e8f0;"
+                f"text-align:center;margin-bottom:10px'>"
+                f"💬 {scene['en_prompt']}</div>",
+                unsafe_allow_html=True,
+            )
+
         comp_props: dict = {
-            "scenes":     SCENES,
-            "started":    True,
-            "evaluation": st.session_state.rs_evaluation,
-            "key":        "restaurant_player",
-            "height":     600,
-            "default":    None,
+            "scene_idx": rs_scene_idx,
+            "lang_code": "da",
+            "label":     "Tap to speak in Danish",
+            "hint":      scene.get("hint", ""),
+            "key":       "restaurant_mic",
+            "height":    180,
+            "default":   None,
         }
         if IS_LOCAL:
             comp_props["proxy_port"] = PROXY_PORT
@@ -230,35 +295,64 @@ with col_video:
 
         result = restaurant_player(**comp_props)
 
-        if isinstance(result, dict):
-            if result.get("type") == "transcript":
-                scene_idx = result["scene_idx"]
-                # Deduplicate — same transcript fires on every rerun until component resets
-                if scene_idx != st.session_state.rs_last_eval_scene:
-                    scene    = SCENES[scene_idx]
-                    txt      = result.get("text", "").strip()
-                    with st.spinner("Lars is thinking…"):
-                        feedback = _claude_evaluate(
-                            txt, scene, st.session_state.rs_chat,
-                            knowledge_profile, name, level, bg_lang,
-                        )
-                    audio = _tts_b64(feedback, voice_id)
-                    st.session_state.rs_chat.extend([
-                        {"role": "user",      "content": txt},
-                        {"role": "assistant", "content": feedback},
-                    ])
-                    st.session_state.rs_evaluation     = {
-                        "scene_idx": scene_idx,
-                        "text":      feedback,
-                        "tts_b64":   audio or None,
-                    }
-                    st.session_state.rs_last_eval_scene = scene_idx
-                    if scene_idx == len(SCENES) - 1:
-                        st.session_state.rs_complete = True
-                    st.rerun()
+        if isinstance(result, dict) and result.get("type") == "transcript":
+            scene_idx = result["scene_idx"]
+            if scene_idx != st.session_state.rs_last_eval_scene:
+                txt = result.get("text", "").strip()
+                with st.spinner("Lars is thinking…"):
+                    feedback = _claude_evaluate(
+                        txt, scene, st.session_state.rs_chat,
+                        knowledge_profile, name, level, bg_lang,
+                    )
+                audio = _tts_b64(feedback, voice_id)
+                st.session_state.rs_chat.extend([
+                    {"role": "user",      "content": txt},
+                    {"role": "assistant", "content": feedback},
+                ])
+                st.session_state.rs_evaluation     = {
+                    "scene_idx": scene_idx,
+                    "text":      feedback,
+                    "tts_b64":   audio or None,
+                }
+                st.session_state.rs_last_eval_scene = scene_idx
+                st.session_state.rs_phase = "feedback"
+                st.rerun()
 
-            elif result.get("type") == "complete":
-                st.session_state.rs_complete = True
+    # ── Feedback phase ─────────────────────────────────────────────────────────
+    elif rs_phase == "feedback":
+        ev        = st.session_state.rs_evaluation or {}
+        tts_b64   = ev.get("tts_b64", "")
+        lars_text = ev.get("text", "")
+
+        st.markdown(
+            f"<div style='font:700 10px system-ui;color:rgba(13,148,136,.8);"
+            f"letter-spacing:1.5px;text-transform:uppercase;margin-bottom:8px'>"
+            f"Scene {rs_scene_idx + 1} / {len(SCENES)} · Lars' feedback</div>",
+            unsafe_allow_html=True,
+        )
+        if tts_b64:
+            st.markdown(
+                f'<audio autoplay src="data:audio/mpeg;base64,{tts_b64}" style="display:none"></audio>',
+                unsafe_allow_html=True,
+            )
+        st.markdown(
+            f"<div style='background:rgba(13,148,136,.15);border:1px solid rgba(13,148,136,.3);"
+            f"border-radius:12px;padding:14px 18px;font:14px/1.6 system-ui;color:#e2e8f0;"
+            f"margin-bottom:12px'>💡 {lars_text}</div>",
+            unsafe_allow_html=True,
+        )
+
+        _, btn_col, _ = st.columns([1, 2, 1])
+        with btn_col:
+            next_idx = rs_scene_idx + 1
+            is_last  = next_idx >= len(SCENES)
+            label    = "Finish Lesson 🎉" if is_last else "Continue  →"
+            if st.button(label, use_container_width=True, type="primary"):
+                if is_last:
+                    st.session_state.rs_phase = "complete"
+                else:
+                    st.session_state.rs_scene_idx = next_idx
+                    st.session_state.rs_phase = "video"
                 st.rerun()
 
 with col_sidebar:
