@@ -155,7 +155,7 @@ function playScene(idx) {
   playGate.classList.add("hidden");
   badge.textContent = "Scene " + (idx+1) + " / " + scenes.length;
 
-  vid.src = "/app/static/restaurant/" + scene.video;
+  vid.src = "restaurant/" + scene.video;
 
   vid.onerror = function() {
     // Video failed to load (e.g. 404) — show the tap gate so the user

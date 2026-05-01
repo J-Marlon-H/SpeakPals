@@ -39,7 +39,7 @@ build/
 .claude/settings.local.json
 
 # Large video/audio assets (generated locally, not committed)
-static/restaurant/*_silent.mp4
+static/restaurant/
 assets/restaurant/*.mp3
 
 # OS
