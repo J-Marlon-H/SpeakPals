@@ -72,6 +72,7 @@ window.addEventListener("message", function(e) {
   // Show/hide mic UI without unmounting the iframe
   if (a.visible != null) root.classList.toggle("hidden", !a.visible);
   if (a.watch_video != null) { if (a.watch_video) startWatchingVideo(); else stopWatchingVideo(); }
+  if (a.watch_audio != null) { if (a.watch_audio) startWatchingAudio(); else stopWatchingAudio(); }
 });
 
 function toggleHint() { hintText.classList.toggle("on"); }
@@ -107,6 +108,40 @@ function tryAttachVideo() {
 
 function stopWatchingVideo() {
   if (videoMonitor) { videoMonitor.disconnect(); videoMonitor = null; }
+}
+
+// ── Audio auto-advance (feedback phase TTS) ─────────────────────────────────
+var audioMonitor = null;
+
+function startWatchingAudio() {
+  stopWatchingAudio();
+  try {
+    var auds = window.parent.document.querySelectorAll('audio');
+    for (var i = 0; i < auds.length; i++) { auds[i]._sp_watched = false; }
+  } catch(e) {}
+  tryAttachAudio();
+  try {
+    audioMonitor = new MutationObserver(function() { tryAttachAudio(); });
+    audioMonitor.observe(window.parent.document.body, {childList:true, subtree:true});
+  } catch(e) {}
+}
+
+function tryAttachAudio() {
+  try {
+    var a = window.parent.document.querySelector('audio');
+    if (a && !a._sp_watched) {
+      a._sp_watched = true;
+      if (a.ended) { stopWatchingAudio(); send({type:"audio_ended"}); return; }
+      a.addEventListener('ended', function() {
+        stopWatchingAudio();
+        send({type:"audio_ended"});
+      }, {once:true});
+    }
+  } catch(e) {}
+}
+
+function stopWatchingAudio() {
+  if (audioMonitor) { audioMonitor.disconnect(); audioMonitor = null; }
 }
 
 // ── PCM AudioWorklet ────────────────────────────────────────────────────────
@@ -147,7 +182,9 @@ function toggleMic() {
 }
 
 async function startListening() {
-  if (!micStream) {
+  // Re-acquire if stream gone or all tracks ended (browser may stop idle tracks)
+  var tracksLive = micStream && micStream.getTracks().some(function(t){ return t.readyState === 'live'; });
+  if (!tracksLive) {
     try { micStream = await navigator.mediaDevices.getUserMedia({audio:true,video:false}); }
     catch(e) { micLbl.textContent = "Mic blocked"; return; }
   }

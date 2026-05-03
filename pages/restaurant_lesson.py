@@ -167,17 +167,22 @@ rs_scene_idx = st.session_state.rs_scene_idx
 
 _scene_now = SCENES[rs_scene_idx] if rs_phase not in ("start", "complete") else {}
 _mic_visible = (rs_phase == "mic")
+_has_feedback_audio = (
+    rs_phase == "feedback"
+    and bool((st.session_state.rs_evaluation or {}).get("tts_b64"))
+)
 
 _comp_base: dict = {
-    "visible":    _mic_visible,
+    "visible":     _mic_visible,
     "watch_video": (rs_phase == "video"),
-    "scene_idx":  rs_scene_idx,
-    "lang_code":  "da",
-    "label":      "Tap to speak in Danish",
-    "hint":       _scene_now.get("hint", ""),
-    "key":        "restaurant_mic",   # same key → same iframe across reruns
-    "height":     160,
-    "default":    None,
+    "watch_audio": _has_feedback_audio,
+    "scene_idx":   rs_scene_idx,
+    "lang_code":   "da",
+    "label":       "Tap to speak in Danish",
+    "hint":        _scene_now.get("hint", ""),
+    "key":         "restaurant_mic",   # same key → same iframe across reruns
+    "height":      160,
+    "default":     None,
 }
 if IS_LOCAL:
     _comp_base["proxy_port"] = PROXY_PORT
@@ -310,22 +315,33 @@ with col_main:
         if video_path.exists():
             st.video(str(video_path), autoplay=False)
 
-        st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
-        _, btn_col, _ = st.columns([1, 2, 1])
-        with btn_col:
-            next_idx = rs_scene_idx + 1
-            is_last  = next_idx >= len(SCENES)
-            label    = "Finish Lesson 🎉" if is_last else "Continue  →"
-            if st.button(label, use_container_width=True, type="primary"):
-                if is_last:
-                    st.session_state.rs_phase = "complete"
-                else:
-                    st.session_state.rs_scene_idx = next_idx
-                    st.session_state.rs_phase = "video"
-                st.rerun()
+        # Show Continue button only as fallback when TTS is unavailable
+        if not _has_feedback_audio:
+            st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
+            _, btn_col, _ = st.columns([1, 2, 1])
+            with btn_col:
+                next_idx = rs_scene_idx + 1
+                is_last  = next_idx >= len(SCENES)
+                label    = "Finish Lesson 🎉" if is_last else "Continue  →"
+                if st.button(label, use_container_width=True, type="primary"):
+                    if is_last:
+                        st.session_state.rs_phase = "complete"
+                    else:
+                        st.session_state.rs_scene_idx = next_idx
+                        st.session_state.rs_phase = "video"
+                    st.rerun()
 
     # ── Mic component — always rendered so mic permission is never lost ─────────
     _result = restaurant_player(**_comp_base)
+
+    if _has_feedback_audio and isinstance(_result, dict) and _result.get("type") == "audio_ended":
+        _next_a = rs_scene_idx + 1
+        if _next_a >= len(SCENES):
+            st.session_state.rs_phase = "complete"
+        else:
+            st.session_state.rs_scene_idx = _next_a
+            st.session_state.rs_phase = "video"
+        st.rerun()
 
     if rs_phase == "video" and isinstance(_result, dict) and _result.get("type") == "video_ended":
         _scene_ve = SCENES[rs_scene_idx]
