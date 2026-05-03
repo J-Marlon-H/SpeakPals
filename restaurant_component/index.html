@@ -79,6 +79,7 @@ function toggleHint() { hintText.classList.toggle("on"); }
 
 // ── Video auto-advance ──────────────────────────────────────────────────────
 var videoMonitor = null;
+var videoWatchInterval = null;
 
 function startWatchingVideo() {
   stopWatchingVideo();
@@ -91,6 +92,23 @@ function startWatchingVideo() {
     videoMonitor = new MutationObserver(function() { tryAttachVideo(); });
     videoMonitor.observe(window.parent.document.body, {childList:true, subtree:true});
   } catch(e) {}
+  // Polling fallback: catches videos that ended before listener was attached
+  // and also kicks autoplay if the browser silently blocked it
+  videoWatchInterval = setInterval(function() {
+    try {
+      var vids = window.parent.document.querySelectorAll('video');
+      for (var i = 0; i < vids.length; i++) {
+        var v = vids[i];
+        if (v.ended && !v._sp_advanced) {
+          v._sp_advanced = true;
+          stopWatchingVideo();
+          send({type:"video_ended", scene_idx:sceneIdx});
+          return;
+        }
+        if (v._sp_watched && v.paused && !v.ended) { v.play().catch(function(){}); }
+      }
+    } catch(e) {}
+  }, 400);
 }
 
 function tryAttachVideo() {
@@ -99,8 +117,9 @@ function tryAttachVideo() {
     for (var i = 0; i < vids.length; i++) {
       var v = vids[i];
       if (v._sp_watched) continue;
-      if (v.ended) { v._sp_watched = true; continue; } // already ended, skip
+      if (v.ended) { v._sp_watched = true; continue; }
       v._sp_watched = true;
+      if (v.paused) { v.play().catch(function(){}); }
       v.addEventListener('ended', function() {
         stopWatchingVideo();
         send({type:"video_ended", scene_idx:sceneIdx});
@@ -112,6 +131,7 @@ function tryAttachVideo() {
 
 function stopWatchingVideo() {
   if (videoMonitor) { videoMonitor.disconnect(); videoMonitor = null; }
+  if (videoWatchInterval) { clearInterval(videoWatchInterval); videoWatchInterval = null; }
 }
 
 // ── Audio auto-advance (feedback phase TTS) ─────────────────────────────────
@@ -179,7 +199,7 @@ function prewarmMic() {
     navigator.mediaDevices.getUserMedia({audio:true,video:false})
       .then(function(s){ micStream = s; }).catch(function(){});
 }
-prewarmMic();
+// prewarmMic not called at load — permission is requested only when user taps mic
 
 function toggleMic() {
   if (listening) { commitAndStop(); } else { startListening(); }

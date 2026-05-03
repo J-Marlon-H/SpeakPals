@@ -319,8 +319,10 @@ with col_main:
                         st.session_state.rs_phase = "video"
                     st.rerun()
 
-    # ── Mic component — always rendered so mic permission is never lost ─────────
-    _result = restaurant_player(**_comp_base)
+    # ── Mic component — mounted during lesson phases only (not start/complete) ───
+    # Keeping the same key across video/mic/feedback preserves the JS context
+    # and avoids re-prompting mic permission between scenes.
+    _result = restaurant_player(**_comp_base) if rs_phase not in ("start", "complete") else None
 
     if _has_feedback_audio and isinstance(_result, dict) and _result.get("type") == "audio_ended":
         _next_a = rs_scene_idx + 1
