@@ -331,7 +331,9 @@ with col_main:
             st.session_state.rs_phase = "video"
         st.rerun()
 
-    if rs_phase == "video" and isinstance(_result, dict) and _result.get("type") == "video_ended":
+    if (rs_phase == "video" and isinstance(_result, dict)
+            and _result.get("type") == "video_ended"
+            and _result.get("scene_idx") == rs_scene_idx):
         _scene_ve = SCENES[rs_scene_idx]
         if _scene_ve["user_turn"]:
             st.session_state.rs_phase = "mic"

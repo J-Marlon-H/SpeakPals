@@ -103,7 +103,7 @@ function tryAttachVideo() {
       v._sp_watched = true;
       v.addEventListener('ended', function() {
         stopWatchingVideo();
-        send({type:"video_ended"});
+        send({type:"video_ended", scene_idx:sceneIdx});
       }, {once:true});
       break;
     }
