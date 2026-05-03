@@ -169,14 +169,15 @@ _scene_now = SCENES[rs_scene_idx] if rs_phase not in ("start", "complete") else 
 _mic_visible = (rs_phase == "mic")
 
 _comp_base: dict = {
-    "visible":   _mic_visible,
-    "scene_idx": rs_scene_idx,
-    "lang_code": "da",
-    "label":     "Tap to speak in Danish",
-    "hint":      _scene_now.get("hint", ""),
-    "key":       "restaurant_mic",   # same key → same iframe across reruns
-    "height":    160 if _mic_visible else 2,
-    "default":   None,
+    "visible":    _mic_visible,
+    "watch_video": (rs_phase == "video"),
+    "scene_idx":  rs_scene_idx,
+    "lang_code":  "da",
+    "label":      "Tap to speak in Danish",
+    "hint":       _scene_now.get("hint", ""),
+    "key":        "restaurant_mic",   # same key → same iframe across reruns
+    "height":     160,
+    "default":    None,
 }
 if IS_LOCAL:
     _comp_base["proxy_port"] = PROXY_PORT
@@ -264,22 +265,6 @@ with col_main:
                 unsafe_allow_html=True,
             )
 
-        st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
-        _, btn_col, _ = st.columns([1, 2, 1])
-        with btn_col:
-            label = "🎤  Ready to respond in Danish" if scene["user_turn"] else "Continue  →"
-            if st.button(label, use_container_width=True, type="primary"):
-                if scene["user_turn"]:
-                    st.session_state.rs_phase = "mic"
-                else:
-                    next_idx = rs_scene_idx + 1
-                    if next_idx >= len(SCENES):
-                        st.session_state.rs_phase = "complete"
-                    else:
-                        st.session_state.rs_scene_idx = next_idx
-                        st.session_state.rs_phase = "video"
-                st.rerun()
-
     # ── Mic phase ──────────────────────────────────────────────────────────────
     elif rs_phase == "mic":
         scene = SCENES[rs_scene_idx]
@@ -341,6 +326,19 @@ with col_main:
 
     # ── Mic component — always rendered so mic permission is never lost ─────────
     _result = restaurant_player(**_comp_base)
+
+    if rs_phase == "video" and isinstance(_result, dict) and _result.get("type") == "video_ended":
+        _scene_ve = SCENES[rs_scene_idx]
+        if _scene_ve["user_turn"]:
+            st.session_state.rs_phase = "mic"
+        else:
+            _next = rs_scene_idx + 1
+            if _next >= len(SCENES):
+                st.session_state.rs_phase = "complete"
+            else:
+                st.session_state.rs_scene_idx = _next
+                st.session_state.rs_phase = "video"
+        st.rerun()
 
     if _mic_visible and isinstance(_result, dict) and _result.get("type") == "transcript":
         _scene_idx = _result["scene_idx"]

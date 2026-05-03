@@ -2,9 +2,9 @@
 *{margin:0;padding:0;box-sizing:border-box}
 html,body{width:100%;height:100%;background:transparent;
   font-family:system-ui,-apple-system,BlinkMacSystemFont,sans-serif;overflow:hidden}
-.root{width:100%;height:100%;display:none;flex-direction:column;
+.root{width:100%;height:100%;display:flex;flex-direction:column;
   align-items:center;justify-content:center;padding:10px 16px;gap:8px}
-.root.visible{display:flex}
+.root.hidden{display:none}
 
 .mic-btn{
   width:64px;height:64px;border-radius:50%;border:none;cursor:pointer;
@@ -31,7 +31,7 @@ html,body{width:100%;height:100%;background:transparent;
   display:none;max-width:340px}
 .hint-text.on{display:block}
 </style></head><body>
-<div class="root">
+<div class="root hidden">
   <button class="mic-btn" id="micBtn" onclick="toggleMic()">🎤</button>
   <div class="mic-lbl" id="micLbl">Tap to speak</div>
   <button class="hint-btn" id="hintBtn" onclick="toggleHint()">Hint 💡</button>
@@ -70,10 +70,44 @@ window.addEventListener("message", function(e) {
     hintBtn.classList.toggle("on", !!a.hint);
   }
   // Show/hide mic UI without unmounting the iframe
-  if (a.visible != null) root.classList.toggle("visible", !!a.visible);
+  if (a.visible != null) root.classList.toggle("hidden", !a.visible);
+  if (a.watch_video != null) { if (a.watch_video) startWatchingVideo(); else stopWatchingVideo(); }
 });
 
 function toggleHint() { hintText.classList.toggle("on"); }
+
+// ── Video auto-advance ──────────────────────────────────────────────────────
+var videoMonitor = null;
+
+function startWatchingVideo() {
+  stopWatchingVideo();
+  try {
+    var vids = window.parent.document.querySelectorAll('video');
+    for (var i = 0; i < vids.length; i++) { vids[i]._sp_watched = false; }
+  } catch(e) {}
+  tryAttachVideo();
+  try {
+    videoMonitor = new MutationObserver(function() { tryAttachVideo(); });
+    videoMonitor.observe(window.parent.document.body, {childList:true, subtree:true});
+  } catch(e) {}
+}
+
+function tryAttachVideo() {
+  try {
+    var v = window.parent.document.querySelector('video');
+    if (v && !v._sp_watched) {
+      v._sp_watched = true;
+      v.addEventListener('ended', function() {
+        stopWatchingVideo();
+        send({type:"video_ended"});
+      }, {once:true});
+    }
+  } catch(e) {}
+}
+
+function stopWatchingVideo() {
+  if (videoMonitor) { videoMonitor.disconnect(); videoMonitor = null; }
+}
 
 // ── PCM AudioWorklet ────────────────────────────────────────────────────────
 var WORKLET = `
