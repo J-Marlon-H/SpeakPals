@@ -187,9 +187,16 @@ _comp_base: dict = {
 if IS_LOCAL:
     _comp_base["proxy_port"] = PROXY_PORT
 else:
-    _tok = _scribe_token(ELEVEN_KEY)
-    if _tok:
-        _comp_base["ws_token"] = _tok
+    # Generate a fresh token only when entering mic phase; cache for that scene.
+    # Calling scribe_token() on every rerun (including video phase) was wasteful
+    # and risked rate-limiting or stale tokens by the time the mic was needed.
+    if rs_phase == "mic":
+        if not st.session_state.get("rs_stt_token"):
+            st.session_state.rs_stt_token = _scribe_token(ELEVEN_KEY)
+    else:
+        st.session_state.rs_stt_token = None
+    if st.session_state.get("rs_stt_token"):
+        _comp_base["ws_token"] = st.session_state.rs_stt_token
 
 # ── Layout ─────────────────────────────────────────────────────────────────────
 

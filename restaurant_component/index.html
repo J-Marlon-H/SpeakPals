@@ -217,7 +217,11 @@ async function startListening() {
   committed = false; lastPartial = "";
   var wsUrl = proxyPort
     ? "ws://localhost:" + proxyPort + "?lang=" + langCode
-    : "wss://api.elevenlabs.io/v1/speech-to-text/realtime?token=" + wsToken + "&model_id=scribe_v2_realtime";
+    : "wss://api.elevenlabs.io/v1/speech-to-text/realtime"
+      + "?token=" + wsToken
+      + "&audio_format=pcm_16000"
+      + "&model_id=scribe_v2_realtime"
+      + "&language_code=" + langCode;
 
   ws = new WebSocket(wsUrl);
   ws.onopen  = function(){ if (proxyPort) ws.send(JSON.stringify({type:"init",lang:langCode})); };
