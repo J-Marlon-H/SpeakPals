@@ -70,7 +70,10 @@ window.addEventListener("message", function(e) {
     hintBtn.classList.toggle("on", !!a.hint);
   }
   // Show/hide mic UI without unmounting the iframe
-  if (a.visible != null) root.classList.toggle("hidden", !a.visible);
+  if (a.visible != null) {
+    root.classList.toggle("hidden", !a.visible);
+    if (a.visible) { prewarmMic(); }
+  }
   if (a.watch_video != null) { if (a.watch_video) startWatchingVideo(); else stopWatchingVideo(); }
   if (a.watch_audio != null) { if (a.watch_audio) startWatchingAudio(); else stopWatchingAudio(); }
 });
@@ -189,32 +192,39 @@ class PCMProcessor extends AudioWorkletProcessor {
 registerProcessor("pcm-processor",PCMProcessor);
 `;
 
-// ── Mic recording ───────────────────────────────────────────────────────────
+// ── Mic state ────────────────────────────────────────────────────────────────
 var micStream   = null;
-var workletNode = null, audioCtx = null, ws = null;
-var listening   = false, committed = false, lastPartial = "";
+var workletNode = null, audioCtx = null, analyser = null, ws = null;
+var listening   = false, committed = false, fired = false, lastPartial = "";
+var spokenOnce  = false, lastSound = 0, startTime = 0, vadTimer = null;
 
-function prewarmMic() {
-  if (!micStream)
-    navigator.mediaDevices.getUserMedia({audio:true,video:false})
-      .then(function(s){ micStream = s; }).catch(function(){});
+var SILENCE_MS = 1800;
+var PROTECT_MS = 800;
+var THRESH     = 5;
+
+async function prewarmMic() {
+  var live = micStream && micStream.getTracks().some(function(t){ return t.readyState==='live'; });
+  if (!live) {
+    try { micStream = await navigator.mediaDevices.getUserMedia({audio:true,video:false}); }
+    catch(e) {}
+  }
 }
-// prewarmMic not called at load — permission is requested only when user taps mic
 
 function toggleMic() {
   if (listening) { commitAndStop(); } else { startListening(); }
 }
 
 async function startListening() {
-  // Re-acquire if stream gone or all tracks ended (browser may stop idle tracks)
-  var tracksLive = micStream && micStream.getTracks().some(function(t){ return t.readyState === 'live'; });
-  if (!tracksLive) {
+  var live = micStream && micStream.getTracks().some(function(t){ return t.readyState==='live'; });
+  if (!live) {
     try { micStream = await navigator.mediaDevices.getUserMedia({audio:true,video:false}); }
     catch(e) { micLbl.textContent = "Mic blocked"; return; }
   }
   if (!proxyPort && !wsToken) { micLbl.textContent = "Not ready"; return; }
 
-  committed = false; lastPartial = "";
+  committed = false; fired = false; lastPartial = "";
+  spokenOnce = false; lastSound = 0; startTime = Date.now();
+
   var wsUrl = proxyPort
     ? "ws://localhost:" + proxyPort + "?lang=" + langCode
     : "wss://api.elevenlabs.io/v1/speech-to-text/realtime"
@@ -224,7 +234,12 @@ async function startListening() {
       + "&language_code=" + langCode;
 
   ws = new WebSocket(wsUrl);
-  ws.onopen  = function(){ if (proxyPort) ws.send(JSON.stringify({type:"init",lang:langCode})); };
+  ws.binaryType = 'arraybuffer';
+
+  ws.onopen = function() {
+    if (proxyPort) ws.send(JSON.stringify({type:"init",lang:langCode}));
+    _setupAudio();
+  };
   ws.onmessage = function(e) {
     try {
       var msg = JSON.parse(e.data);
@@ -234,54 +249,110 @@ async function startListening() {
         micLbl.textContent = msg.text.length > 42 ? "…"+msg.text.slice(-40) : msg.text;
       }
       if ((mt === "committed_transcript" || mt === "committed_transcript_with_timestamps") && msg.text) {
-        if (!committed) { committed = true; sendTranscript(msg.text); }
-        stopAudio();
+        if (!fired) { fired = true; sendTranscript(msg.text); }
+        resetMic();
       }
-      if (mt === "error" || mt === "auth_error") { stopAudio(); }
+      if (mt === "error" || mt === "auth_error" || mt === "input_error") { resetMic(); }
     } catch(_){}
   };
-  ws.onerror = function(){ stopAudio(); };
-  ws.onclose = function(){ if (listening) commitAndStop(); };
+  ws.onerror = function() { resetMic(); };
+  ws.onclose = function() { if (listening) commitAndStop(); else resetMic(); };
+}
 
-  audioCtx = new AudioContext({sampleRate:16000});
-  var blobUrl = URL.createObjectURL(new Blob([WORKLET],{type:"application/javascript"}));
-  await audioCtx.audioWorklet.addModule(blobUrl);
-  var src = audioCtx.createMediaStreamSource(micStream);
-  workletNode = new AudioWorkletNode(audioCtx,"pcm-processor");
-  src.connect(workletNode);
-  workletNode.port.onmessage = function(ev) {
-    if (ws && ws.readyState === WebSocket.OPEN) ws.send(ev.data);
-  };
+async function _setupAudio() {
+  try {
+    audioCtx = new AudioContext({sampleRate:16000});
+    var blobUrl = URL.createObjectURL(new Blob([WORKLET],{type:"application/javascript"}));
+    await audioCtx.audioWorklet.addModule(blobUrl);
+    if (audioCtx.state === 'suspended') { try { await audioCtx.resume(); } catch(_){} }
 
-  listening = true;
-  micBtn.classList.add("listening");
-  micLbl.textContent = "Listening…";
+    analyser = audioCtx.createAnalyser();
+    analyser.fftSize = 512;
+    var src = audioCtx.createMediaStreamSource(micStream);
+    src.connect(analyser);
+    workletNode = new AudioWorkletNode(audioCtx,"pcm-processor");
+    src.connect(workletNode);
+
+    workletNode.port.onmessage = function(ev) {
+      if (!ws || ws.readyState !== WebSocket.OPEN) return;
+      if (proxyPort) {
+        ws.send(ev.data);
+      } else {
+        // Cloud: ElevenLabs expects JSON+base64, not raw binary
+        var bytes = new Uint8Array(ev.data);
+        var bin = '';
+        for (var i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+        ws.send(JSON.stringify({
+          message_type:'input_audio_chunk', audio_base_64:btoa(bin),
+          commit:false, sample_rate:16000
+        }));
+      }
+    };
+
+    listening = true;
+    micBtn.classList.add("listening");
+    micLbl.textContent = "Listening…";
+    startVAD();
+  } catch(e) { resetMic(); }
+}
+
+function startVAD() {
+  vadTimer = setInterval(function() {
+    if (!listening || !analyser) { clearInterval(vadTimer); return; }
+    if (audioCtx && audioCtx.state === 'suspended') { audioCtx.resume(); }
+    var data = new Uint8Array(analyser.fftSize);
+    analyser.getByteTimeDomainData(data);
+    var sum = 0;
+    for (var i = 0; i < data.length; i++) { var d = data[i]-128; sum += d*d; }
+    var rms = Math.sqrt(sum / data.length);
+    if (rms > THRESH) { lastSound = Date.now(); spokenOnce = true; }
+    var elapsed = Date.now() - startTime;
+    var silent  = lastSound === 0 ? 0 : Date.now() - lastSound;
+    if (spokenOnce && silent > SILENCE_MS && elapsed > PROTECT_MS) {
+      clearInterval(vadTimer);
+      commitAndStop();
+    }
+  }, 50);
 }
 
 function commitAndStop() {
-  if (!listening) return;
+  if (committed) return;
+  committed = true;
+  if (vadTimer) { clearInterval(vadTimer); vadTimer = null; }
   listening = false;
   micBtn.classList.remove("listening");
-  if (workletNode){ workletNode.port.onmessage=null; workletNode.disconnect(); workletNode=null; }
+
+  if (workletNode) { workletNode.port.onmessage=null; workletNode.disconnect(); workletNode=null; }
   if (ws && ws.readyState === WebSocket.OPEN) {
-    if (proxyPort) ws.send(JSON.stringify({type:"commit"}));
-    else ws.send(JSON.stringify({message_type:"input_audio_chunk",audio_base_64:"",commit:true,sample_rate:16000}));
+    if (proxyPort) {
+      ws.send(JSON.stringify({type:"commit"}));
+    } else {
+      ws.send(JSON.stringify({
+        message_type:'input_audio_chunk', audio_base_64:'', commit:true, sample_rate:16000
+      }));
+    }
   }
-  if (audioCtx){ audioCtx.close(); audioCtx=null; }
-  ws = null;
-  if (lastPartial && !committed) {
-    committed = true; sendTranscript(lastPartial);
-  } else if (!committed) {
+  if (audioCtx) { audioCtx.close(); audioCtx=null; analyser=null; }
+  if (micStream) { micStream.getTracks().forEach(function(t){ t.stop(); }); micStream=null; }
+
+  if (lastPartial && !fired) {
+    fired = true; sendTranscript(lastPartial); lastPartial = '';
+  } else if (!fired) {
     micLbl.textContent = "Transcribing…";
   }
 }
 
-function stopAudio() {
-  listening = false;
+function resetMic() {
+  listening = false; committed = false; fired = false; lastPartial = '';
+  if (vadTimer) { clearInterval(vadTimer); vadTimer = null; }
   micBtn.classList.remove("listening");
-  if (workletNode){ workletNode.port.onmessage=null; workletNode.disconnect(); workletNode=null; }
-  if (audioCtx){ audioCtx.close(); audioCtx=null; }
-  ws = null;
+  var _ws = ws; ws = null;
+  if (_ws) { try { _ws.close(); } catch(_){} }
+  if (workletNode) { workletNode.port.onmessage=null; workletNode.disconnect(); workletNode=null; }
+  if (audioCtx) { audioCtx.close(); audioCtx=null; analyser=null; }
+  if (micStream) { micStream.getTracks().forEach(function(t){ t.stop(); }); micStream=null; }
+  setTimeout(function(){ if (!listening) micLbl.textContent = "Tap to speak"; }, 1500);
+  setTimeout(prewarmMic, 300);
 }
 
 function sendTranscript(text) {
