@@ -218,18 +218,7 @@ with col_main:
 
     # ── Complete screen ────────────────────────────────────────────────────────
     elif rs_phase == "complete":
-        last_eval  = st.session_state.rs_evaluation or {}
-        tts_b64    = last_eval.get("tts_b64", "")
-        lars_text  = last_eval.get("text", "")
-        audio_tag  = (f'<audio autoplay src="data:audio/mpeg;base64,{tts_b64}" '
-                      f'style="display:none"></audio>') if tts_b64 else ""
-        lars_block = (f"<div style='background:rgba(13,148,136,.15);"
-                      f"border:1px solid rgba(13,148,136,.3);border-radius:10px;"
-                      f"padding:12px 16px;margin:0 auto 24px;max-width:380px;"
-                      f"font:13px/1.5 system-ui;color:#e2e8f0;text-align:left'>"
-                      f"💡 {lars_text}</div>") if lars_text else ""
         st.markdown(f"""
-        {audio_tag}
         <div style='text-align:center;padding:50px 20px 24px'>
           <div style='font-size:56px;margin-bottom:16px'>🎉</div>
           <div style='font:800 26px/1.2 system-ui;color:#f1f5f9;margin-bottom:10px'>
@@ -238,7 +227,6 @@ with col_main:
             max-width:360px;margin:0 auto 24px'>
             Great work, {name}! You ordered ramen, asked for a fork, and got the
             bill — all in Danish. 🍜</div>
-          {lars_block}
         </div>""", unsafe_allow_html=True)
         _, btn_col, _ = st.columns([2, 2, 2])
         with btn_col:

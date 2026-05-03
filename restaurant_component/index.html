@@ -95,13 +95,17 @@ function startWatchingVideo() {
 
 function tryAttachVideo() {
   try {
-    var v = window.parent.document.querySelector('video');
-    if (v && !v._sp_watched) {
+    var vids = window.parent.document.querySelectorAll('video');
+    for (var i = 0; i < vids.length; i++) {
+      var v = vids[i];
+      if (v._sp_watched) continue;
+      if (v.ended) { v._sp_watched = true; continue; } // already ended, skip
       v._sp_watched = true;
       v.addEventListener('ended', function() {
         stopWatchingVideo();
         send({type:"video_ended"});
       }, {once:true});
+      break;
     }
   } catch(e) {}
 }
