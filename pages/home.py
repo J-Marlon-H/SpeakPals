@@ -275,12 +275,12 @@ with col_scenes:
 
 # ── Video Lessons ──────────────────────────────────────────────────────────────
 with col_scenes:
-    _restaurant_img = _img_b64("restaurant.webp") or _img_b64("restaurant.jpg")
+    _restaurant_img = _img_b64("japanese_restaurant.jpg")
     _restaurant_bg  = (
-        f"background-image:url('{_restaurant_img}');"
-        "background-size:cover;background-position:top center"
+        f"background-image:url('{_restaurant_img}')!important;"
+        "background-size:cover!important;background-position:top center!important"
         if _restaurant_img else
-        "background:linear-gradient(135deg,#7c2d12,#9a3412)"
+        "background:linear-gradient(135deg,#7c2d12,#9a3412)!important"
     )
     st.markdown("""<style>
       .st-key-btn_restaurant_lesson button{

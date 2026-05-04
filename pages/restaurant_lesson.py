@@ -73,9 +73,9 @@ def _claude_evaluate(user_text: str, scene: dict, history: list,
         f"You are Lars, a warm Danish tutor. The student ({name}, level {level}, "
         f"native language: {bg_lang}) is doing a restaurant role-play lesson. "
         f"They were asked to say something like: '{scene['da_target']}'\n\n"
-        f"Evaluate their attempt in 1-2 sentences. "
-        f"If correct or close: praise and confirm. "
-        f"If wrong: give a short encouraging hint with the correct Danish phrase. "
+        f"Reply in ONE short sentence only. "
+        f"If correct or close: praise briefly. "
+        f"If wrong or no response: say the correct Danish phrase naturally and encouragingly. "
         f"Plain text only — no markdown, no JSON."
     )
     if knowledge_profile:
@@ -86,7 +86,7 @@ def _claude_evaluate(user_text: str, scene: dict, history: list,
         "https://api.anthropic.com/v1/messages",
         headers={"x-api-key": CLAUDE_KEY, "anthropic-version": "2023-06-01",
                  "Content-Type": "application/json"},
-        json={"model": "claude-haiku-4-5-20251001", "max_tokens": 150,
+        json={"model": "claude-haiku-4-5-20251001", "max_tokens": 80,
               "temperature": 0.6, "system": system, "messages": messages},
         timeout=20,
     )
@@ -111,7 +111,7 @@ def _tts_b64(text: str, voice_id: str) -> str | None:
 # ── Page config ────────────────────────────────────────────────────────────────
 
 st.set_page_config(page_title="Restaurant Lesson — SpeakPals", page_icon="🍜",
-                   layout="wide", initial_sidebar_state="collapsed")
+                   layout="wide", initial_sidebar_state="expanded")
 
 st.markdown("""<style>
   html,body{font-family:system-ui,-apple-system,BlinkMacSystemFont,Roboto,sans-serif!important}
@@ -119,18 +119,33 @@ st.markdown("""<style>
   [data-testid="stHeader"],header,.stAppHeader{display:none!important}
   [data-testid="collapsedControl"],[data-testid="stSidebarCollapseButton"],
   [data-testid="stSidebarNav"]{display:none!important}
-  [data-testid="stAppViewContainer"],[data-testid="stMain"]{background:#0a0a0a!important}
+  [data-testid="stAppViewContainer"],[data-testid="stMain"]{background:#ffffff!important}
   .block-container{padding:1rem 1.5rem!important;max-width:100%!important}
   div[data-testid="stVerticalBlock"]{gap:0.4rem!important}
-  .chat-msg{padding:10px 14px;border-radius:12px;margin-bottom:6px;font-size:13px;line-height:1.5}
-  .chat-user{background:rgba(13,148,136,.15);color:#e2e8f0;text-align:right}
-  .chat-tutor{background:rgba(255,255,255,.07);color:#e2e8f0}
   .stButton button{border-radius:10px!important;font-weight:600!important;font-size:13px!important}
   .stButton button[kind="primary"]{
     background:#0d9488!important;color:#fff!important;border:none!important}
-  /* Dark background for video widget */
   [data-testid="stVideo"]{border-radius:14px;overflow:hidden}
   video{border-radius:14px}
+  /* Light sidebar */
+  [data-testid="stSidebar"]{
+    background:#f5f5f5!important;
+    border-right:1px solid #e5e5e5!important;
+    width:280px!important;min-width:280px!important}
+  [data-testid="stSidebar"] *{color:#111827!important}
+  [data-testid="stSidebar"] section{padding:0!important}
+  [data-testid="stSidebar"] > div:first-child{
+    padding-bottom:72px!important;overflow-y:auto!important}
+  .st-key-rs_exit{
+    position:fixed!important;bottom:0!important;left:0!important;
+    width:280px!important;padding:10px 16px 14px!important;
+    background:#f5f5f5!important;border-top:1px solid #e5e5e5!important;
+    z-index:100!important}
+  .chat-msg{padding:8px 12px;border-radius:10px;margin-bottom:5px;font-size:12px;line-height:1.5}
+  .chat-user{background:rgba(13,148,136,.1);color:#0f3d39;text-align:right;
+    border:1px solid rgba(13,148,136,.2)}
+  .chat-tutor{background:rgba(245,158,11,.08);color:#78350f;
+    border:1px solid rgba(245,158,11,.25)}
 </style>""", unsafe_allow_html=True)
 
 # ── User profile ───────────────────────────────────────────────────────────────
@@ -198,20 +213,65 @@ else:
     if st.session_state.get("rs_stt_token"):
         _comp_base["ws_token"] = st.session_state.rs_stt_token
 
-# ── Layout ─────────────────────────────────────────────────────────────────────
+# ── Sidebar: conversation + exit ───────────────────────────────────────────────
 
-col_main, col_sidebar = st.columns([3, 1], gap="medium")
+with st.sidebar:
+    st.markdown("""<div style='padding:20px 16px 0'>
+      <div style='font:800 16px/1.2 system-ui;color:#111827;letter-spacing:-.2px'>🍜 Lars · Tutor</div>
+      <div style='font:500 11px system-ui;color:rgba(17,24,39,.45);margin-top:3px'>Restaurant Lesson</div>
+      <div style='height:1px;background:#e5e5e5;margin:12px 0 4px'></div>
+    </div>""", unsafe_allow_html=True)
 
-with col_main:
+    if rs_phase == "mic" and _scene_now.get("en_prompt"):
+        st.markdown(
+            f"<div style='margin:8px 12px 0;padding:10px 12px;"
+            f"font:400 12px/1.5 system-ui;color:#374151;"
+            f"background:#fff;border-left:2px solid rgba(13,148,136,.6);"
+            f"border-radius:0 8px 8px 0'>{_scene_now['en_prompt']}</div>",
+            unsafe_allow_html=True,
+        )
+    if rs_phase == "mic" and _scene_now.get("hint"):
+        _hint = _scene_now["hint"]
+        st.markdown(
+            f"<div style='margin:6px 12px 0;padding:8px 10px;"
+            f"font:12px system-ui;color:#92400e;"
+            f"background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.3);"
+            f"border-radius:8px'>💡 {_hint}</div>",
+            unsafe_allow_html=True,
+        )
+
+    st.markdown("<div style='height:6px'></div>", unsafe_allow_html=True)
+    if st.session_state.rs_chat:
+        for msg in st.session_state.rs_chat:
+            if msg["role"] == "user":
+                st.markdown(f"<div class='chat-msg chat-user'>🧑 {msg['content']}</div>",
+                            unsafe_allow_html=True)
+            else:
+                st.markdown(f"<div class='chat-msg chat-tutor'>💡 {msg['content']}</div>",
+                            unsafe_allow_html=True)
+    else:
+        st.markdown("""<div style='font:400 12px system-ui;color:rgba(17,24,39,.35);
+          margin:8px 12px'>Your conversation will appear here.</div>""",
+                    unsafe_allow_html=True)
+
+    st.markdown("<br>", unsafe_allow_html=True)
+    if st.button("🏠 Exit lesson", key="rs_exit", use_container_width=True):
+        for k in _RS_KEYS:
+            st.session_state.pop(k, None)
+        st.switch_page("pages/home.py")
+
+# ── Main area ──────────────────────────────────────────────────────────────────
+
+if True:
 
     # ── Start screen ───────────────────────────────────────────────────────────
     if rs_phase == "start":
         st.markdown("""
         <div style='text-align:center;padding:60px 20px 30px'>
           <div style='font-size:56px;margin-bottom:16px'>🍜</div>
-          <div style='font:800 26px/1.2 system-ui;color:#f1f5f9;margin-bottom:10px'>
+          <div style='font:800 26px/1.2 system-ui;color:#111827;margin-bottom:10px'>
             At the Restaurant</div>
-          <div style='font:400 14px/1.6 system-ui;color:rgba(255,255,255,.5);
+          <div style='font:400 14px/1.6 system-ui;color:rgba(17,24,39,.5);
             max-width:340px;margin:0 auto 32px'>
             A video lesson set in a ramen restaurant. Watch each scene and
             speak your Danish replies — Lars will guide you.</div>
@@ -228,9 +288,9 @@ with col_main:
         st.markdown(f"""
         <div style='text-align:center;padding:50px 20px 24px'>
           <div style='font-size:56px;margin-bottom:16px'>🎉</div>
-          <div style='font:800 26px/1.2 system-ui;color:#f1f5f9;margin-bottom:10px'>
+          <div style='font:800 26px/1.2 system-ui;color:#111827;margin-bottom:10px'>
             Lesson Complete!</div>
-          <div style='font:400 14px/1.6 system-ui;color:rgba(255,255,255,.55);
+          <div style='font:400 14px/1.6 system-ui;color:rgba(17,24,39,.55);
             max-width:360px;margin:0 auto 24px'>
             Great work, {name}! You ordered ramen, asked for a fork, and got the
             bill — all in Danish. 🍜</div>
@@ -247,12 +307,6 @@ with col_main:
         scene = SCENES[rs_scene_idx]
         video_path = VIDEO_DIR / scene["video"]
 
-        st.markdown(
-            f"<div style='font:700 10px system-ui;color:rgba(13,148,136,.8);"
-            f"letter-spacing:1.5px;text-transform:uppercase;margin-bottom:6px'>"
-            f"Scene {rs_scene_idx + 1} / {len(SCENES)}</div>",
-            unsafe_allow_html=True,
-        )
         if video_path.exists():
             st.video(str(video_path), autoplay=True)
         else:
@@ -260,7 +314,7 @@ with col_main:
 
         if scene.get("en_prompt"):
             st.markdown(
-                f"<div style='font:13px/1.5 system-ui;color:rgba(255,255,255,.6);"
+                f"<div style='font:13px/1.5 system-ui;color:rgba(17,24,39,.55);"
                 f"margin-top:8px;text-align:center'>{scene['en_prompt']}</div>",
                 unsafe_allow_html=True,
             )
@@ -270,19 +324,12 @@ with col_main:
         scene = SCENES[rs_scene_idx]
         video_path = VIDEO_DIR / scene["video"]
 
-        st.markdown(
-            f"<div style='font:700 10px system-ui;color:rgba(13,148,136,.8);"
-            f"letter-spacing:1.5px;text-transform:uppercase;margin-bottom:6px'>"
-            f"Scene {rs_scene_idx + 1} / {len(SCENES)} · Your turn</div>",
-            unsafe_allow_html=True,
-        )
-        # Show the video (without autoplay) so the scene stays visible
         if video_path.exists():
             st.video(str(video_path), autoplay=False)
 
         if scene.get("en_prompt"):
             st.markdown(
-                f"<div style='font:14px/1.5 system-ui;color:#e2e8f0;"
+                f"<div style='font:14px/1.5 system-ui;color:#374151;"
                 f"text-align:center;margin:8px 0 4px'>"
                 f"💬 {scene['en_prompt']}</div>",
                 unsafe_allow_html=True,
@@ -293,12 +340,6 @@ with col_main:
         ev      = st.session_state.rs_evaluation or {}
         tts_b64 = ev.get("tts_b64", "")
 
-        st.markdown(
-            f"<div style='font:700 10px system-ui;color:rgba(13,148,136,.8);"
-            f"letter-spacing:1.5px;text-transform:uppercase;margin-bottom:6px'>"
-            f"Scene {rs_scene_idx + 1} / {len(SCENES)}</div>",
-            unsafe_allow_html=True,
-        )
         # Play Lars' TTS audio; feedback text is in the sidebar conversation
         if tts_b64:
             st.markdown(
@@ -355,52 +396,32 @@ with col_main:
                 st.session_state.rs_phase = "video"
         st.rerun()
 
+    def _handle_eval(scene_idx, user_text):
+        if scene_idx == st.session_state.rs_last_eval_scene:
+            return
+        with st.spinner("Lars is thinking…"):
+            _feedback = _claude_evaluate(
+                user_text, _scene_now, st.session_state.rs_chat,
+                knowledge_profile, name, level, bg_lang,
+            )
+        _audio = _tts_b64(_feedback, voice_id)
+        _display = user_text if user_text else "(no response)"
+        st.session_state.rs_chat.extend([
+            {"role": "user",      "content": _display},
+            {"role": "assistant", "content": _feedback},
+        ])
+        st.session_state.rs_evaluation     = {
+            "scene_idx": scene_idx,
+            "text":      _feedback,
+            "tts_b64":   _audio or None,
+        }
+        st.session_state.rs_last_eval_scene = scene_idx
+        st.session_state.rs_phase = "feedback"
+        st.rerun()
+
     if _mic_visible and isinstance(_result, dict) and _result.get("type") == "transcript":
-        _scene_idx = _result["scene_idx"]
-        if _scene_idx != st.session_state.rs_last_eval_scene:
-            _txt = _result.get("text", "").strip()
-            with st.spinner("Lars is thinking…"):
-                _feedback = _claude_evaluate(
-                    _txt, _scene_now, st.session_state.rs_chat,
-                    knowledge_profile, name, level, bg_lang,
-                )
-            _audio = _tts_b64(_feedback, voice_id)
-            st.session_state.rs_chat.extend([
-                {"role": "user",      "content": _txt},
-                {"role": "assistant", "content": _feedback},
-            ])
-            st.session_state.rs_evaluation     = {
-                "scene_idx": _scene_idx,
-                "text":      _feedback,
-                "tts_b64":   _audio or None,
-            }
-            st.session_state.rs_last_eval_scene = _scene_idx
-            st.session_state.rs_phase = "feedback"
-            st.rerun()
+        _handle_eval(_result["scene_idx"], _result.get("text", "").strip())
 
-with col_sidebar:
-    st.markdown("""<div style='font:700 10px system-ui;color:rgba(255,255,255,.4);
-      letter-spacing:2px;text-transform:uppercase;margin-bottom:12px'>
-      💡 Lars · Tutor</div>""", unsafe_allow_html=True)
+    if _mic_visible and isinstance(_result, dict) and _result.get("type") == "timeout":
+        _handle_eval(_result.get("scene_idx", rs_scene_idx), "")
 
-    if st.session_state.rs_chat:
-        st.markdown("""<div style='font:700 10px system-ui;color:rgba(255,255,255,.3);
-          letter-spacing:1.5px;text-transform:uppercase;margin-bottom:8px'>
-          Conversation</div>""", unsafe_allow_html=True)
-        for msg in st.session_state.rs_chat:
-            if msg["role"] == "user":
-                st.markdown(f"<div class='chat-msg chat-user'>🧑 {msg['content']}</div>",
-                            unsafe_allow_html=True)
-            else:
-                st.markdown(f"<div class='chat-msg chat-tutor'>💡 {msg['content']}</div>",
-                            unsafe_allow_html=True)
-    else:
-        st.markdown("""<div style='font:400 12px system-ui;color:rgba(255,255,255,.25);
-          margin-top:8px'>Your conversation will appear here.</div>""",
-                    unsafe_allow_html=True)
-
-    st.markdown("<br>", unsafe_allow_html=True)
-    if st.button("🏠 Exit lesson", use_container_width=True):
-        for k in _RS_KEYS:
-            st.session_state.pop(k, None)
-        st.switch_page("pages/home.py")

@@ -16,7 +16,7 @@ VOICE_ID   = "V34B5u5UbLdNJVEkcgXp"  # Noam
 LINES = {
     "scene1": "Hej!<break time=\"0.07s\"/> Velkommen!<break time=\"0.45s\"/> Vil du sidde ved baren eller ved vinduet?",
     "scene2": "Velkommen til vores restaurant! Følg mig venligst, her er et bord ved vinduet.<break time=\"0.56s\"/> Sætte jer. <break time=\"1.13s\"/> Her er menuen. Vi har ramen og gyoza i dag. Hvad må det være?",
-    "scene3": "Ja, selvfølgelig – det ordner jeg med det samme.",
+    "scene3": "Ja, selvfølgelig, det ordner jeg med det samme",
     "scene4": "Værsgo! Ramen til dig! God appetit!",
     "scene5": "Selvfølgelig, jeg henter en gaffel til dig.",
     "scene6": "Jeg håber, at alt var lækkert, og vi ses forhåbentlig igen snart.",
