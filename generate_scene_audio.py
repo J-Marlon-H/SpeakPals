@@ -14,12 +14,18 @@ ELEVEN_KEY = _secret("ELEVENLABS_API_KEY")
 VOICE_ID   = "V34B5u5UbLdNJVEkcgXp"  # Noam
 
 LINES = {
-    "scene1": "Hej! Velkommen! Vil du sidde ved baren eller ved vinduet?",
-    "scene2": "Velkommen til vores restaurant! Følg mig venligst – her er et bord ved vinduet. Værsgo at sætte jer. Her er menuen. Vi har ramen og gyoza i dag. Hvad må det være?",
-    "scene3": "Ja, selvfølgelig – det ordner jeg med det samme. Værsgo.",
+    "scene1": "Hej!<break time=\"0.07s\"/> Velkommen!<break time=\"0.45s\"/> Vil du sidde ved baren eller ved vinduet?",
+    "scene2": "Velkommen til vores restaurant! Følg mig venligst, her er et bord ved vinduet.<break time=\"0.56s\"/> Sætte jer. <break time=\"1.13s\"/> Her er menuen. Vi har ramen og gyoza i dag. Hvad må det være?",
+    "scene3": "Ja, selvfølgelig – det ordner jeg med det samme.",
     "scene4": "Værsgo! Ramen til dig! God appetit!",
-    "scene5": "Selvfølgelig, jeg henter en gaffel til dig. Undskyld fejlen.",
+    "scene5": "Selvfølgelig, jeg henter en gaffel til dig.",
     "scene6": "Jeg håber, at alt var lækkert, og vi ses forhåbentlig igen snart.",
+}
+
+# Per-scene voice setting overrides (merged on top of defaults)
+OVERRIDES = {
+    "scene2": {"speed": 0.89},
+    "scene6": {"speed": 1.0},
 }
 
 out = pathlib.Path("assets/restaurant")
@@ -27,13 +33,15 @@ out.mkdir(parents=True, exist_ok=True)
 
 for name, text in LINES.items():
     print(f"Generating {name}…")
+    voice_settings = {"stability": 0.4, "similarity_boost": 0.75, "speed": 0.8}
+    voice_settings.update(OVERRIDES.get(name, {}))
     r = requests.post(
         f"https://api.elevenlabs.io/v1/text-to-speech/{VOICE_ID}/stream",
         headers={"xi-api-key": ELEVEN_KEY, "Content-Type": "application/json"},
         json={
             "text": text,
             "model_id": "eleven_multilingual_v2",
-            "voice_settings": {"stability": 0.4, "similarity_boost": 0.75, "speed": 1.0},
+            "voice_settings": voice_settings,
             "language_code": "da",
         },
         timeout=30,
