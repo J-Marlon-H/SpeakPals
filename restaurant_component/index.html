@@ -224,6 +224,7 @@ function tryAttachVideo() {
     var vids = window.parent.document.querySelectorAll('video');
     for (var i = 0; i < vids.length; i++) {
       var v = vids[i];
+      v.removeAttribute('controls');
       if (v._sp_watched) continue;
       if (v.ended) { v._sp_watched = true; continue; }
       v._sp_watched = true;
