@@ -15,7 +15,7 @@ VOICE_ID   = "V34B5u5UbLdNJVEkcgXp"  # Noam
 
 LINES = {
     "scene1": "Hej!<break time=\"0.07s\"/> Velkommen!<break time=\"0.45s\"/> Vil du sidde ved baren eller ved vinduet?",
-    "scene2": "Velkommen til vores restaurant! Følg mig venligst, her er et bord ved vinduet.<break time=\"0.56s\"/> Sætte jer. <break time=\"1.13s\"/> Her er menuen. Vi har ramen og gyoza i dag. Hvad må det være?",
+    "scene2": "Velkommen til vores restaurant! Følg mig venligst, her er et bord ved vinduet.<break time=\"0.56s\"/> Sætte jer. <break time=\"1.13s\"/> Her er menuen. Vi har <break time=\"1.0s\"/> ramen og gyoza i dag. <break time=\"1.0s\"/> Hvad må det være?",
     "scene3": "Ja, selvfølgelig, det ordner jeg med det samme",
     "scene4": "Værsgo! Ramen til dig! God appetit!",
     "scene5": "Selvfølgelig, jeg henter en gaffel til dig.",
@@ -24,7 +24,7 @@ LINES = {
 
 # Per-scene voice setting overrides (merged on top of defaults)
 OVERRIDES = {
-    "scene2": {"speed": 0.89},
+    "scene2": {"speed": 1.0},
     "scene6": {"speed": 1.0},
 }
 
