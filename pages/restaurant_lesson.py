@@ -195,6 +195,7 @@ _comp_base: dict = {
     "lang_code":   "da",
     "label":       "Tap to speak in Danish",
     "hint":        _scene_now.get("hint", ""),
+    "prompt":      _scene_now.get("en_prompt", ""),
     "key":         "restaurant_mic",   # same key → same iframe across reruns
     "height":      160,
     "default":     None,
@@ -327,14 +328,6 @@ if True:
         if video_path.exists():
             st.video(str(video_path), autoplay=False)
 
-        if scene.get("en_prompt"):
-            st.markdown(
-                f"<div style='font:14px/1.5 system-ui;color:#374151;"
-                f"text-align:center;margin:8px 0 4px'>"
-                f"💬 {scene['en_prompt']}</div>",
-                unsafe_allow_html=True,
-            )
-
     # ── Feedback phase ─────────────────────────────────────────────────────────
     elif rs_phase == "feedback":
         ev      = st.session_state.rs_evaluation or {}
@@ -422,6 +415,4 @@ if True:
     if _mic_visible and isinstance(_result, dict) and _result.get("type") == "transcript":
         _handle_eval(_result["scene_idx"], _result.get("text", "").strip())
 
-    if _mic_visible and isinstance(_result, dict) and _result.get("type") == "timeout":
-        _handle_eval(_result.get("scene_idx", rs_scene_idx), "")
 

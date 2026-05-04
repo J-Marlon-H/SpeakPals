@@ -3,16 +3,20 @@
 html,body{width:100%;height:100%;background:transparent;
   font-family:system-ui,-apple-system,BlinkMacSystemFont,sans-serif;overflow:hidden}
 
-.wrap{position:absolute;inset:0;background:rgba(10,10,20,.97);display:none}
+.wrap{position:absolute;inset:0;background:rgba(248,250,252,.97);display:none;
+  flex-direction:column;align-items:center;justify-content:center;
+  padding:10px 118px 10px 10px;gap:10px}
+.prompt-text{font:13px/1.5 system-ui;color:#374151;text-align:center;
+  max-width:100%;padding:0 4px}
 
-/* ── Avatar panel — bottom right ──────────────────────────────────────────── */
+/* ── Avatar panel — right centre ──────────────────────────────────────────── */
 .av-panel{
-  position:absolute;bottom:28px;right:10px;width:104px;
-  background:rgba(20,20,40,.85);backdrop-filter:blur(10px);
+  position:absolute;top:50%;right:10px;transform:translateY(-50%);width:104px;
+  background:#fff;backdrop-filter:blur(10px);
   border-radius:14px;padding:5px 5px 5px;
   display:flex;flex-direction:column;align-items:center;gap:2px;
-  box-shadow:0 4px 20px rgba(0,0,0,.45);border:1px solid rgba(255,255,255,.07)}
-.av-title{font:700 8px/1 system-ui;color:rgba(255,255,255,.5);
+  box-shadow:0 4px 20px rgba(17,24,39,.1);border:1px solid rgba(17,24,39,.08)}
+.av-title{font:700 8px/1 system-ui;color:rgba(17,24,39,.45);
   letter-spacing:2px;text-transform:uppercase;padding-bottom:1px}
 .head-wrap{position:relative;width:70px;height:70px;
   display:flex;align-items:center;justify-content:center}
@@ -33,38 +37,41 @@ html,body{width:100%;height:100%;background:transparent;
   0%,100%{d:path("M 165 292 Q 200 300 235 292 Q 200 316 165 292 Z")}
   40%{d:path("M 167 287 Q 200 274 233 287 Q 200 323 167 287 Z")}}
 .mouth.on{animation:talk 0.2s ease-in-out infinite}
-.av-lbl{font:9px/1 system-ui;color:rgba(255,255,255,.4);min-height:12px;
+.av-lbl{font:9px/1 system-ui;color:rgba(17,24,39,.4);min-height:12px;
   letter-spacing:.3px;text-align:center}
-.av-lbl.speaking{color:#14b8a6}
+.av-lbl.speaking{color:#0d9488}
 
-/* ── Mic panel — bottom centre ─────────────────────────────────────────────── */
+/* ── Mic panel — flex item, centred by parent ──────────────────────────────── */
 .mic-wrap{
-  position:absolute;bottom:28px;left:50%;transform:translateX(-50%);
   display:flex;flex-direction:column;align-items:center;gap:4px;
-  background:rgba(0,0,0,.5);backdrop-filter:blur(10px);
+  background:#fff;backdrop-filter:blur(10px);
   border-radius:32px;padding:6px 14px 7px;
-  box-shadow:0 4px 18px rgba(0,0,0,.45);border:1px solid rgba(255,255,255,.09)}
+  box-shadow:0 2px 12px rgba(17,24,39,.1);border:1px solid rgba(17,24,39,.08)}
 #micBtn{
-  width:52px;height:52px;border-radius:50%;border:none;cursor:pointer;
+  width:52px;height:52px;border-radius:50%;border:1px solid rgba(13,148,136,.3);
+  cursor:pointer;color:#0d9488;
   position:relative;display:flex;align-items:center;justify-content:center;
-  background:rgba(255,255,255,.16);
-  box-shadow:0 3px 14px rgba(0,0,0,.2);
-  transition:background .25s,box-shadow .25s;flex-shrink:0}
+  background:rgba(13,148,136,.1);
+  box-shadow:0 2px 8px rgba(13,148,136,.12);
+  transition:background .25s,box-shadow .25s,color .25s;flex-shrink:0}
 #micBtn.listening{
   background:linear-gradient(135deg,#0d9488,#14b8a6);
-  box-shadow:0 6px 28px rgba(13,148,136,.6)}
+  box-shadow:0 6px 28px rgba(13,148,136,.6);
+  color:#fff;border-color:transparent}
 #ring{
   position:absolute;border-radius:50%;width:52px;height:52px;
   border:3px solid rgba(13,148,136,.0);pointer-events:none;
   transition:border-color .1s}
 #micBtn.listening #ring{border-color:rgba(13,148,136,.45)}
-#micLbl{font:10px/1.3 system-ui;color:rgba(255,255,255,.65);
+#micLbl{font:10px/1.3 system-ui;color:rgba(17,24,39,.55);
   letter-spacing:.4px;text-align:center;white-space:nowrap}
 </style></head><body>
 
 <div class="wrap" id="wrap">
 
-  <!-- Lars avatar — bottom right -->
+  <div class="prompt-text" id="promptText"></div>
+
+  <!-- Lars avatar — right centre -->
   <div class="av-panel" id="avPanel">
     <div class="av-title">Lars</div>
     <div class="head-wrap">
@@ -111,14 +118,14 @@ html,body{width:100%;height:100%;background:transparent;
     <button id="micBtn" onclick="toggleMic()">
       <div id="ring"></div>
       <svg width="24" height="24" viewBox="0 0 24 24"
-           fill="rgba(255,255,255,.85)" style="pointer-events:none;transition:fill .25s">
+           fill="currentColor" style="pointer-events:none;transition:fill .25s">
         <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
         <path d="M19 10v2a7 7 0 0 1-14 0v-2"
-              stroke="rgba(255,255,255,.85)" stroke-width="2" fill="none" stroke-linecap="round"/>
+              stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/>
         <line x1="12" y1="19" x2="12" y2="23"
-              stroke="rgba(255,255,255,.85)" stroke-width="2" stroke-linecap="round"/>
+              stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
         <line x1="8"  y1="23" x2="16" y2="23"
-              stroke="rgba(255,255,255,.85)" stroke-width="2" stroke-linecap="round"/>
+              stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
       </svg>
     </button>
     <div id="micLbl">tap to speak</div>
@@ -133,8 +140,9 @@ function send(val){
 window.parent.postMessage({isStreamlitMessage:true,type:"streamlit:componentReady",apiVersion:1},"*");
 
 // ── DOM refs ────────────────────────────────────────────────────────────────
-var wrap    = document.getElementById("wrap");
-var avMouth = document.getElementById("avMouth");
+var wrap      = document.getElementById("wrap");
+var promptEl  = document.getElementById("promptText");
+var avMouth   = document.getElementById("avMouth");
 var avLbl   = document.getElementById("avLbl");
 var micWrap = document.getElementById("micWrap");
 var micBtn  = document.getElementById("micBtn");
@@ -149,7 +157,7 @@ var langCode  = "da";
 
 function updateUI() {
   var show = isMicPhase || isFeedbackPhase;
-  wrap.style.display    = show ? "block" : "none";
+  wrap.style.display    = show ? "flex" : "none";
   micWrap.style.display = isMicPhase ? "flex" : "none";
   avMouth.classList.toggle("on", isFeedbackPhase);
   avLbl.textContent = isFeedbackPhase ? "speaking…" : (isMicPhase ? "listening" : "");
@@ -165,10 +173,10 @@ window.addEventListener("message", function(e) {
   if (a.scene_idx  != null) sceneIdx  = a.scene_idx;
   if (a.lang_code  != null) langCode  = a.lang_code;
   if (a.label      != null) micLbl.textContent = a.label;
+  if (a.prompt     != null) promptEl.textContent = a.prompt;
   if (a.visible != null) {
     isMicPhase = a.visible;
-    if (a.visible) { prewarmMic(); startMicTimeout(); }
-    else           { clearMicTimeout(); }
+    if (a.visible) { prewarmMic(); }
     updateUI();
   }
   if (a.watch_video != null) { if (a.watch_video) startWatchingVideo(); else stopWatchingVideo(); }
@@ -178,21 +186,6 @@ window.addEventListener("message", function(e) {
     updateUI();
   }
 });
-
-// ── Auto-timeout: fire if user doesn't speak within 10 s ───────────────────
-var timeoutTimer = null;
-
-function startMicTimeout() {
-  clearMicTimeout();
-  timeoutTimer = setTimeout(function() {
-    timeoutTimer = null;
-    if (!listening) { send({type:"timeout", scene_idx:sceneIdx}); }
-  }, 10000);
-}
-
-function clearMicTimeout() {
-  if (timeoutTimer) { clearTimeout(timeoutTimer); timeoutTimer = null; }
-}
 
 // ── Video auto-advance ──────────────────────────────────────────────────────
 var videoMonitor = null;
@@ -327,7 +320,6 @@ function toggleMic() {
 }
 
 async function startListening() {
-  clearMicTimeout();
   var live = micStream && micStream.getTracks().some(function(t){ return t.readyState==='live'; });
   if (!live) {
     try { micStream = await navigator.mediaDevices.getUserMedia({audio:true,video:false}); }
@@ -468,7 +460,6 @@ function resetMic() {
 }
 
 function sendTranscript(text) {
-  clearMicTimeout();
   micLbl.textContent = "✓ " + text.slice(0, 38);
   send({type:"transcript", scene_idx:sceneIdx, text:text});
 }
