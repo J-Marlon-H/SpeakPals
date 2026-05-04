@@ -282,25 +282,32 @@ with col_scenes:
         if _restaurant_img else
         "background:linear-gradient(135deg,#7c2d12,#9a3412)!important"
     )
-    st.markdown("""<style>
-      .st-key-btn_restaurant_lesson button{
+    st.markdown(f"""<style>
+      .st-key-btn_restaurant_lesson button{{
         display:block!important;width:100%!important;height:185px!important;
         padding:0!important;margin:0!important;
         border-radius:18px!important;overflow:hidden!important;border:none!important;
-        background-size:cover!important;background-position:top center!important;
+        {_restaurant_bg}
         box-shadow:0 4px 20px rgba(17,24,39,.18)!important;
         cursor:pointer!important;position:relative!important;
-        transition:transform .22s cubic-bezier(.34,1.56,.64,1),box-shadow .22s ease!important}
-      .st-key-btn_restaurant_lesson button:hover{
+        transition:transform .22s cubic-bezier(.34,1.56,.64,1),
+                   box-shadow .22s ease,filter .22s ease!important}}
+      .st-key-btn_restaurant_lesson button:hover{{
+        {_restaurant_bg}
         transform:scale(1.035) translateY(-4px)!important;
-        box-shadow:0 16px 40px rgba(13,148,136,.3)!important}
-      .st-key-btn_restaurant_lesson button p{
-        position:absolute!important;bottom:0!important;left:0!important;right:0!important;
+        box-shadow:0 16px 40px rgba(13,148,136,.3),0 4px 16px rgba(17,24,39,.15)!important;
+        filter:brightness(1.05)!important}}
+      .st-key-btn_restaurant_lesson button [data-testid="stMarkdownContainer"],
+      .st-key-btn_restaurant_lesson button p{{
+        position:absolute!important;bottom:0!important;left:0!important;right:0!important;top:auto!important;
         padding:28px 16px 14px!important;
-        background:linear-gradient(to top,rgba(10,10,20,.88) 0%,transparent 100%)!important;
+        background:linear-gradient(to top,rgba(10,10,20,.88) 0%,
+                   rgba(10,10,20,.35) 55%,transparent 100%)!important;
         border-radius:0 0 18px 18px!important;
-        text-align:left!important;font:800 19px/1.2 system-ui!important;
-        color:#fff!important;margin:0!important}
+        text-align:left!important;pointer-events:none!important;margin:0!important}}
+      .st-key-btn_restaurant_lesson button p{{
+        font:800 19px/1.2 system-ui,-apple-system,BlinkMacSystemFont,Roboto,sans-serif!important;
+        color:#fff!important;text-align:left!important;margin:0!important}}
     </style>""", unsafe_allow_html=True)
     st.markdown(
         f"<div class='section-head' style='margin-top:48px'>"
@@ -310,8 +317,6 @@ with col_scenes:
         f"New</span></div>",
         unsafe_allow_html=True,
     )
-    st.markdown(f"<style>.st-key-btn_restaurant_lesson button{{{_restaurant_bg}}}</style>",
-                unsafe_allow_html=True)
     if st.button("🍜 At the Restaurant", key="btn_restaurant_lesson", use_container_width=True):
         st.switch_page("pages/restaurant_lesson.py")
     st.markdown(
