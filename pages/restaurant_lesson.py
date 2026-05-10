@@ -353,11 +353,9 @@ if True:
 
     # ── Mic phase ──────────────────────────────────────────────────────────────
     elif rs_phase == "mic":
-        scene = SCENES[rs_scene_idx]
-        video_path = VIDEO_DIR / scene["video"]
-
-        if video_path.exists():
-            st.video(str(video_path), autoplay=False)
+        last_frame = VIDEO_DIR / f"scene{rs_scene_idx + 1}_last.jpg"
+        if last_frame.exists():
+            st.image(str(last_frame), use_container_width=True)
 
     # ── Feedback phase ─────────────────────────────────────────────────────────
     elif rs_phase == "feedback":
@@ -370,10 +368,10 @@ if True:
                 f'<audio autoplay src="data:audio/mpeg;base64,{tts_b64}" style="display:none"></audio>',
                 unsafe_allow_html=True,
             )
-        # Show scene video for context while user listens to feedback
-        video_path = VIDEO_DIR / SCENES[rs_scene_idx]["video"]
-        if video_path.exists():
-            st.video(str(video_path), autoplay=False)
+        # Show last frame for context while user listens to tip
+        last_frame = VIDEO_DIR / f"scene{rs_scene_idx + 1}_last.jpg"
+        if last_frame.exists():
+            st.image(str(last_frame), use_container_width=True)
 
         # Show Continue button only as fallback when TTS is unavailable
         if not _has_feedback_audio:
