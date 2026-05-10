@@ -79,12 +79,24 @@ _HELP_RE = re.compile(
     re.IGNORECASE,
 )
 _DANISH_CHARS = frozenset("æøåÆØÅ")
+_PUNCT_RE = re.compile(r'[^\w\s]')
 
 def _is_help_request(text: str) -> bool:
     """True when the utterance is an English help question rather than a Danish attempt."""
     if any(c in _DANISH_CHARS for c in text):
         return False
     return bool(_HELP_RE.search(text))
+
+def _score_answer(attempt: str, target: str) -> bool:
+    """True if at least half the target words appear in the attempt."""
+    if not target:
+        return True
+    norm = lambda s: _PUNCT_RE.sub('', s.lower()).split()
+    target_words = set(norm(target))
+    if not target_words:
+        return True
+    attempt_words = set(norm(attempt))
+    return len(target_words & attempt_words) / len(target_words) >= 0.5
 
 def _tts_b64(text: str, voice_id: str) -> str | None:
     try:
@@ -157,13 +169,14 @@ if sb_user_id and sb_token and not knowledge_profile:
 
 # ── Session state ──────────────────────────────────────────────────────────────
 
-_RS_KEYS = ["rs_phase","rs_scene_idx","rs_chat","rs_evaluation","rs_correct_log","rs_last_chat_scene"]
+_RS_KEYS = ["rs_phase","rs_scene_idx","rs_chat","rs_evaluation","rs_correct_log","rs_coaching_log","rs_last_chat_scene"]
 for k, v in [
     ("rs_phase",           "start"),
     ("rs_scene_idx",       0),
     ("rs_chat",            []),
     ("rs_evaluation",      None),
     ("rs_correct_log",     []),
+    ("rs_coaching_log",    []),
     ("rs_last_chat_scene", -1),
 ]:
     if k not in st.session_state:
@@ -172,11 +185,12 @@ for k, v in [
 rs_phase     = st.session_state.rs_phase
 rs_scene_idx = st.session_state.rs_scene_idx
 
-# Auto-append waiter's line to chat when entering a new scene
+# Auto-append waiter's line to chat + correct_log when entering a new scene
 if rs_phase in ("video", "mic", "feedback") and rs_scene_idx != st.session_state.rs_last_chat_scene:
     _da = SCENES[rs_scene_idx].get("da_line", "")
     if _da:
         st.session_state.rs_chat.append({"role": "waiter", "content": _da})
+        st.session_state.rs_correct_log.append({"who": "character", "text": _da})
     st.session_state.rs_last_chat_scene = rs_scene_idx
 
 # ── Shared component props (always rendered to keep mic permission alive) ──────
@@ -272,7 +286,7 @@ with st.sidebar:
         if st.button("Finish Lesson", key="rs_finish",
                      use_container_width=True, type="primary"):
             st.session_state["correct_log"]    = st.session_state.rs_correct_log
-            st.session_state["coaching_log"]   = []
+            st.session_state["coaching_log"]   = st.session_state.rs_coaching_log
             st.session_state["selected_scene"] = "restaurant_lesson"
             for k in _RS_KEYS:
                 st.session_state.pop(k, None)
@@ -321,7 +335,7 @@ if True:
         with btn_col:
             if st.button("View Feedback →", use_container_width=True, type="primary"):
                 st.session_state["correct_log"]    = st.session_state.rs_correct_log
-                st.session_state["coaching_log"]   = []
+                st.session_state["coaching_log"]   = st.session_state.rs_coaching_log
                 st.session_state["selected_scene"] = "restaurant_lesson"
                 for k in _RS_KEYS:
                     st.session_state.pop(k, None)
@@ -414,10 +428,18 @@ if True:
                     st.session_state.rs_phase = "feedback"
                     st.rerun()
         else:
-            # Danish attempt — log it and advance
+            # Danish attempt — score and log it, then advance
             if _txt:
-                st.session_state.rs_correct_log.append({"who": "student", "text": _txt})
                 st.session_state.rs_chat.append({"role": "user", "content": _txt})
+                _target = _scene_now.get("da_target", "")
+                if _score_answer(_txt, _target):
+                    st.session_state.rs_correct_log.append({"who": "student", "text": _txt})
+                else:
+                    st.session_state.rs_coaching_log.append({
+                        "question":   _scene_now.get("da_line", ""),
+                        "attempt":    _txt,
+                        "correction": _scene_now.get("hint", f"Try: {_target}"),
+                    })
             _next = rs_scene_idx + 1
             if _next >= len(SCENES):
                 st.session_state.rs_phase = "complete"
