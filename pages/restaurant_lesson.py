@@ -23,43 +23,49 @@ if IS_LOCAL:
 
 SCENES = [
     {
-        "video":       "scene1.mp4",
-        "user_turn":   True,
-        "en_prompt":   "The waiter is asking: bar or window?",
-        "da_target":   "Ved vinduet",
-        "hint":        "Try 'Ved vinduet tak' (by the window, please)",
+        "video":     "scene1.mp4",
+        "user_turn": True,
+        "da_line":   "Hej! Velkommen! Vil du sidde ved baren eller ved vinduet?",
+        "en_prompt": "The waiter is asking: bar or window?",
+        "da_target": "Ved vinduet",
+        "hint":      "Try 'Ved vinduet tak' (by the window, please)",
     },
     {
-        "video":       "scene2.mp4",
-        "user_turn":   True,
-        "en_prompt":   "Order the ramen from the menu.",
-        "da_target":   "Jeg vil gerne have ramen",
-        "hint":        "Try 'Jeg vil gerne have ramen tak' (I'd like the ramen, please)",
+        "video":     "scene2.mp4",
+        "user_turn": True,
+        "da_line":   "Velkommen! Her er menuen — vi har ramen og gyoza i dag. Hvad må det være?",
+        "en_prompt": "Order the ramen from the menu.",
+        "da_target": "Jeg vil gerne have ramen",
+        "hint":      "Try 'Jeg vil gerne have ramen tak' (I'd like the ramen, please)",
     },
     {
-        "video":       "scene3.mp4",
-        "user_turn":   False,
-        "en_prompt":   "",
-        "hint":        "",
+        "video":     "scene3.mp4",
+        "user_turn": False,
+        "da_line":   "Ja, selvfølgelig, det ordner jeg med det samme.",
+        "en_prompt": "",
+        "hint":      "",
     },
     {
-        "video":       "scene4.mp4",
-        "user_turn":   True,
-        "en_prompt":   "The ramen arrived! Thank the waiter and ask for a fork.",
-        "da_target":   "Tak! Må jeg få en gaffel?",
-        "hint":        "Try 'Tak! Må jeg få en gaffel?' (Thanks! May I have a fork?)",
+        "video":     "scene4.mp4",
+        "user_turn": True,
+        "da_line":   "Værsgo! Ramen til dig! God appetit!",
+        "en_prompt": "The ramen arrived! Thank the waiter and ask for a fork.",
+        "da_target": "Tak! Må jeg få en gaffel?",
+        "hint":      "Try 'Tak! Må jeg få en gaffel?' (Thanks! May I have a fork?)",
     },
     {
-        "video":       "scene5.mp4",
-        "user_turn":   False,
-        "en_prompt":   "",
-        "hint":        "",
+        "video":     "scene5.mp4",
+        "user_turn": False,
+        "da_line":   "Selvfølgelig, jeg henter en gaffel til dig.",
+        "en_prompt": "",
+        "hint":      "",
     },
     {
-        "video":       "scene6.mp4",
-        "user_turn":   False,
-        "en_prompt":   "",
-        "hint":        "",
+        "video":     "scene6.mp4",
+        "user_turn": False,
+        "da_line":   "Jeg håber, at alt var lækkert, og vi ses forhåbentlig igen snart.",
+        "en_prompt": "",
+        "hint":      "",
     },
 ]
 
@@ -201,38 +207,22 @@ with st.sidebar:
       <div style='height:1px;background:#e5e5e5;margin:12px 0 8px'></div>
     </div>""", unsafe_allow_html=True)
 
-    # ── Current Task ──────────────────────────────────────────────────────────
-    _en_prompt = _scene_now.get("en_prompt", "") if rs_phase not in ("start","complete") else ""
-    _hint_text = _scene_now.get("hint", "")      if rs_phase not in ("start","complete") else ""
-    st.markdown(
-        "<div style='padding:0 16px 6px;font:600 9px system-ui;"
-        "letter-spacing:1.5px;text-transform:uppercase;color:rgba(17,24,39,.35)'>"
-        "Current Task</div>",
-        unsafe_allow_html=True,
-    )
-    if _en_prompt:
+    # ── Waiter speech bubble ──────────────────────────────────────────────────
+    if rs_phase not in ("start", "complete") and _scene_now.get("da_line"):
+        _da = _scene_now["da_line"]
         _hint_html = (
-            f"<div style='margin-top:8px;padding-top:8px;"
-            f"border-top:1px solid #f0f0f0;"
-            f"font:12px/1.5 system-ui;color:#92400e'>"
-            f"💡 {_hint_text}</div>"
-            if _hint_text else ""
+            f"<div style='margin-top:8px;padding-top:8px;border-top:1px solid #ececec;"
+            f"font:12px/1.5 system-ui;color:#92400e'>💡 {_scene_now['hint']}</div>"
+            if _scene_now.get("hint") else ""
         )
         st.markdown(
-            f"<div style='margin:0 12px 12px;padding:12px;"
-            f"background:#fff;border:1px solid #e5e5e5;border-radius:10px;"
-            f"border-left:3px solid #0d9488'>"
-            f"<div style='font:400 13px/1.5 system-ui;color:#111827'>{_en_prompt}</div>"
-            f"{_hint_html}</div>",
-            unsafe_allow_html=True,
-        )
-    else:
-        st.markdown(
-            "<div style='margin:0 12px 12px;padding:12px;"
-            "background:#fff;border:1px solid #e5e5e5;border-radius:10px;"
-            "border-left:3px solid #e5e5e5;"
-            "font:400 13px/1.5 system-ui;color:rgba(17,24,39,.3)'>"
-            "Watch the scene…</div>",
+            f"<div style='margin:0 12px 12px'>"
+            f"<div style='font:600 9px system-ui;letter-spacing:.8px;text-transform:uppercase;"
+            f"color:rgba(17,24,39,.35);margin-bottom:5px'>Waiter</div>"
+            f"<div style='background:rgba(0,0,0,.04);border-radius:4px 12px 12px 12px;"
+            f"padding:10px 12px;font:400 13px/1.5 system-ui;color:#111827'>"
+            f"<em>{_da}</em>"
+            f"{_hint_html}</div></div>",
             unsafe_allow_html=True,
         )
 
@@ -253,9 +243,7 @@ with st.sidebar:
                             unsafe_allow_html=True)
     else:
         st.markdown(
-            "<div style='margin:0 12px 8px;padding:12px;"
-            "background:#fff;border:1px solid #e5e5e5;border-radius:10px;"
-            "font:400 12px system-ui;color:rgba(17,24,39,.3)'>"
+            "<div style='font:400 12px system-ui;color:rgba(17,24,39,.35);margin:0 12px 8px'>"
             "Your responses will appear here.</div>",
             unsafe_allow_html=True,
         )
