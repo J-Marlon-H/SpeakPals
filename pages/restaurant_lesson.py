@@ -201,32 +201,38 @@ with st.sidebar:
       <div style='height:1px;background:#e5e5e5;margin:12px 0 8px'></div>
     </div>""", unsafe_allow_html=True)
 
-    # ── Scene task + tip ──────────────────────────────────────────────────────
-    if rs_phase not in ("start", "complete") and _scene_now.get("en_prompt"):
-        st.markdown(
-            "<div style='padding:0 16px 4px;font:600 9px system-ui;"
-            "letter-spacing:1.5px;text-transform:uppercase;color:rgba(17,24,39,.35)'>"
-            "Current Task</div>",
-            unsafe_allow_html=True,
+    # ── Current Task ──────────────────────────────────────────────────────────
+    _en_prompt = _scene_now.get("en_prompt", "") if rs_phase not in ("start","complete") else ""
+    _hint_text = _scene_now.get("hint", "")      if rs_phase not in ("start","complete") else ""
+    st.markdown(
+        "<div style='padding:0 16px 6px;font:600 9px system-ui;"
+        "letter-spacing:1.5px;text-transform:uppercase;color:rgba(17,24,39,.35)'>"
+        "Current Task</div>",
+        unsafe_allow_html=True,
+    )
+    if _en_prompt:
+        _hint_html = (
+            f"<div style='margin-top:8px;padding-top:8px;"
+            f"border-top:1px solid #f0f0f0;"
+            f"font:12px/1.5 system-ui;color:#92400e'>"
+            f"💡 {_hint_text}</div>"
+            if _hint_text else ""
         )
         st.markdown(
-            f"<div style='margin:0 12px 0;padding:10px 12px;"
-            f"font:400 13px/1.5 system-ui;color:#111827;"
-            f"background:#fff;border-left:3px solid #0d9488;"
-            f"border-radius:0 8px 8px 0'>{_scene_now['en_prompt']}</div>",
+            f"<div style='margin:0 12px 12px;padding:12px;"
+            f"background:#fff;border:1px solid #e5e5e5;border-radius:10px;"
+            f"border-left:3px solid #0d9488'>"
+            f"<div style='font:400 13px/1.5 system-ui;color:#111827'>{_en_prompt}</div>"
+            f"{_hint_html}</div>",
             unsafe_allow_html=True,
         )
-        if _scene_now.get("hint"):
-            _hint = _scene_now["hint"]
-            st.markdown(
-                f"<div style='margin:6px 12px 8px;padding:8px 10px;"
-                f"font:12px/1.5 system-ui;color:#92400e;"
-                f"background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.3);"
-                f"border-radius:8px'>💡 {_hint}</div>",
-                unsafe_allow_html=True,
-            )
+    else:
         st.markdown(
-            "<div style='height:1px;background:#e5e5e5;margin:8px 12px 8px'></div>",
+            "<div style='margin:0 12px 12px;padding:12px;"
+            "background:#fff;border:1px solid #e5e5e5;border-radius:10px;"
+            "border-left:3px solid #e5e5e5;"
+            "font:400 13px/1.5 system-ui;color:rgba(17,24,39,.3)'>"
+            "Watch the scene…</div>",
             unsafe_allow_html=True,
         )
 
@@ -247,8 +253,10 @@ with st.sidebar:
                             unsafe_allow_html=True)
     else:
         st.markdown(
-            "<div style='font:400 12px system-ui;color:rgba(17,24,39,.35);"
-            "margin:0 12px 8px'>Your responses will appear here.</div>",
+            "<div style='margin:0 12px 8px;padding:12px;"
+            "background:#fff;border:1px solid #e5e5e5;border-radius:10px;"
+            "font:400 12px system-ui;color:rgba(17,24,39,.3)'>"
+            "Your responses will appear here.</div>",
             unsafe_allow_html=True,
         )
 
