@@ -198,28 +198,45 @@ with st.sidebar:
     st.markdown("""<div style='padding:20px 16px 0'>
       <div style='font:800 16px/1.2 system-ui;color:#111827;letter-spacing:-.2px'>🍜 Lars · Tutor</div>
       <div style='font:500 11px system-ui;color:rgba(17,24,39,.45);margin-top:3px'>Restaurant Lesson</div>
-      <div style='height:1px;background:#e5e5e5;margin:12px 0 4px'></div>
+      <div style='height:1px;background:#e5e5e5;margin:12px 0 8px'></div>
     </div>""", unsafe_allow_html=True)
 
-    if rs_phase == "mic" and _scene_now.get("en_prompt"):
+    # ── Scene task + tip ──────────────────────────────────────────────────────
+    if rs_phase not in ("start", "complete") and _scene_now.get("en_prompt"):
         st.markdown(
-            f"<div style='margin:8px 12px 0;padding:10px 12px;"
-            f"font:400 12px/1.5 system-ui;color:#374151;"
-            f"background:#fff;border-left:2px solid rgba(13,148,136,.6);"
+            "<div style='padding:0 16px 4px;font:600 9px system-ui;"
+            "letter-spacing:1.5px;text-transform:uppercase;color:rgba(17,24,39,.35)'>"
+            "Current Task</div>",
+            unsafe_allow_html=True,
+        )
+        st.markdown(
+            f"<div style='margin:0 12px 0;padding:10px 12px;"
+            f"font:400 13px/1.5 system-ui;color:#111827;"
+            f"background:#fff;border-left:3px solid #0d9488;"
             f"border-radius:0 8px 8px 0'>{_scene_now['en_prompt']}</div>",
             unsafe_allow_html=True,
         )
-    if rs_phase == "mic" and _scene_now.get("hint"):
-        _hint = _scene_now["hint"]
+        if _scene_now.get("hint"):
+            _hint = _scene_now["hint"]
+            st.markdown(
+                f"<div style='margin:6px 12px 8px;padding:8px 10px;"
+                f"font:12px/1.5 system-ui;color:#92400e;"
+                f"background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.3);"
+                f"border-radius:8px'>💡 {_hint}</div>",
+                unsafe_allow_html=True,
+            )
         st.markdown(
-            f"<div style='margin:6px 12px 0;padding:8px 10px;"
-            f"font:12px system-ui;color:#92400e;"
-            f"background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.3);"
-            f"border-radius:8px'>💡 {_hint}</div>",
+            "<div style='height:1px;background:#e5e5e5;margin:8px 12px 8px'></div>",
             unsafe_allow_html=True,
         )
 
-    st.markdown("<div style='height:6px'></div>", unsafe_allow_html=True)
+    # ── Conversation history ──────────────────────────────────────────────────
+    st.markdown(
+        "<div style='padding:0 16px 6px;font:600 9px system-ui;"
+        "letter-spacing:1.5px;text-transform:uppercase;color:rgba(17,24,39,.35)'>"
+        "Conversation</div>",
+        unsafe_allow_html=True,
+    )
     if st.session_state.rs_chat:
         for msg in st.session_state.rs_chat:
             if msg["role"] == "user":
@@ -229,9 +246,11 @@ with st.sidebar:
                 st.markdown(f"<div class='chat-msg chat-tutor'>💡 {msg['content']}</div>",
                             unsafe_allow_html=True)
     else:
-        st.markdown("""<div style='font:400 12px system-ui;color:rgba(17,24,39,.35);
-          margin:8px 12px'>Your conversation will appear here.</div>""",
-                    unsafe_allow_html=True)
+        st.markdown(
+            "<div style='font:400 12px system-ui;color:rgba(17,24,39,.35);"
+            "margin:0 12px 8px'>Your responses will appear here.</div>",
+            unsafe_allow_html=True,
+        )
 
     st.markdown("<br>", unsafe_allow_html=True)
     if rs_phase not in ("start", "complete"):
