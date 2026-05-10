@@ -109,10 +109,14 @@ st.markdown("""<style>
   [data-testid="stSidebar"] *{color:#111827!important}
   [data-testid="stSidebar"] section{padding:0!important}
   [data-testid="stSidebar"] > div:first-child{
-    padding-bottom:72px!important;overflow-y:auto!important}
+    padding-bottom:140px!important;overflow-y:auto!important}
+  .st-key-rs_finish{
+    position:fixed!important;bottom:58px!important;left:0!important;
+    width:280px!important;padding:0 16px 6px!important;
+    background:#f5f5f5!important;z-index:101!important}
   .st-key-rs_exit{
     position:fixed!important;bottom:0!important;left:0!important;
-    width:280px!important;padding:10px 16px 14px!important;
+    width:280px!important;padding:0 16px 14px!important;
     background:#f5f5f5!important;border-top:1px solid #e5e5e5!important;
     z-index:100!important}
   .chat-msg{padding:8px 12px;border-radius:10px;margin-bottom:5px;font-size:12px;line-height:1.5}
@@ -138,12 +142,13 @@ if sb_user_id and sb_token and not knowledge_profile:
 
 # ── Session state ──────────────────────────────────────────────────────────────
 
-_RS_KEYS = ["rs_phase","rs_scene_idx","rs_chat","rs_evaluation"]
+_RS_KEYS = ["rs_phase","rs_scene_idx","rs_chat","rs_evaluation","rs_correct_log"]
 for k, v in [
-    ("rs_phase",      "start"),
-    ("rs_scene_idx",  0),
-    ("rs_chat",       []),
-    ("rs_evaluation", None),
+    ("rs_phase",       "start"),
+    ("rs_scene_idx",   0),
+    ("rs_chat",        []),
+    ("rs_evaluation",  None),
+    ("rs_correct_log", []),
 ]:
     if k not in st.session_state:
         st.session_state[k] = v
@@ -229,6 +234,15 @@ with st.sidebar:
                     unsafe_allow_html=True)
 
     st.markdown("<br>", unsafe_allow_html=True)
+    if rs_phase not in ("start", "complete"):
+        if st.button("Finish Lesson", key="rs_finish",
+                     use_container_width=True, type="primary"):
+            st.session_state["correct_log"]    = st.session_state.rs_correct_log
+            st.session_state["coaching_log"]   = []
+            st.session_state["selected_scene"] = "restaurant_lesson"
+            for k in _RS_KEYS:
+                st.session_state.pop(k, None)
+            st.switch_page("pages/feedback.py")
     if st.button("🏠 Exit lesson", key="rs_exit", use_container_width=True):
         for k in _RS_KEYS:
             st.session_state.pop(k, None)
@@ -237,15 +251,6 @@ with st.sidebar:
 # ── Main area ──────────────────────────────────────────────────────────────────
 
 if True:
-
-    # ── Finish lesson button — visible during all active phases ───────────────
-    if rs_phase not in ("start", "complete"):
-        _, _finish_col = st.columns([6, 1])
-        with _finish_col:
-            if st.button("✕ Finish", key="rs_finish", use_container_width=True):
-                for k in _RS_KEYS:
-                    st.session_state.pop(k, None)
-                st.switch_page("pages/home.py")
 
     # ── Start screen ───────────────────────────────────────────────────────────
     if rs_phase == "start":
@@ -280,10 +285,13 @@ if True:
         </div>""", unsafe_allow_html=True)
         _, btn_col, _ = st.columns([2, 2, 2])
         with btn_col:
-            if st.button("← Back to Home", use_container_width=True, type="primary"):
+            if st.button("View Feedback →", use_container_width=True, type="primary"):
+                st.session_state["correct_log"]    = st.session_state.rs_correct_log
+                st.session_state["coaching_log"]   = []
+                st.session_state["selected_scene"] = "restaurant_lesson"
                 for k in _RS_KEYS:
                     st.session_state.pop(k, None)
-                st.switch_page("pages/home.py")
+                st.switch_page("pages/feedback.py")
 
     # ── Video phase ────────────────────────────────────────────────────────────
     elif rs_phase == "video":
@@ -361,6 +369,9 @@ if True:
         st.rerun()
 
     if _mic_visible and isinstance(_result, dict) and _result.get("type") == "transcript":
+        _txt = _result.get("text", "").strip()
+        if _txt:
+            st.session_state.rs_correct_log.append({"who": "student", "text": _txt})
         _next = rs_scene_idx + 1
         if _next >= len(SCENES):
             st.session_state.rs_phase = "complete"
