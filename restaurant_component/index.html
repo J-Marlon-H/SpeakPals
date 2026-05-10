@@ -139,6 +139,14 @@ function send(val){
 }
 window.parent.postMessage({isStreamlitMessage:true,type:"streamlit:componentReady",apiVersion:1},"*");
 
+// Strip native controls from every video Streamlit renders, regardless of phase
+setInterval(function() {
+  try {
+    var vids = window.parent.document.querySelectorAll('video');
+    for (var i = 0; i < vids.length; i++) { vids[i].removeAttribute('controls'); }
+  } catch(e) {}
+}, 300);
+
 // ── DOM refs ────────────────────────────────────────────────────────────────
 var wrap      = document.getElementById("wrap");
 var promptEl  = document.getElementById("promptText");
@@ -209,6 +217,7 @@ function startWatchingVideo() {
         var v = vids[i];
         if (v.ended && !v._sp_advanced) {
           v._sp_advanced = true;
+          v.style.visibility = 'hidden';
           stopWatchingVideo();
           send({type:"video_ended", scene_idx:sceneIdx});
           return;
@@ -230,6 +239,7 @@ function tryAttachVideo() {
       v._sp_watched = true;
       if (v.paused) { v.play().catch(function(){}); }
       v.addEventListener('ended', function() {
+        this.style.visibility = 'hidden';
         stopWatchingVideo();
         send({type:"video_ended", scene_idx:sceneIdx});
       }, {once:true});
