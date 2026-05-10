@@ -372,6 +372,7 @@ if True:
         _txt = _result.get("text", "").strip()
         if _txt:
             st.session_state.rs_correct_log.append({"who": "student", "text": _txt})
+            st.session_state.rs_chat.append({"role": "user", "content": _txt})
         _next = rs_scene_idx + 1
         if _next >= len(SCENES):
             st.session_state.rs_phase = "complete"
