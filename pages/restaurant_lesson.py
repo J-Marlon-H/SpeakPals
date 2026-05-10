@@ -1,6 +1,6 @@
 # SpeakPals — Restaurant Video Lesson
 from __future__ import annotations
-import pathlib, json, base64
+import pathlib, base64
 import streamlit as st
 import requests
 from dotenv import load_dotenv
@@ -66,32 +66,6 @@ SCENES = [
 VIDEO_DIR = pathlib.Path("static/restaurant")
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
-
-def _claude_evaluate(user_text: str, scene: dict, history: list,
-                     knowledge_profile: dict, name: str, level: str, bg_lang: str) -> str:
-    system = (
-        f"You are Lars, a warm Danish tutor. The student ({name}, level {level}, "
-        f"native language: {bg_lang}) is doing a restaurant role-play lesson. "
-        f"They were asked to say something like: '{scene['da_target']}'\n\n"
-        f"Reply in ONE short sentence only. "
-        f"If correct or close: praise briefly. "
-        f"If wrong or no response: say the correct Danish phrase naturally and encouragingly. "
-        f"Plain text only — no markdown, no JSON."
-    )
-    if knowledge_profile:
-        system += f"\n\nWhat you know about this student: {json.dumps(knowledge_profile)}"
-    messages = [{"role": m["role"], "content": m["content"]} for m in history[-6:]]
-    messages.append({"role": "user", "content": user_text or "(no response)"})
-    r = requests.post(
-        "https://api.anthropic.com/v1/messages",
-        headers={"x-api-key": CLAUDE_KEY, "anthropic-version": "2023-06-01",
-                 "Content-Type": "application/json"},
-        json={"model": "claude-haiku-4-5-20251001", "max_tokens": 80,
-              "temperature": 0.6, "system": system, "messages": messages},
-        timeout=20,
-    )
-    r.raise_for_status()
-    return r.json()["content"][0]["text"].strip()
 
 def _tts_b64(text: str, voice_id: str) -> str | None:
     try:
@@ -164,13 +138,12 @@ if sb_user_id and sb_token and not knowledge_profile:
 
 # ── Session state ──────────────────────────────────────────────────────────────
 
-_RS_KEYS = ["rs_phase","rs_scene_idx","rs_chat","rs_evaluation","rs_last_eval_scene"]
+_RS_KEYS = ["rs_phase","rs_scene_idx","rs_chat","rs_evaluation"]
 for k, v in [
-    ("rs_phase",          "start"),
-    ("rs_scene_idx",      0),
-    ("rs_chat",           []),
-    ("rs_evaluation",     None),
-    ("rs_last_eval_scene",-1),
+    ("rs_phase",      "start"),
+    ("rs_scene_idx",  0),
+    ("rs_chat",       []),
+    ("rs_evaluation", None),
 ]:
     if k not in st.session_state:
         st.session_state[k] = v
@@ -193,8 +166,8 @@ _comp_base: dict = {
     "watch_audio": _has_feedback_audio,
     "scene_idx":   rs_scene_idx,
     "lang_code":   "da",
+    "show":        rs_phase not in ("start", "complete"),
     "label":       "Tap to speak in Danish",
-    "hint":        _scene_now.get("hint", ""),
     "prompt":      _scene_now.get("en_prompt", ""),
     "key":         "restaurant_mic",   # same key → same iframe across reruns
     "height":      160,
@@ -265,6 +238,15 @@ with st.sidebar:
 
 if True:
 
+    # ── Finish lesson button — visible during all active phases ───────────────
+    if rs_phase not in ("start", "complete"):
+        _, _finish_col = st.columns([6, 1])
+        with _finish_col:
+            if st.button("✕ Finish", key="rs_finish", use_container_width=True):
+                for k in _RS_KEYS:
+                    st.session_state.pop(k, None)
+                st.switch_page("pages/home.py")
+
     # ── Start screen ───────────────────────────────────────────────────────────
     if rs_phase == "start":
         st.markdown("""
@@ -313,13 +295,6 @@ if True:
         else:
             st.warning(f"Video not found: {video_path}")
 
-        if scene.get("en_prompt"):
-            st.markdown(
-                f"<div style='font:13px/1.5 system-ui;color:rgba(17,24,39,.55);"
-                f"margin-top:8px;text-align:center'>{scene['en_prompt']}</div>",
-                unsafe_allow_html=True,
-            )
-
     # ── Mic phase ──────────────────────────────────────────────────────────────
     elif rs_phase == "mic":
         scene = SCENES[rs_scene_idx]
@@ -366,12 +341,8 @@ if True:
     _result = restaurant_player(**_comp_base) if rs_phase not in ("start", "complete") else None
 
     if _has_feedback_audio and isinstance(_result, dict) and _result.get("type") == "audio_ended":
-        _next_a = rs_scene_idx + 1
-        if _next_a >= len(SCENES):
-            st.session_state.rs_phase = "complete"
-        else:
-            st.session_state.rs_scene_idx = _next_a
-            st.session_state.rs_phase = "video"
+        st.session_state.rs_evaluation = None
+        st.session_state.rs_phase = "mic"
         st.rerun()
 
     if (rs_phase == "video" and isinstance(_result, dict)
@@ -389,30 +360,26 @@ if True:
                 st.session_state.rs_phase = "video"
         st.rerun()
 
-    def _handle_eval(scene_idx, user_text):
-        if scene_idx == st.session_state.rs_last_eval_scene:
-            return
-        with st.spinner("Lars is thinking…"):
-            _feedback = _claude_evaluate(
-                user_text, _scene_now, st.session_state.rs_chat,
-                knowledge_profile, name, level, bg_lang,
-            )
-        _audio = _tts_b64(_feedback, voice_id)
-        _display = user_text if user_text else "(no response)"
-        st.session_state.rs_chat.extend([
-            {"role": "user",      "content": _display},
-            {"role": "assistant", "content": _feedback},
-        ])
-        st.session_state.rs_evaluation     = {
-            "scene_idx": scene_idx,
-            "text":      _feedback,
-            "tts_b64":   _audio or None,
-        }
-        st.session_state.rs_last_eval_scene = scene_idx
-        st.session_state.rs_phase = "feedback"
+    if _mic_visible and isinstance(_result, dict) and _result.get("type") == "transcript":
+        _next = rs_scene_idx + 1
+        if _next >= len(SCENES):
+            st.session_state.rs_phase = "complete"
+        else:
+            st.session_state.rs_scene_idx = _next
+            st.session_state.rs_phase = "video"
         st.rerun()
 
-    if _mic_visible and isinstance(_result, dict) and _result.get("type") == "transcript":
-        _handle_eval(_result["scene_idx"], _result.get("text", "").strip())
+    if _mic_visible and isinstance(_result, dict) and _result.get("type") == "ask_tip":
+        _hint = _scene_now.get("hint", "")
+        if _hint:
+            _tip_audio = _tts_b64(_hint, voice_id)
+            if _tip_audio:
+                st.session_state.rs_evaluation = {"tts_b64": _tip_audio}
+                st.session_state.rs_chat.append({"role": "assistant", "content": _hint})
+                st.session_state.rs_phase = "feedback"
+                st.rerun()
+            else:
+                st.session_state.rs_chat.append({"role": "assistant", "content": _hint})
+                st.rerun()
 
 
