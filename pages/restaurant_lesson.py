@@ -8,6 +8,7 @@ from db import require_auth, load_knowledge_profile, _secret
 from pipeline import VOICES_BY_LANG, SETTINGS_DEFAULTS
 from restaurant_helper import restaurant_player
 from ws_proxy import start_in_thread, PROXY_PORT, scribe_token as _scribe_token
+import streamlit.components.v1 as components
 
 load_dotenv("keys.env")
 require_auth()
@@ -125,11 +126,7 @@ st.markdown("""<style>
     width:280px!important;padding:0 16px 14px!important;
     background:#f5f5f5!important;border-top:1px solid #e5e5e5!important;
     z-index:100!important}
-  .chat-msg{padding:8px 12px;border-radius:10px;margin-bottom:5px;font-size:12px;line-height:1.5}
-  .chat-user{background:rgba(13,148,136,.1);color:#0f3d39;text-align:right;
-    border:1px solid rgba(13,148,136,.2)}
-  .chat-tutor{background:rgba(245,158,11,.08);color:#78350f;
-    border:1px solid rgba(245,158,11,.25)}
+  @keyframes msgSlideIn{from{opacity:0;transform:translateX(-14px)}to{opacity:1;transform:translateX(0)}}
 </style>""", unsafe_allow_html=True)
 
 # ── User profile ───────────────────────────────────────────────────────────────
@@ -148,19 +145,27 @@ if sb_user_id and sb_token and not knowledge_profile:
 
 # ── Session state ──────────────────────────────────────────────────────────────
 
-_RS_KEYS = ["rs_phase","rs_scene_idx","rs_chat","rs_evaluation","rs_correct_log"]
+_RS_KEYS = ["rs_phase","rs_scene_idx","rs_chat","rs_evaluation","rs_correct_log","rs_last_chat_scene"]
 for k, v in [
-    ("rs_phase",       "start"),
-    ("rs_scene_idx",   0),
-    ("rs_chat",        []),
-    ("rs_evaluation",  None),
-    ("rs_correct_log", []),
+    ("rs_phase",           "start"),
+    ("rs_scene_idx",       0),
+    ("rs_chat",            []),
+    ("rs_evaluation",      None),
+    ("rs_correct_log",     []),
+    ("rs_last_chat_scene", -1),
 ]:
     if k not in st.session_state:
         st.session_state[k] = v
 
 rs_phase     = st.session_state.rs_phase
 rs_scene_idx = st.session_state.rs_scene_idx
+
+# Auto-append waiter's line to chat when entering a new scene
+if rs_phase in ("video", "mic", "feedback") and rs_scene_idx != st.session_state.rs_last_chat_scene:
+    _da = SCENES[rs_scene_idx].get("da_line", "")
+    if _da:
+        st.session_state.rs_chat.append({"role": "waiter", "content": _da})
+    st.session_state.rs_last_chat_scene = rs_scene_idx
 
 # ── Shared component props (always rendered to keep mic permission alive) ──────
 
@@ -207,46 +212,48 @@ with st.sidebar:
       <div style='height:1px;background:#e5e5e5;margin:12px 0 8px'></div>
     </div>""", unsafe_allow_html=True)
 
-    # ── Waiter speech bubble ──────────────────────────────────────────────────
-    if rs_phase not in ("start", "complete") and _scene_now.get("da_line"):
-        _da = _scene_now["da_line"]
-        _hint_html = (
-            f"<div style='margin-top:8px;padding-top:8px;border-top:1px solid #ececec;"
-            f"font:12px/1.5 system-ui;color:#92400e'>💡 {_scene_now['hint']}</div>"
-            if _scene_now.get("hint") else ""
-        )
+    # ── Conversation log ──────────────────────────────────────────────────────
+    _log = st.session_state.rs_chat
+    if not _log:
         st.markdown(
-            f"<div style='margin:0 12px 12px'>"
-            f"<div style='font:600 9px system-ui;letter-spacing:.8px;text-transform:uppercase;"
-            f"color:rgba(17,24,39,.35);margin-bottom:5px'>Waiter</div>"
-            f"<div style='background:rgba(0,0,0,.04);border-radius:4px 12px 12px 12px;"
-            f"padding:10px 12px;font:400 13px/1.5 system-ui;color:#111827'>"
-            f"<em>{_da}</em>"
-            f"{_hint_html}</div></div>",
+            "<div style='padding:16px;font-size:12px;color:rgba(17,24,39,.45);font-style:italic'>"
+            "Your conversation will appear here.</div>",
             unsafe_allow_html=True,
         )
-
-    # ── Conversation history ──────────────────────────────────────────────────
-    st.markdown(
-        "<div style='padding:0 16px 6px;font:600 9px system-ui;"
-        "letter-spacing:1.5px;text-transform:uppercase;color:rgba(17,24,39,.35)'>"
-        "Conversation</div>",
-        unsafe_allow_html=True,
-    )
-    if st.session_state.rs_chat:
-        for msg in st.session_state.rs_chat:
-            if msg["role"] == "user":
-                st.markdown(f"<div class='chat-msg chat-user'>🧑 {msg['content']}</div>",
-                            unsafe_allow_html=True)
-            else:
-                st.markdown(f"<div class='chat-msg chat-tutor'>💡 {msg['content']}</div>",
-                            unsafe_allow_html=True)
     else:
-        st.markdown(
-            "<div style='font:400 12px system-ui;color:rgba(17,24,39,.35);margin:0 12px 8px'>"
-            "Your responses will appear here.</div>",
-            unsafe_allow_html=True,
-        )
+        _last_i = len(_log) - 1
+        _parts = []
+        for _i, _msg in enumerate(_log):
+            _txt  = _msg["content"].replace("<", "&lt;").replace(">", "&gt;")
+            _anim = "animation:msgSlideIn .4s cubic-bezier(.34,1.56,.64,1) both;" if _i == _last_i else ""
+            if _msg["role"] == "waiter":
+                _parts.append(
+                    f"<div style='padding:8px 12px 4px'>"
+                    f"<div style='background:#ffffff;border:1px solid #e5e5e5;border-radius:12px 12px 12px 3px;"
+                    f"padding:10px 12px;font-size:13px;line-height:1.5;"
+                    f"color:#111827;word-break:break-word;{_anim}'>"
+                    f"<span style='font:600 10px system-ui;color:#9ca3af;display:block;margin-bottom:4px;letter-spacing:.5px;text-transform:uppercase'>Waiter</span>"
+                    f"<em>{_txt}</em></div></div>"
+                )
+            elif _msg["role"] == "user":
+                _parts.append(
+                    f"<div style='padding:4px 12px 8px'>"
+                    f"<div style='background:rgba(13,148,136,.1);border:1px solid rgba(13,148,136,.2);border-radius:12px 12px 3px 12px;"
+                    f"padding:10px 12px;font-size:13px;line-height:1.5;"
+                    f"color:#0f3d39;word-break:break-word;{_anim}'>"
+                    f"<span style='font:600 10px system-ui;color:#0d9488;display:block;margin-bottom:4px;letter-spacing:.5px;text-transform:uppercase'>You</span>"
+                    f"{_txt}</div></div>"
+                )
+        st.markdown("".join(_parts), unsafe_allow_html=True)
+        components.html(f"""<script>
+(function(){{
+  function scroll(){{
+    var s=window.parent.document.querySelector('[data-testid="stSidebar"]>div:first-child');
+    if(s) s.scrollTop=s.scrollHeight;
+  }}
+  scroll(); setTimeout(scroll,120); setTimeout(scroll,400);
+}})();
+</script>""", height=0)
 
     st.markdown("<br>", unsafe_allow_html=True)
     if rs_phase not in ("start", "complete"):
@@ -402,11 +409,7 @@ if True:
             _tip_audio = _tts_b64(_hint, voice_id)
             if _tip_audio:
                 st.session_state.rs_evaluation = {"tts_b64": _tip_audio}
-                st.session_state.rs_chat.append({"role": "assistant", "content": _hint})
                 st.session_state.rs_phase = "feedback"
-                st.rerun()
-            else:
-                st.session_state.rs_chat.append({"role": "assistant", "content": _hint})
                 st.rerun()
 
 
