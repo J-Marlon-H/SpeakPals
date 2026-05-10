@@ -1,6 +1,6 @@
 # SpeakPals — Restaurant Video Lesson
 from __future__ import annotations
-import pathlib, base64
+import pathlib, base64, re
 import streamlit as st
 import requests
 from dotenv import load_dotenv
@@ -73,6 +73,18 @@ SCENES = [
 VIDEO_DIR = pathlib.Path("static/restaurant")
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
+
+_HELP_RE = re.compile(
+    r'\b(how|what|why|help|say|tell|don\'?t know|i need|can you|could you|what does|what is|how do|how to)\b',
+    re.IGNORECASE,
+)
+_DANISH_CHARS = frozenset("æøåÆØÅ")
+
+def _is_help_request(text: str) -> bool:
+    """True when the utterance is an English help question rather than a Danish attempt."""
+    if any(c in _DANISH_CHARS for c in text):
+        return False
+    return bool(_HELP_RE.search(text))
 
 def _tts_b64(text: str, voice_id: str) -> str | None:
     try:
@@ -392,16 +404,27 @@ if True:
 
     if _mic_visible and isinstance(_result, dict) and _result.get("type") == "transcript":
         _txt = _result.get("text", "").strip()
-        if _txt:
-            st.session_state.rs_correct_log.append({"who": "student", "text": _txt})
-            st.session_state.rs_chat.append({"role": "user", "content": _txt})
-        _next = rs_scene_idx + 1
-        if _next >= len(SCENES):
-            st.session_state.rs_phase = "complete"
+        if _txt and _is_help_request(_txt):
+            # English help question — give tip, stay on same scene
+            _hint = _scene_now.get("hint", "")
+            if _hint:
+                _tip_audio = _tts_b64(_hint, voice_id)
+                if _tip_audio:
+                    st.session_state.rs_evaluation = {"tts_b64": _tip_audio}
+                    st.session_state.rs_phase = "feedback"
+                    st.rerun()
         else:
-            st.session_state.rs_scene_idx = _next
-            st.session_state.rs_phase = "video"
-        st.rerun()
+            # Danish attempt — log it and advance
+            if _txt:
+                st.session_state.rs_correct_log.append({"who": "student", "text": _txt})
+                st.session_state.rs_chat.append({"role": "user", "content": _txt})
+            _next = rs_scene_idx + 1
+            if _next >= len(SCENES):
+                st.session_state.rs_phase = "complete"
+            else:
+                st.session_state.rs_scene_idx = _next
+                st.session_state.rs_phase = "video"
+            st.rerun()
 
     if _mic_visible and isinstance(_result, dict) and _result.get("type") == "ask_tip":
         _hint = _scene_now.get("hint", "")
