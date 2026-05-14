@@ -166,6 +166,7 @@ var activeLabel     = "tap to speak";
 var proxyPort = null, wsToken = null;
 var sceneIdx  = 0;
 var langCode  = "da";
+var lastFrame = null;   // base64 data URI of the current scene's last frame
 
 function updateUI() {
   micWrap.style.opacity      = isMicPhase ? "1" : "0.35";
@@ -184,10 +185,11 @@ function updateUI() {
 window.addEventListener("message", function(e) {
   if (!e.data || e.data.type !== "streamlit:render" || !e.data.args) return;
   var a = e.data.args;
-  if (a.proxy_port != null) proxyPort = a.proxy_port;
-  if (a.ws_token   != null) wsToken   = a.ws_token;
-  if (a.scene_idx  != null) sceneIdx  = a.scene_idx;
-  if (a.lang_code  != null) langCode  = a.lang_code;
+  if (a.proxy_port  != null) proxyPort = a.proxy_port;
+  if (a.ws_token    != null) wsToken   = a.ws_token;
+  if (a.scene_idx   != null) sceneIdx  = a.scene_idx;
+  if (a.lang_code   != null) langCode  = a.lang_code;
+  if (a.last_frame  != null) lastFrame = a.last_frame;
   if (a.show   != null) { wrap.style.display = a.show ? "flex" : "none"; }
   if (a.label  != null) { activeLabel = a.label; }
   if (a.prompt != null) { promptEl.textContent = a.prompt; }
@@ -204,12 +206,45 @@ window.addEventListener("message", function(e) {
   }
 });
 
+// ── Last-frame overlay ──────────────────────────────────────────────────────
+// Inject a position:fixed image over the video the instant it ends so the
+// Streamlit rerender into mic phase is invisible to the user.
+function injectLastFrameOverlay(v) {
+  if (!lastFrame) { v.style.visibility = 'hidden'; return; }
+  try {
+    var r   = v.getBoundingClientRect();
+    var img = window.parent.document.createElement('img');
+    img.setAttribute('data-sp-lf', '1');
+    img.src = lastFrame;
+    img.style.cssText =
+      'position:fixed;z-index:9999;pointer-events:none;' +
+      'top:'    + r.top    + 'px;' +
+      'left:'   + r.left   + 'px;' +
+      'width:'  + r.width  + 'px;' +
+      'height:' + r.height + 'px;' +
+      'border-radius:14px;object-fit:cover';
+    window.parent.document.body.appendChild(img);
+    // Wait one paint cycle so the img is composited before we hide the video
+    window.parent.requestAnimationFrame(function() {
+      v.style.visibility = 'hidden';
+    });
+  } catch(e) { v.style.visibility = 'hidden'; }
+}
+
+function removeLastFrameOverlay() {
+  try {
+    var imgs = window.parent.document.querySelectorAll('img[data-sp-lf]');
+    for (var i = 0; i < imgs.length; i++) imgs[i].remove();
+  } catch(e) {}
+}
+
 // ── Video auto-advance ──────────────────────────────────────────────────────
 var videoMonitor = null;
 var videoWatchInterval = null;
 
 function startWatchingVideo() {
   stopWatchingVideo();
+  removeLastFrameOverlay(); // clear overlay from previous scene before new video plays
   try {
     var vids = window.parent.document.querySelectorAll('video');
     for (var i = 0; i < vids.length; i++) { vids[i]._sp_watched = false; }
@@ -226,7 +261,7 @@ function startWatchingVideo() {
         var v = vids[i];
         if (v.ended && !v._sp_advanced) {
           v._sp_advanced = true;
-          v.style.visibility = 'hidden';
+          injectLastFrameOverlay(v);
           stopWatchingVideo();
           send({type:"video_ended", scene_idx:sceneIdx});
           return;
@@ -248,7 +283,7 @@ function tryAttachVideo() {
       v._sp_watched = true;
       if (v.paused) { v.play().catch(function(){}); }
       v.addEventListener('ended', function() {
-        this.style.visibility = 'hidden';
+        injectLastFrameOverlay(this);
         stopWatchingVideo();
         send({type:"video_ended", scene_idx:sceneIdx});
       }, {once:true});

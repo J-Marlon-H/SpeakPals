@@ -1,6 +1,6 @@
 # SpeakPals — Restaurant Video Lesson
 from __future__ import annotations
-import pathlib, base64, re
+import pathlib, base64, re, functools
 import streamlit as st
 import requests
 from dotenv import load_dotenv
@@ -72,6 +72,13 @@ SCENES = [
 
 VIDEO_DIR = pathlib.Path("static/restaurant")
 
+@functools.lru_cache(maxsize=20)
+def _last_frame_uri(scene_idx: int) -> str | None:
+    p = VIDEO_DIR / f"scene{scene_idx + 1}_last.jpg"
+    if not p.exists():
+        return None
+    return "data:image/jpeg;base64," + base64.b64encode(p.read_bytes()).decode()
+
 # ── Helpers ────────────────────────────────────────────────────────────────────
 
 _HELP_RE = re.compile(
@@ -122,6 +129,7 @@ st.markdown("""<style>
   html,body{font-family:system-ui,-apple-system,BlinkMacSystemFont,Roboto,sans-serif!important}
   #MainMenu,footer,[data-testid="stToolbar"]{visibility:hidden}
   [data-testid="stHeader"],header,.stAppHeader{display:none!important}
+  [data-testid="stStatusWidget"]{display:none!important}
   [data-testid="collapsedControl"],[data-testid="stSidebarCollapseButton"],
   [data-testid="stSidebarNav"]{display:none!important}
   [data-testid="stAppViewContainer"],[data-testid="stMain"]{background:#ffffff!important}
@@ -214,6 +222,9 @@ _comp_base: dict = {
     "key":         "restaurant_mic",   # same key → same iframe across reruns
     "height":      160,
     "default":     None,
+    # Pass last frame so the component can overlay it the instant the video ends,
+    # hiding the Streamlit rerender gap entirely.
+    "last_frame":  _last_frame_uri(rs_scene_idx) if rs_phase == "video" else None,
 }
 if IS_LOCAL:
     _comp_base["proxy_port"] = PROXY_PORT
