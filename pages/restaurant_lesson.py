@@ -303,6 +303,12 @@ with st.sidebar:
                 st.session_state.pop(k, None)
             st.switch_page("pages/feedback.py")
     if st.button("🏠 Exit lesson", key="rs_exit", use_container_width=True):
+        components.html("""<script>
+try {
+    var imgs = window.parent.document.querySelectorAll('img[data-sp-lf]');
+    for (var i = 0; i < imgs.length; i++) imgs[i].remove();
+} catch(e) {}
+</script>""", height=0)
         for k in _RS_KEYS:
             st.session_state.pop(k, None)
         st.switch_page("pages/home.py")
@@ -332,6 +338,12 @@ if True:
 
     # ── Complete screen ────────────────────────────────────────────────────────
     elif rs_phase == "complete":
+        components.html("""<script>
+try {
+    var imgs = window.parent.document.querySelectorAll('img[data-sp-lf]');
+    for (var i = 0; i < imgs.length; i++) imgs[i].remove();
+} catch(e) {}
+</script>""", height=0)
         st.markdown(f"""
         <div style='text-align:center;padding:50px 20px 24px'>
           <div style='font-size:56px;margin-bottom:16px'>🎉</div>

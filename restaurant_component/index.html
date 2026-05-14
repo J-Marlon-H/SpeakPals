@@ -190,7 +190,10 @@ window.addEventListener("message", function(e) {
   if (a.scene_idx   != null) sceneIdx  = a.scene_idx;
   if (a.lang_code   != null) langCode  = a.lang_code;
   if (a.last_frame  != null) lastFrame = a.last_frame;
-  if (a.show   != null) { wrap.style.display = a.show ? "flex" : "none"; }
+  if (a.show   != null) {
+    wrap.style.display = a.show ? "flex" : "none";
+    if (!a.show) removeLastFrameOverlay(); // lesson ended — clear any stuck overlay
+  }
   if (a.label  != null) { activeLabel = a.label; }
   if (a.prompt != null) { promptEl.textContent = a.prompt; }
   if (a.visible != null) {
@@ -210,7 +213,7 @@ window.addEventListener("message", function(e) {
 // Inject a position:fixed image over the video the instant it ends so the
 // Streamlit rerender into mic phase is invisible to the user.
 function injectLastFrameOverlay(v) {
-  if (!lastFrame) { v.style.visibility = 'hidden'; return; }
+  if (!lastFrame) return;
   try {
     var r   = v.getBoundingClientRect();
     var img = window.parent.document.createElement('img');
@@ -224,11 +227,10 @@ function injectLastFrameOverlay(v) {
       'height:' + r.height + 'px;' +
       'border-radius:14px;object-fit:cover';
     window.parent.document.body.appendChild(img);
-    // Wait one paint cycle so the img is composited before we hide the video
-    window.parent.requestAnimationFrame(function() {
-      v.style.visibility = 'hidden';
-    });
-  } catch(e) { v.style.visibility = 'hidden'; }
+    // Don't hide the video — its last frame is already correct and
+    // hides any end-state browser chrome. The overlay sits on top and
+    // is removed only when the next video actually starts playing.
+  } catch(e) {}
 }
 
 function removeLastFrameOverlay() {
@@ -244,7 +246,6 @@ var videoWatchInterval = null;
 
 function startWatchingVideo() {
   stopWatchingVideo();
-  removeLastFrameOverlay(); // clear overlay from previous scene before new video plays
   try {
     var vids = window.parent.document.querySelectorAll('video');
     for (var i = 0; i < vids.length; i++) { vids[i]._sp_watched = false; }
@@ -282,6 +283,8 @@ function tryAttachVideo() {
       if (v.ended) { v._sp_watched = true; continue; }
       v._sp_watched = true;
       if (v.paused) { v.play().catch(function(){}); }
+      // Remove any previous scene's overlay the moment this video produces its first frame
+      v.addEventListener('playing', function() { removeLastFrameOverlay(); }, {once:true});
       v.addEventListener('ended', function() {
         injectLastFrameOverlay(this);
         stopWatchingVideo();
