@@ -67,6 +67,14 @@ _tutor_bg_rule = (
     "background:linear-gradient(160deg,#0d9488 0%,#065f46 60%,#042f2e 100%)!important"
 )
 
+_restaurant_img = _img_b64("japanese_restaurant.jpg")
+_restaurant_bg_rule = (
+    f"background-image:url('{_restaurant_img}')!important;"
+    "background-size:cover!important;background-position:top center!important"
+    if _restaurant_img else
+    "background:linear-gradient(135deg,#7c2d12,#9a3412)!important"
+)
+
 st.markdown(f"""<style>
   html,body{{font-family:system-ui,-apple-system,BlinkMacSystemFont,Roboto,sans-serif!important}}
   #MainMenu,footer,[data-testid="stToolbar"]{{visibility:hidden}}
@@ -162,6 +170,35 @@ st.markdown(f"""<style>
     font:800 19px/1.2 system-ui,-apple-system,BlinkMacSystemFont,Roboto,sans-serif!important;
     color:#fff!important;text-align:left!important;margin:0!important}}
 
+  /* ── Restaurant video lesson card ─────────────────────────────────────── */
+  .st-key-btn_restaurant_lesson,
+  .st-key-btn_restaurant_lesson > div {{overflow:visible!important}}
+  .st-key-btn_restaurant_lesson button {{
+    display:block!important;width:100%!important;height:185px!important;
+    padding:0!important;margin:0!important;
+    border-radius:18px!important;overflow:hidden!important;border:none!important;
+    box-shadow:0 4px 20px rgba(17,24,39,.18)!important;
+    cursor:pointer!important;position:relative!important;
+    transition:transform .22s cubic-bezier(.34,1.56,.64,1),
+               box-shadow .22s ease,filter .22s ease!important}}
+  .st-key-btn_restaurant_lesson button,
+  .st-key-btn_restaurant_lesson button:hover {{{_restaurant_bg_rule}}}
+  .st-key-btn_restaurant_lesson button:hover {{
+    transform:scale(1.035) translateY(-4px)!important;
+    box-shadow:0 16px 40px rgba(13,148,136,.3),0 4px 16px rgba(17,24,39,.15)!important;
+    filter:brightness(1.05)!important}}
+  .st-key-btn_restaurant_lesson button [data-testid="stMarkdownContainer"],
+  .st-key-btn_restaurant_lesson button p {{
+    position:absolute!important;bottom:0!important;left:0!important;right:0!important;top:auto!important;
+    padding:28px 16px 14px!important;
+    background:linear-gradient(to top,rgba(10,10,20,.88) 0%,
+               rgba(10,10,20,.35) 55%,transparent 100%)!important;
+    border-radius:0 0 18px 18px!important;
+    text-align:left!important;pointer-events:none!important;margin:0!important}}
+  .st-key-btn_restaurant_lesson button p {{
+    font:800 19px/1.2 system-ui,-apple-system,BlinkMacSystemFont,Roboto,sans-serif!important;
+    color:#fff!important;text-align:left!important;margin:0!important}}
+
   /* Per-scene heights + background images */
   {_scene_card_css()}
 </style>""", unsafe_allow_html=True)
@@ -247,6 +284,23 @@ with col_scenes:
         if level in levels_with_scenes else levels_with_scenes
     )
 
+    # ── Restaurant video lesson — shown first ─────────────────────────────────
+    st.markdown(
+        "<div class='section-head' style='margin-top:0'>"
+        "🎬 Generated for You &nbsp;"
+        "<span style='background:#7c3aed;color:#fff;font-size:10px;font-weight:700;"
+        "letter-spacing:.5px;padding:2px 7px;border-radius:20px;vertical-align:middle'>"
+        "New</span></div>",
+        unsafe_allow_html=True,
+    )
+    if st.button("🍜 At the Restaurant", key="btn_restaurant_lesson", use_container_width=True):
+        st.switch_page("pages/restaurant_lesson.py")
+    st.markdown(
+        "<div class='scene-desc'>A video lesson built from your onboarding conversation — "
+        "order ramen, ask for a fork, get the bill, all in Danish</div>",
+        unsafe_allow_html=True,
+    )
+
     for lvl in ordered_levels:
         scenes = [s for s in _LESSON_SCENES if s["level"] == lvl]
         is_recommended = lvl == level
@@ -273,56 +327,6 @@ with col_scenes:
                     unsafe_allow_html=True,
                 )
 
-# ── Video Lessons ──────────────────────────────────────────────────────────────
-with col_scenes:
-    _restaurant_img = _img_b64("japanese_restaurant.jpg")
-    _restaurant_bg  = (
-        f"background-image:url('{_restaurant_img}')!important;"
-        "background-size:cover!important;background-position:top center!important"
-        if _restaurant_img else
-        "background:linear-gradient(135deg,#7c2d12,#9a3412)!important"
-    )
-    st.markdown(f"""<style>
-      .st-key-btn_restaurant_lesson button{{
-        display:block!important;width:100%!important;height:185px!important;
-        padding:0!important;margin:0!important;
-        border-radius:18px!important;overflow:hidden!important;border:none!important;
-        {_restaurant_bg}
-        box-shadow:0 4px 20px rgba(17,24,39,.18)!important;
-        cursor:pointer!important;position:relative!important;
-        transition:transform .22s cubic-bezier(.34,1.56,.64,1),
-                   box-shadow .22s ease,filter .22s ease!important}}
-      .st-key-btn_restaurant_lesson button:hover{{
-        {_restaurant_bg}
-        transform:scale(1.035) translateY(-4px)!important;
-        box-shadow:0 16px 40px rgba(13,148,136,.3),0 4px 16px rgba(17,24,39,.15)!important;
-        filter:brightness(1.05)!important}}
-      .st-key-btn_restaurant_lesson button [data-testid="stMarkdownContainer"],
-      .st-key-btn_restaurant_lesson button p{{
-        position:absolute!important;bottom:0!important;left:0!important;right:0!important;top:auto!important;
-        padding:28px 16px 14px!important;
-        background:linear-gradient(to top,rgba(10,10,20,.88) 0%,
-                   rgba(10,10,20,.35) 55%,transparent 100%)!important;
-        border-radius:0 0 18px 18px!important;
-        text-align:left!important;pointer-events:none!important;margin:0!important}}
-      .st-key-btn_restaurant_lesson button p{{
-        font:800 19px/1.2 system-ui,-apple-system,BlinkMacSystemFont,Roboto,sans-serif!important;
-        color:#fff!important;text-align:left!important;margin:0!important}}
-    </style>""", unsafe_allow_html=True)
-    st.markdown(
-        f"<div class='section-head' style='margin-top:48px'>"
-        f"🎬 Video Lessons &nbsp;"
-        f"<span style='background:#7c3aed;color:#fff;font-size:10px;font-weight:700;"
-        f"letter-spacing:.5px;padding:2px 7px;border-radius:20px;vertical-align:middle'>"
-        f"New</span></div>",
-        unsafe_allow_html=True,
-    )
-    if st.button("🍜 At the Restaurant", key="btn_restaurant_lesson", use_container_width=True):
-        st.switch_page("pages/restaurant_lesson.py")
-    st.markdown(
-        "<div class='scene-desc'>Interactive video lesson — order ramen, ask for a fork, get the bill</div>",
-        unsafe_allow_html=True,
-    )
 
 # ── RIGHT: Tutor conversation card ────────────────────────────────────────────
 with col_tutor:
