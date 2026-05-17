@@ -367,12 +367,12 @@ try {
     # ── Video phase ────────────────────────────────────────────────────────────
     elif rs_phase == "video":
         scene = SCENES[rs_scene_idx]
-        video_path = VIDEO_DIR / scene["video"]
-
-        if video_path.exists():
-            st.video(str(video_path), autoplay=True)
-        else:
-            st.warning(f"Video not found: {video_path}")
+        video_url = f"/app/static/restaurant/{scene['video']}"
+        st.markdown(
+            f'<video src="{video_url}" autoplay playsinline '
+            f'style="width:100%;border-radius:14px;display:block"></video>',
+            unsafe_allow_html=True,
+        )
 
     # ── Mic phase ──────────────────────────────────────────────────────────────
     elif rs_phase == "mic":
