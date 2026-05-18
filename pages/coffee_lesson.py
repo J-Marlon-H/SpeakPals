@@ -1,0 +1,466 @@
+# SpeakPals — Coffee Room Video Lesson
+from __future__ import annotations
+import pathlib, base64, re, functools
+import streamlit as st
+import requests
+from dotenv import load_dotenv
+from db import require_auth, load_knowledge_profile, _secret
+from pipeline import VOICES_BY_LANG, SETTINGS_DEFAULTS
+from restaurant_helper import restaurant_player
+from ws_proxy import start_in_thread, PROXY_PORT, scribe_token as _scribe_token
+import streamlit.components.v1 as components
+
+load_dotenv("keys.env")
+require_auth()
+
+ELEVEN_KEY = _secret("ELEVENLABS_API_KEY")
+IS_LOCAL   = pathlib.Path("keys.env").exists()
+
+if IS_LOCAL:
+    start_in_thread()
+
+# ── Scene definitions ──────────────────────────────────────────────────────────
+
+SCENES = [
+    {
+        "video":     "scene1_coffee.mp4",
+        "user_turn": True,
+        "da_line":   "Godmorgen! Du ser lidt træt ud i dag.",
+        "en_prompt": "Sofie says you look a little tired. Agree and say you need coffee.",
+        "da_target": "Ja jeg har brug for kaffe",
+        "hint":      "Try 'Ja, jeg tror, jeg har brug for meget kaffe' (Yes, I think I need a lot of coffee)",
+    },
+    {
+        "video":     "scene2_coffee.mp4",
+        "user_turn": True,
+        "da_line":   "Det kender jeg godt. Jeg er heller ikke helt vågen endnu.",
+        "en_prompt": "She says she's also not fully awake yet. Agree that coffee helps.",
+        "da_target": "Det hjælper lidt med kaffe",
+        "hint":      "Try 'Det hjælper lidt med kaffe' (Coffee helps a little)",
+    },
+    {
+        "video":     "scene3_coffee.mp4",
+        "user_turn": True,
+        "da_line":   "Ja, kaffe er vigtigt på et dansk kontor. Har du planer efter arbejde i dag?",
+        "en_prompt": "She's asking about your plans after work. Say not really, maybe just relax at home.",
+        "da_target": "Ikke rigtigt måske slappe af derhjemme",
+        "hint":      "Try 'Ikke rigtigt. Måske bare slappe af derhjemme.' (Not really. Maybe just relax at home.)",
+    },
+    {
+        "video":     "scene4_coffee.mp4",
+        "user_turn": True,
+        "da_line":   "Jeg skal bare hjem og lave aftensmad. Ikke noget spændende.",
+        "en_prompt": "She says she's just going home to cook dinner. Say that sounds nice.",
+        "da_target": "Det lyder meget rart",
+        "hint":      "Try 'Det lyder faktisk meget rart!' (That actually sounds very nice!)",
+    },
+    {
+        "video":     "scene5_coffee.mp4",
+        "user_turn": True,
+        "da_line":   "Så er kaffen klar.",
+        "en_prompt": "The coffee is ready! Thank her.",
+        "da_target": "Perfekt tak",
+        "hint":      "Try 'Perfekt, tak!' (Perfect, thank you!)",
+    },
+    {
+        "video":     "scene6_coffee.mp4",
+        "user_turn": False,
+        "da_line":   "Selv tak. Vi ses til mødet senere!",
+        "en_prompt": "",
+        "hint":      "",
+    },
+]
+
+VIDEO_DIR = pathlib.Path("static/coffee")
+
+@functools.lru_cache(maxsize=20)
+def _last_frame_uri(scene_idx: int) -> str | None:
+    p = VIDEO_DIR / f"scene{scene_idx + 1}_coffee_last.jpg"
+    if not p.exists():
+        return None
+    return "data:image/jpeg;base64," + base64.b64encode(p.read_bytes()).decode()
+
+# ── Helpers ────────────────────────────────────────────────────────────────────
+
+_HELP_RE = re.compile(
+    r'\b(how|what|why|help|say|tell|don\'?t know|i need|can you|could you|what does|what is|how do|how to)\b',
+    re.IGNORECASE,
+)
+_DANISH_CHARS = frozenset("æøåÆØÅ")
+_PUNCT_RE     = re.compile(r'[^\w\s]')
+_DA_STOP      = frozenset({
+    "jeg", "du", "han", "hun", "vi", "de", "det", "den", "der",
+    "en", "et", "er", "var", "har", "vil", "kan", "skal", "får", "være",
+    "ikke", "til", "og", "at", "på", "af", "med", "i", "for",
+    "fra", "som", "men", "om", "sig", "sin", "sit", "os", "dem",
+    "hvad", "hvem", "hvor", "når", "da", "nu", "her", "så", "jo",
+    "bare", "også", "lige", "lidt", "meget", "nok", "vel", "godt",
+})
+
+def _is_help_request(text: str) -> bool:
+    if any(c in _DANISH_CHARS for c in text):
+        return False
+    return bool(_HELP_RE.search(text))
+
+def _score_answer(attempt: str, target: str) -> bool:
+    if not target:
+        return True
+    norm = lambda s: _PUNCT_RE.sub("", s.lower()).split()
+    target_words = set(norm(target)) - _DA_STOP
+    if not target_words:
+        return bool(norm(attempt))
+    attempt_words = set(norm(attempt)) - _DA_STOP
+    return len(target_words & attempt_words) / len(target_words) >= 0.5
+
+def _tts_b64(text: str, voice_id: str) -> str | None:
+    try:
+        r = requests.post(
+            f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}/stream",
+            headers={"xi-api-key": ELEVEN_KEY, "Content-Type": "application/json"},
+            json={"text": text, "model_id": "eleven_multilingual_v2",
+                  "voice_settings": {"stability": 0.4, "similarity_boost": 0.75},
+                  "language_code": "en"},
+            timeout=20,
+        )
+        r.raise_for_status()
+        return base64.b64encode(r.content).decode()
+    except Exception:
+        return None
+
+# ── Page config ────────────────────────────────────────────────────────────────
+
+st.set_page_config(page_title="Coffee Room Lesson — SpeakPals", page_icon="☕",
+                   layout="wide", initial_sidebar_state="expanded")
+
+st.markdown("""<style>
+  html,body{font-family:system-ui,-apple-system,BlinkMacSystemFont,Roboto,sans-serif!important}
+  #MainMenu,footer,[data-testid="stToolbar"]{visibility:hidden}
+  [data-testid="stHeader"],header,.stAppHeader{display:none!important}
+  [data-testid="stStatusWidget"]{display:none!important}
+  [data-testid="collapsedControl"],[data-testid="stSidebarCollapseButton"],
+  [data-testid="stSidebarNav"]{display:none!important}
+  [data-testid="stAppViewContainer"],[data-testid="stMain"]{background:#ffffff!important}
+  .block-container{padding:1rem 1.5rem!important;max-width:100%!important}
+  div[data-testid="stVerticalBlock"]{gap:0.4rem!important}
+  .stButton button{border-radius:10px!important;font-weight:600!important;font-size:13px!important}
+  .stButton button[kind="primary"]{
+    background:#0d9488!important;color:#fff!important;border:none!important}
+  video{border-radius:14px}
+  /* Light sidebar */
+  [data-testid="stSidebar"]{
+    background:#f5f5f5!important;
+    border-right:1px solid #e5e5e5!important;
+    width:280px!important;min-width:280px!important}
+  [data-testid="stSidebar"] *{color:#111827!important}
+  [data-testid="stSidebar"] section{padding:0!important}
+  [data-testid="stSidebar"] > div:first-child{
+    padding-bottom:140px!important;overflow-y:auto!important}
+  .st-key-cs_finish{
+    position:fixed!important;bottom:58px!important;left:0!important;
+    width:280px!important;padding:0 16px 6px!important;
+    background:#f5f5f5!important;z-index:101!important}
+  .st-key-cs_exit{
+    position:fixed!important;bottom:0!important;left:0!important;
+    width:280px!important;padding:0 16px 14px!important;
+    background:#f5f5f5!important;border-top:1px solid #e5e5e5!important;
+    z-index:100!important}
+  @keyframes msgSlideIn{from{opacity:0;transform:translateX(-14px)}to{opacity:1;transform:translateX(0)}}
+</style>""", unsafe_allow_html=True)
+
+# ── User profile ───────────────────────────────────────────────────────────────
+
+sb_user_id = st.session_state.get("sb_user_id")
+sb_token   = st.session_state.get("sb_access_token")
+name       = st.session_state.get("s_name")    or "there"
+lang_voices = VOICES_BY_LANG.get("Danish", {})
+voice_label = st.session_state.get("s_voice_label", SETTINGS_DEFAULTS["s_voice_label"])
+voice_id    = lang_voices.get(voice_label, next(iter(lang_voices.values()), ""))
+knowledge_profile = st.session_state.get("knowledge_profile") or {}
+if sb_user_id and sb_token and not knowledge_profile:
+    knowledge_profile = load_knowledge_profile(sb_user_id, sb_token) or {}
+
+# ── Session state ──────────────────────────────────────────────────────────────
+
+_CS_KEYS = ["cs_phase","cs_scene_idx","cs_chat","cs_evaluation","cs_correct_log","cs_coaching_log","cs_last_chat_scene"]
+for k, v in [
+    ("cs_phase",           "start"),
+    ("cs_scene_idx",       0),
+    ("cs_chat",            []),
+    ("cs_evaluation",      None),
+    ("cs_correct_log",     []),
+    ("cs_coaching_log",    []),
+    ("cs_last_chat_scene", -1),
+]:
+    if k not in st.session_state:
+        st.session_state[k] = v
+
+cs_phase     = st.session_state.cs_phase
+cs_scene_idx = st.session_state.cs_scene_idx
+
+# Auto-append Sofie's line to chat + correct_log when entering a new scene
+if cs_phase in ("video", "mic", "feedback") and cs_scene_idx != st.session_state.cs_last_chat_scene:
+    _da = SCENES[cs_scene_idx].get("da_line", "")
+    if _da:
+        st.session_state.cs_chat.append({"role": "sofie", "content": _da})
+        st.session_state.cs_correct_log.append({"who": "character", "text": _da})
+    st.session_state.cs_last_chat_scene = cs_scene_idx
+
+# ── Shared component props ─────────────────────────────────────────────────────
+
+_scene_now = SCENES[cs_scene_idx] if cs_phase not in ("start", "complete") else {}
+_mic_visible = (cs_phase == "mic")
+_has_feedback_audio = (
+    cs_phase == "feedback"
+    and bool((st.session_state.cs_evaluation or {}).get("tts_b64"))
+)
+
+_comp_base: dict = {
+    "visible":     _mic_visible,
+    "watch_video": (cs_phase == "video"),
+    "watch_audio": _has_feedback_audio,
+    "scene_idx":   cs_scene_idx,
+    "lang_code":   "da",
+    "show":        cs_phase not in ("start", "complete"),
+    "label":       "Tap to speak in Danish",
+    "prompt":      _scene_now.get("en_prompt", ""),
+    "key":         "coffee_mic",
+    "height":      160,
+    "default":     None,
+    "last_frame":  _last_frame_uri(cs_scene_idx) if cs_phase == "video" else None,
+}
+if IS_LOCAL:
+    _comp_base["proxy_port"] = PROXY_PORT
+else:
+    if cs_phase == "mic":
+        if not st.session_state.get("cs_stt_token"):
+            st.session_state.cs_stt_token = _scribe_token(ELEVEN_KEY)
+    else:
+        st.session_state.cs_stt_token = None
+    if st.session_state.get("cs_stt_token"):
+        _comp_base["ws_token"] = st.session_state.cs_stt_token
+
+# ── Sidebar ────────────────────────────────────────────────────────────────────
+
+with st.sidebar:
+    st.markdown("""<div style='padding:20px 16px 0'>
+      <div style='font:800 16px/1.2 system-ui;color:#111827;letter-spacing:-.2px'>☕ Sofie · Colleague</div>
+      <div style='font:500 11px system-ui;color:rgba(17,24,39,.45);margin-top:3px'>Coffee Room Lesson</div>
+      <div style='height:1px;background:#e5e5e5;margin:12px 0 8px'></div>
+    </div>""", unsafe_allow_html=True)
+
+    _log = st.session_state.cs_chat
+    if not _log:
+        st.markdown(
+            "<div style='padding:16px;font-size:12px;color:rgba(17,24,39,.45);font-style:italic'>"
+            "Your conversation will appear here.</div>",
+            unsafe_allow_html=True,
+        )
+    else:
+        _last_i = len(_log) - 1
+        _parts = []
+        for _i, _msg in enumerate(_log):
+            _txt  = _msg["content"].replace("<", "&lt;").replace(">", "&gt;")
+            _anim = "animation:msgSlideIn .4s cubic-bezier(.34,1.56,.64,1) both;" if _i == _last_i else ""
+            if _msg["role"] == "sofie":
+                _parts.append(
+                    f"<div style='padding:8px 12px 4px'>"
+                    f"<div style='background:#ffffff;border:1px solid #e5e5e5;border-radius:12px 12px 12px 3px;"
+                    f"padding:10px 12px;font-size:13px;line-height:1.5;"
+                    f"color:#111827;word-break:break-word;{_anim}'>"
+                    f"<span style='font:600 10px system-ui;color:#9ca3af;display:block;margin-bottom:4px;letter-spacing:.5px;text-transform:uppercase'>Sofie</span>"
+                    f"<em>{_txt}</em></div></div>"
+                )
+            elif _msg["role"] == "user":
+                _parts.append(
+                    f"<div style='padding:4px 12px 8px'>"
+                    f"<div style='background:rgba(13,148,136,.1);border:1px solid rgba(13,148,136,.2);border-radius:12px 12px 3px 12px;"
+                    f"padding:10px 12px;font-size:13px;line-height:1.5;"
+                    f"color:#0f3d39;word-break:break-word;{_anim}'>"
+                    f"<span style='font:600 10px system-ui;color:#0d9488;display:block;margin-bottom:4px;letter-spacing:.5px;text-transform:uppercase'>You</span>"
+                    f"{_txt}</div></div>"
+                )
+        st.markdown("".join(_parts), unsafe_allow_html=True)
+        components.html(f"""<script>
+(function(){{
+  function scroll(){{
+    var s=window.parent.document.querySelector('[data-testid="stSidebar"]>div:first-child');
+    if(s) s.scrollTop=s.scrollHeight;
+  }}
+  scroll(); setTimeout(scroll,120); setTimeout(scroll,400);
+}})();
+</script>""", height=0)
+
+    st.markdown("<br>", unsafe_allow_html=True)
+    if cs_phase not in ("start", "complete"):
+        if st.button("Finish Lesson", key="cs_finish", width="stretch", type="primary"):
+            st.session_state["correct_log"]    = st.session_state.cs_correct_log
+            st.session_state["coaching_log"]   = st.session_state.cs_coaching_log
+            st.session_state["selected_scene"] = "coffee_lesson"
+            for k in _CS_KEYS:
+                st.session_state.pop(k, None)
+            st.switch_page("pages/feedback.py")
+    if st.button("🏠 Exit lesson", key="cs_exit", width="stretch"):
+        components.html("""<script>
+try {
+    var imgs = window.parent.document.querySelectorAll('img[data-sp-lf]');
+    for (var i = 0; i < imgs.length; i++) imgs[i].remove();
+} catch(e) {}
+</script>""", height=0)
+        for k in _CS_KEYS:
+            st.session_state.pop(k, None)
+        st.switch_page("pages/home.py")
+
+# ── Main area ──────────────────────────────────────────────────────────────────
+
+if True:
+
+    # ── Start screen ───────────────────────────────────────────────────────────
+    if cs_phase == "start":
+        st.markdown("""
+        <div style='text-align:center;padding:60px 20px 30px'>
+          <div style='font-size:56px;margin-bottom:16px'>☕</div>
+          <div style='font:800 26px/1.2 system-ui;color:#111827;margin-bottom:10px'>
+            At the Coffee Machine</div>
+          <div style='font:400 14px/1.6 system-ui;color:rgba(17,24,39,.5);
+            max-width:340px;margin:0 auto 32px'>
+            Morning small talk with your colleague Sofie. Watch each scene and
+            speak your Danish replies.</div>
+        </div>""", unsafe_allow_html=True)
+        _, btn_col, _ = st.columns([2, 2, 2])
+        with btn_col:
+            if st.button("▶  Start Lesson", width="stretch", type="primary"):
+                st.session_state.cs_phase     = "video"
+                st.session_state.cs_scene_idx = 0
+                st.rerun()
+
+    # ── Complete screen ────────────────────────────────────────────────────────
+    elif cs_phase == "complete":
+        components.html("""<script>
+try {
+    var imgs = window.parent.document.querySelectorAll('img[data-sp-lf]');
+    for (var i = 0; i < imgs.length; i++) imgs[i].remove();
+} catch(e) {}
+</script>""", height=0)
+        st.markdown(f"""
+        <div style='text-align:center;padding:50px 20px 24px'>
+          <div style='font-size:56px;margin-bottom:16px'>🎉</div>
+          <div style='font:800 26px/1.2 system-ui;color:#111827;margin-bottom:10px'>
+            Lesson Complete!</div>
+          <div style='font:400 14px/1.6 system-ui;color:rgba(17,24,39,.55);
+            max-width:360px;margin:0 auto 24px'>
+            Great work, {name}! You chatted with Sofie over coffee — all in Danish. ☕</div>
+        </div>""", unsafe_allow_html=True)
+        _, btn_col, _ = st.columns([2, 2, 2])
+        with btn_col:
+            if st.button("View Feedback →", width="stretch", type="primary"):
+                st.session_state["correct_log"]    = st.session_state.cs_correct_log
+                st.session_state["coaching_log"]   = st.session_state.cs_coaching_log
+                st.session_state["selected_scene"] = "coffee_lesson"
+                for k in _CS_KEYS:
+                    st.session_state.pop(k, None)
+                st.switch_page("pages/feedback.py")
+
+    # ── Video phase ────────────────────────────────────────────────────────────
+    elif cs_phase == "video":
+        scene = SCENES[cs_scene_idx]
+        video_url = f"/app/static/coffee/{scene['video']}"
+        st.markdown(
+            f'<video src="{video_url}" autoplay playsinline '
+            f'style="width:100%;border-radius:14px;display:block"></video>',
+            unsafe_allow_html=True,
+        )
+
+    # ── Mic phase ──────────────────────────────────────────────────────────────
+    elif cs_phase == "mic":
+        last_frame = VIDEO_DIR / f"scene{cs_scene_idx + 1}_coffee_last.jpg"
+        if last_frame.exists():
+            st.image(str(last_frame), width="stretch")
+
+    # ── Feedback phase ─────────────────────────────────────────────────────────
+    elif cs_phase == "feedback":
+        ev      = st.session_state.cs_evaluation or {}
+        tts_b64 = ev.get("tts_b64", "")
+        if tts_b64:
+            st.markdown(
+                f'<audio autoplay src="data:audio/mpeg;base64,{tts_b64}" style="display:none"></audio>',
+                unsafe_allow_html=True,
+            )
+        last_frame = VIDEO_DIR / f"scene{cs_scene_idx + 1}_coffee_last.jpg"
+        if last_frame.exists():
+            st.image(str(last_frame), width="stretch")
+        if not _has_feedback_audio:
+            st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
+            _, btn_col, _ = st.columns([1, 2, 1])
+            with btn_col:
+                next_idx = cs_scene_idx + 1
+                is_last  = next_idx >= len(SCENES)
+                label    = "Finish Lesson 🎉" if is_last else "Continue  →"
+                if st.button(label, width="stretch", type="primary"):
+                    if is_last:
+                        st.session_state.cs_phase = "complete"
+                    else:
+                        st.session_state.cs_scene_idx = next_idx
+                        st.session_state.cs_phase = "video"
+                    st.rerun()
+
+    # ── Mic component ──────────────────────────────────────────────────────────
+    _result = restaurant_player(**_comp_base) if cs_phase not in ("start", "complete") else None
+
+    if _has_feedback_audio and isinstance(_result, dict) and _result.get("type") == "audio_ended":
+        st.session_state.cs_evaluation = None
+        st.session_state.cs_phase = "mic"
+        st.rerun()
+
+    if (cs_phase == "video" and isinstance(_result, dict)
+            and _result.get("type") == "video_ended"
+            and _result.get("scene_idx") == cs_scene_idx):
+        _scene_ve = SCENES[cs_scene_idx]
+        if _scene_ve["user_turn"]:
+            st.session_state.cs_phase = "mic"
+        else:
+            _next = cs_scene_idx + 1
+            if _next >= len(SCENES):
+                st.session_state.cs_phase = "complete"
+            else:
+                st.session_state.cs_scene_idx = _next
+                st.session_state.cs_phase = "video"
+        st.rerun()
+
+    if _mic_visible and isinstance(_result, dict) and _result.get("type") == "transcript":
+        _txt = _result.get("text", "").strip()
+        if _txt and _is_help_request(_txt):
+            _hint = _scene_now.get("hint", "")
+            if _hint:
+                _tip_audio = _tts_b64(_hint, voice_id)
+                if _tip_audio:
+                    st.session_state.cs_evaluation = {"tts_b64": _tip_audio}
+                    st.session_state.cs_phase = "feedback"
+                    st.rerun()
+        else:
+            if _txt:
+                st.session_state.cs_chat.append({"role": "user", "content": _txt})
+                _target = _scene_now.get("da_target", "")
+                if _score_answer(_txt, _target):
+                    st.session_state.cs_correct_log.append({"who": "student", "text": _txt})
+                else:
+                    st.session_state.cs_coaching_log.append({
+                        "question":   _scene_now.get("da_line", ""),
+                        "attempt":    _txt,
+                        "correction": _scene_now.get("hint", f"Try: {_target}"),
+                    })
+            _next = cs_scene_idx + 1
+            if _next >= len(SCENES):
+                st.session_state.cs_phase = "complete"
+            else:
+                st.session_state.cs_scene_idx = _next
+                st.session_state.cs_phase = "video"
+            st.rerun()
+
+    if _mic_visible and isinstance(_result, dict) and _result.get("type") == "ask_tip":
+        _hint = _scene_now.get("hint", "")
+        if _hint:
+            _tip_audio = _tts_b64(_hint, voice_id)
+            if _tip_audio:
+                st.session_state.cs_evaluation = {"tts_b64": _tip_audio}
+                st.session_state.cs_phase = "feedback"
+                st.rerun()
