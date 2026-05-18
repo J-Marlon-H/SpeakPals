@@ -114,7 +114,7 @@ if "reset_session" not in st.session_state:
     else:
         st.error(f"This reset link is invalid or has expired. {_err or ''}")
         st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
-        if st.button("Request a new reset link", use_container_width=True):
+        if st.button("Request a new reset link", width="stretch"):
             st.switch_page("pages/login.py")
         st.stop()
 
@@ -125,7 +125,7 @@ with st.form("reset_pw_form"):
     confirm_pw = st.text_input("Confirm new password", type="password",
                                placeholder="••••••••")
     st.markdown("<div style='height:4px'></div>", unsafe_allow_html=True)
-    submitted  = st.form_submit_button("Set new password", use_container_width=True)
+    submitted  = st.form_submit_button("Set new password", width="stretch")
 
 if submitted:
     if len(new_pw) < 6:

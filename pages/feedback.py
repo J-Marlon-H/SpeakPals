@@ -654,14 +654,14 @@ with tab_latest:
         _col_a, _col_b = st.columns(2)
         with _col_a:
             _replay_lbl = "↺ Try again — aim for no mistakes" if _n_err0 > 0 else f"↺ Replay {_s0.get('scene_title','')}"
-            if st.button(_replay_lbl, use_container_width=True, key="momentum_replay"):
+            if st.button(_replay_lbl, width="stretch", key="momentum_replay"):
                 for k in LESSON_STATE_KEYS:
                     st.session_state.pop(k, None)
                 st.session_state["selected_scene"] = _sk0
                 st.switch_page("pages/lesson.py")
         with _col_b:
             _next_lbl = f"Next: {_next_sc['title']} →" if _next_sc else "Browse scenes →"
-            if st.button(_next_lbl, use_container_width=True, key="momentum_next"):
+            if st.button(_next_lbl, width="stretch", key="momentum_next"):
                 for k in LESSON_STATE_KEYS:
                     st.session_state.pop(k, None)
                 if _next_sc:
@@ -698,8 +698,8 @@ with tab_hist:
 st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
 _nav1, _nav2 = st.columns(2)
 with _nav1:
-    if st.button("← Back to lesson", use_container_width=True):
+    if st.button("← Back to lesson", width="stretch"):
         st.switch_page("pages/lesson.py")
 with _nav2:
-    if st.button("🏠 Home", use_container_width=True):
+    if st.button("🏠 Home", width="stretch"):
         st.switch_page("pages/home.py")

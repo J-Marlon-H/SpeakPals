@@ -207,7 +207,7 @@ else:
         unsafe_allow_html=True
     )
 
-if st.button("✈ Telegram & Calendar settings", use_container_width=True):
+if st.button("✈ Telegram & Calendar settings", width="stretch"):
     st.switch_page("pages/telegram_settings.py")
 
 st.markdown("<div class='sec-div'></div>", unsafe_allow_html=True)
@@ -334,7 +334,7 @@ _render_expander(
 st.markdown("<br>", unsafe_allow_html=True)
 
 if not st.session_state.get("_confirm_delete_profile"):
-    if st.button("🗑 Delete all my learning data", use_container_width=True):
+    if st.button("🗑 Delete all my learning data", width="stretch"):
         st.session_state["_confirm_delete_profile"] = True
         st.rerun()
 else:
@@ -351,7 +351,7 @@ else:
 </div>""", unsafe_allow_html=True)
     _col_yes, _col_no = st.columns(2)
     with _col_yes:
-        if st.button("Yes, delete everything", use_container_width=True):
+        if st.button("Yes, delete everything", width="stretch"):
             if "sb_user_id" in st.session_state:
                 delete_knowledge_profile(
                     st.session_state.sb_user_id,
@@ -362,7 +362,7 @@ else:
             st.success("Your learning data has been deleted.")
             st.rerun()
     with _col_no:
-        if st.button("Cancel", use_container_width=True):
+        if st.button("Cancel", width="stretch"):
             st.session_state.pop("_confirm_delete_profile", None)
             st.rerun()
 
@@ -371,7 +371,7 @@ st.markdown("<div class='sec-div'></div>", unsafe_allow_html=True)
 # ── Session ────────────────────────────────────────────────────────────────────
 st.markdown("<div class='sec-label'>Session</div>", unsafe_allow_html=True)
 
-if st.button("🔄 Clear lesson & restart", use_container_width=True):
+if st.button("🔄 Clear lesson & restart", width="stretch"):
     for k in LESSON_STATE_KEYS:
         st.session_state.pop(k, None)
     st.switch_page("pages/lesson.py")
@@ -393,7 +393,7 @@ st.markdown(
     unsafe_allow_html=True
 )
 if not st.session_state.get("_show_change_pw"):
-    if st.button("Change password", use_container_width=True):
+    if st.button("Change password", width="stretch"):
         st.session_state["_show_change_pw"] = True
         st.rerun()
 else:
@@ -402,9 +402,9 @@ else:
         confirm_pw = st.text_input("Confirm new password", type="password", placeholder="••••••••")
         _col_save, _col_cancel = st.columns(2)
         with _col_save:
-            pw_submitted = st.form_submit_button("Update password", use_container_width=True)
+            pw_submitted = st.form_submit_button("Update password", width="stretch")
         with _col_cancel:
-            cancelled = st.form_submit_button("Cancel", use_container_width=True)
+            cancelled = st.form_submit_button("Cancel", width="stretch")
 
     if cancelled:
         st.session_state.pop("_show_change_pw", None)
@@ -427,7 +427,7 @@ else:
                 st.success("Password updated.")
                 st.rerun()
 
-if st.button("Sign out", use_container_width=True):
+if st.button("Sign out", width="stretch"):
     from db import sign_out
     sign_out(st.session_state.get("sb_access_token", ""))
     for k in list(st.session_state.keys()):
@@ -452,20 +452,20 @@ def _save():
 
 col_save, col_home = st.columns(2)
 with col_save:
-    if st.button("Save", use_container_width=True):
+    if st.button("Save", width="stretch"):
         _save()
         st.success("Saved!")
 with col_home:
-    if st.button("🏠 Home", use_container_width=True):
+    if st.button("🏠 Home", width="stretch"):
         _save()
         st.switch_page("pages/home.py")
 
 col_lesson, col_ob = st.columns(2)
 with col_lesson:
-    if st.button("← Back to Lesson", use_container_width=True):
+    if st.button("← Back to Lesson", width="stretch"):
         _save()
         st.switch_page("pages/lesson.py")
 with col_ob:
-    if st.button("👋 Redo Onboarding", use_container_width=True):
+    if st.button("👋 Redo Onboarding", width="stretch"):
         _save()
         st.switch_page("pages/onboarding.py")

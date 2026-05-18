@@ -456,7 +456,7 @@ with st.sidebar:
                 st.rerun()
 
     # Finish onboarding — pinned to bottom
-    if st.button("✅ Finish Onboarding", key="btn_ob_home", use_container_width=True):
+    if st.button("✅ Finish Onboarding", key="btn_ob_home", width="stretch"):
         # Profile is saved during [ONBOARDING_COMPLETE] processing (primary path).
         # If not yet saved (user left early or completion save failed), do a best-effort
         # background save so we never block navigation on an API call.

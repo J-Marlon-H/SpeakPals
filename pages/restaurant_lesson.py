@@ -88,21 +88,31 @@ _HELP_RE = re.compile(
 _DANISH_CHARS = frozenset("æøåÆØÅ")
 _PUNCT_RE = re.compile(r'[^\w\s]')
 
+# Common Danish function words — excluded from scoring so only content words count.
+# e.g. "Ja jeg har brug for kaffe" → content words: {"brug", "kaffe"}
+_DA_STOP = frozenset({
+    "jeg", "du", "han", "hun", "vi", "de", "det", "den", "der",
+    "en", "et", "er", "var", "har", "vil", "kan", "skal", "får", "være",
+    "ikke", "til", "og", "at", "på", "af", "med", "i", "for",
+    "fra", "som", "men", "om", "sig", "sin", "sit", "os", "dem",
+    "hvad", "hvem", "hvor", "når", "da", "nu", "her", "så", "jo",
+    "bare", "også", "lige", "lidt", "meget", "nok", "vel", "godt",
+})
+
 def _is_help_request(text: str) -> bool:
-    """True when the utterance is an English help question rather than a Danish attempt."""
     if any(c in _DANISH_CHARS for c in text):
         return False
     return bool(_HELP_RE.search(text))
 
 def _score_answer(attempt: str, target: str) -> bool:
-    """True if at least half the target words appear in the attempt."""
+    """True if the attempt hits ≥50% of the target's content words (stop words excluded)."""
     if not target:
         return True
-    norm = lambda s: _PUNCT_RE.sub('', s.lower()).split()
-    target_words = set(norm(target))
+    norm = lambda s: _PUNCT_RE.sub("", s.lower()).split()
+    target_words = set(norm(target)) - _DA_STOP
     if not target_words:
-        return True
-    attempt_words = set(norm(attempt))
+        return bool(norm(attempt))
+    attempt_words = set(norm(attempt)) - _DA_STOP
     return len(target_words & attempt_words) / len(target_words) >= 0.5
 
 def _tts_b64(text: str, voice_id: str) -> str | None:
@@ -295,14 +305,14 @@ with st.sidebar:
     st.markdown("<br>", unsafe_allow_html=True)
     if rs_phase not in ("start", "complete"):
         if st.button("Finish Lesson", key="rs_finish",
-                     use_container_width=True, type="primary"):
+                     width="stretch", type="primary"):
             st.session_state["correct_log"]    = st.session_state.rs_correct_log
             st.session_state["coaching_log"]   = st.session_state.rs_coaching_log
             st.session_state["selected_scene"] = "restaurant_lesson"
             for k in _RS_KEYS:
                 st.session_state.pop(k, None)
             st.switch_page("pages/feedback.py")
-    if st.button("🏠 Exit lesson", key="rs_exit", use_container_width=True):
+    if st.button("🏠 Exit lesson", key="rs_exit", width="stretch"):
         components.html("""<script>
 try {
     var imgs = window.parent.document.querySelectorAll('img[data-sp-lf]');
@@ -331,7 +341,7 @@ if True:
         </div>""", unsafe_allow_html=True)
         _, btn_col, _ = st.columns([2, 2, 2])
         with btn_col:
-            if st.button("▶  Start Lesson", use_container_width=True, type="primary"):
+            if st.button("▶  Start Lesson", width="stretch", type="primary"):
                 st.session_state.rs_phase     = "video"
                 st.session_state.rs_scene_idx = 0
                 st.rerun()
@@ -356,7 +366,7 @@ try {
         </div>""", unsafe_allow_html=True)
         _, btn_col, _ = st.columns([2, 2, 2])
         with btn_col:
-            if st.button("View Feedback →", use_container_width=True, type="primary"):
+            if st.button("View Feedback →", width="stretch", type="primary"):
                 st.session_state["correct_log"]    = st.session_state.rs_correct_log
                 st.session_state["coaching_log"]   = st.session_state.rs_coaching_log
                 st.session_state["selected_scene"] = "restaurant_lesson"
@@ -367,18 +377,18 @@ try {
     # ── Video phase ────────────────────────────────────────────────────────────
     elif rs_phase == "video":
         scene = SCENES[rs_scene_idx]
-        video_path = VIDEO_DIR / scene["video"]
-
-        if video_path.exists():
-            st.video(str(video_path), autoplay=True)
-        else:
-            st.warning(f"Video not found: {video_path}")
+        video_url = f"/app/static/restaurant/{scene['video']}"
+        st.markdown(
+            f'<video src="{video_url}" autoplay playsinline '
+            f'style="width:100%;border-radius:14px;display:block"></video>',
+            unsafe_allow_html=True,
+        )
 
     # ── Mic phase ──────────────────────────────────────────────────────────────
     elif rs_phase == "mic":
         last_frame = VIDEO_DIR / f"scene{rs_scene_idx + 1}_last.jpg"
         if last_frame.exists():
-            st.image(str(last_frame), use_container_width=True)
+            st.image(str(last_frame), width="stretch")
 
     # ── Feedback phase ─────────────────────────────────────────────────────────
     elif rs_phase == "feedback":
@@ -394,7 +404,7 @@ try {
         # Show last frame for context while user listens to tip
         last_frame = VIDEO_DIR / f"scene{rs_scene_idx + 1}_last.jpg"
         if last_frame.exists():
-            st.image(str(last_frame), use_container_width=True)
+            st.image(str(last_frame), width="stretch")
 
         # Show Continue button only as fallback when TTS is unavailable
         if not _has_feedback_audio:
@@ -404,7 +414,7 @@ try {
                 next_idx = rs_scene_idx + 1
                 is_last  = next_idx >= len(SCENES)
                 label    = "Finish Lesson 🎉" if is_last else "Continue  →"
-                if st.button(label, use_container_width=True, type="primary"):
+                if st.button(label, width="stretch", type="primary"):
                     if is_last:
                         st.session_state.rs_phase = "complete"
                     else:

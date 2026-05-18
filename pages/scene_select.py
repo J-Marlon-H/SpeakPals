@@ -117,7 +117,7 @@ for col, scene in zip(cols, scenes):
 </div>
 """, unsafe_allow_html=True)
 
-        if st.button(f"Choose — {scene['title']}", key=scene["key"], use_container_width=True):
+        if st.button(f"Choose — {scene['title']}", key=scene["key"], width="stretch"):
             st.session_state["selected_scene"] = scene["key"]
             for k in LESSON_STATE_KEYS:
                 st.session_state.pop(k, None)
@@ -128,8 +128,8 @@ for col, scene in zip(cols, scenes):
 st.markdown("<div style='height:24px'></div>", unsafe_allow_html=True)
 c1, c2 = st.columns(2)
 with c1:
-    if st.button("← Back to lesson", use_container_width=True):
+    if st.button("← Back to lesson", width="stretch"):
         st.switch_page("pages/lesson.py")
 with c2:
-    if st.button("🏠 All scenes", use_container_width=True):
+    if st.button("🏠 All scenes", width="stretch"):
         st.switch_page("pages/home.py")

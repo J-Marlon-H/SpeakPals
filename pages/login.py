@@ -69,7 +69,7 @@ with tab_login:
         email_in    = st.text_input("Email", key="login_email", placeholder="you@example.com")
         password_in = st.text_input("Password", key="login_pw", type="password", placeholder="••••••••")
         st.markdown("<div style='height:4px'></div>", unsafe_allow_html=True)
-        submitted = st.form_submit_button("Sign in", use_container_width=True)
+        submitted = st.form_submit_button("Sign in", width="stretch")
 
     if submitted:
         if not email_in or not password_in:
@@ -144,7 +144,7 @@ with tab_register:
         "margin-bottom:12px'>* Required field</div>",
         unsafe_allow_html=True,
     )
-    reg_submitted = st.button("Create account", use_container_width=True, key="btn_register")
+    reg_submitted = st.button("Create account", width="stretch", key="btn_register")
 
     if reg_submitted:
         _bg_lang_val  = reg_bg_other.strip() if reg_bg_sel == "Other" else reg_bg_sel
@@ -206,7 +206,7 @@ with tab_forgot:
     with st.form("forgot_form"):
         forgot_email = st.text_input("Email", key="forgot_email", placeholder="you@example.com")
         st.markdown("<div style='height:4px'></div>", unsafe_allow_html=True)
-        forgot_submitted = st.form_submit_button("Send reset link", use_container_width=True)
+        forgot_submitted = st.form_submit_button("Send reset link", width="stretch")
 
     if forgot_submitted:
         if not forgot_email.strip():
