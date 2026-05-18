@@ -88,21 +88,31 @@ _HELP_RE = re.compile(
 _DANISH_CHARS = frozenset("æøåÆØÅ")
 _PUNCT_RE = re.compile(r'[^\w\s]')
 
+# Common Danish function words — excluded from scoring so only content words count.
+# e.g. "Ja jeg har brug for kaffe" → content words: {"brug", "kaffe"}
+_DA_STOP = frozenset({
+    "jeg", "du", "han", "hun", "vi", "de", "det", "den", "der",
+    "en", "et", "er", "var", "har", "vil", "kan", "skal", "får", "være",
+    "ikke", "til", "og", "at", "på", "af", "med", "i", "for",
+    "fra", "som", "men", "om", "sig", "sin", "sit", "os", "dem",
+    "hvad", "hvem", "hvor", "når", "da", "nu", "her", "så", "jo",
+    "bare", "også", "lige", "lidt", "meget", "nok", "vel", "godt",
+})
+
 def _is_help_request(text: str) -> bool:
-    """True when the utterance is an English help question rather than a Danish attempt."""
     if any(c in _DANISH_CHARS for c in text):
         return False
     return bool(_HELP_RE.search(text))
 
 def _score_answer(attempt: str, target: str) -> bool:
-    """True if at least half the target words appear in the attempt."""
+    """True if the attempt hits ≥50% of the target's content words (stop words excluded)."""
     if not target:
         return True
-    norm = lambda s: _PUNCT_RE.sub('', s.lower()).split()
-    target_words = set(norm(target))
+    norm = lambda s: _PUNCT_RE.sub("", s.lower()).split()
+    target_words = set(norm(target)) - _DA_STOP
     if not target_words:
-        return True
-    attempt_words = set(norm(attempt))
+        return bool(norm(attempt))
+    attempt_words = set(norm(attempt)) - _DA_STOP
     return len(target_words & attempt_words) / len(target_words) >= 0.5
 
 def _tts_b64(text: str, voice_id: str) -> str | None:
