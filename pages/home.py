@@ -75,7 +75,7 @@ _restaurant_bg_rule = (
     "background:linear-gradient(135deg,#7c2d12,#9a3412)!important"
 )
 
-_coffee_img = _img_b64("cafe.png")
+_coffee_img = _img_b64("coffee_with_coworker.png")
 _coffee_bg_rule = (
     f"background-image:url('{_coffee_img}')!important;"
     "background-size:cover!important;background-position:top center!important"
