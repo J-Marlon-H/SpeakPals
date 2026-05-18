@@ -22,7 +22,7 @@ from db import _secret
 load_dotenv("keys.env")
 
 ELEVEN_KEY = _secret("ELEVENLABS_API_KEY")
-VOICE_ID   = "gfKKsLN1k0oYYN9n2dXX"
+VOICE_ID   = "gfKKsLN1k0oYYN9n2dXX" # Violetta
 
 # ── Scene script ──────────────────────────────────────────────────────────────
 # da_line   : what the character says (spoken via TTS + shown in sidebar)
@@ -34,7 +34,7 @@ VOICE_ID   = "gfKKsLN1k0oYYN9n2dXX"
 SCENES = [
     {
         "name":      "scene1_coffee",
-        "da_line":   "Godmorgen! Du ser lidt træt ud i dag.",
+        "da_line":   "Godmorgen! <break time=\"0.76s\"/> Du ser lidt træt ud i dag.",
         "user_turn": True,
         "en_prompt": "Sofie says you look a little tired. Agree and say you need coffee.",
         "da_target": "Ja jeg har brug for kaffe",
@@ -42,7 +42,7 @@ SCENES = [
     },
     {
         "name":      "scene2_coffee",
-        "da_line":   "Det kender jeg godt. Jeg er heller ikke helt vågen endnu.",
+        "da_line":   "<break time=\"3.00s\"/> <break time=\"0.82s\"/>  Det kender jeg godt. <break time=\"0.30s\"/> Jeg er heller ikke helt vågen endnu.",
         "user_turn": True,
         "en_prompt": "She says she's also not fully awake yet. Agree that coffee helps.",
         "da_target": "Det hjælper lidt med kaffe",
@@ -50,35 +50,33 @@ SCENES = [
     },
     {
         "name":      "scene3_coffee",
-        "da_line":   "Ja, kaffe er vigtigt på et dansk kontor.",
-        "user_turn": True,
-        "en_prompt": "She jokes that coffee is important in a Danish office. Say you've noticed.",
-        "da_target": "Det har jeg lagt mærke til",
-        "hint":      "Try 'Det har jeg lagt mærke til' (I've noticed that)",
-    },
-    {
-        "name":      "scene4_coffee",
-        "da_line":   "Har du planer efter arbejde i dag?",
+        "da_line":   "<break time=\"1.04s\"/>Ja, kaffe er vigtigt på et dansk kontor. <break time=\"3.00s\"/><break time=\"1.02s\"/> Har du planer efter arbejde i dag?",
         "user_turn": True,
         "en_prompt": "She's asking about your plans after work. Say not really, maybe just relax at home.",
         "da_target": "Ikke rigtigt måske slappe af derhjemme",
         "hint":      "Try 'Ikke rigtigt. Måske bare slappe af derhjemme.' (Not really. Maybe just relax at home.)",
     },
+
     {
-        "name":      "scene5_coffee",
-        "da_line":   "Jeg skal bare hjem og lave aftensmad. Ikke noget spændende.",
+        "name":      "scene4_coffee",
+        "da_line":   "<break time=\"3.0s\"/><break time=\"1.27s\"/> Jeg skal bare hjem og lave aftensmad. <break time=\"0.20s\"/>  Ikke noget spændende.",
         "user_turn": True,
         "en_prompt": "She says she's just going home to cook dinner. Say that sounds nice.",
         "da_target": "Det lyder meget rart",
         "hint":      "Try 'Det lyder faktisk meget rart!' (That actually sounds very nice!)",
     },
     {
-        "name":      "scene6_coffee",
+        "name":      "scene5_coffee",
         "da_line":   "Så er kaffen klar.",
         "user_turn": True,
         "en_prompt": "The coffee is ready! Thank her.",
         "da_target": "Perfekt tak",
         "hint":      "Try 'Perfekt, tak!' (Perfect, thank you!)",
+    },
+    {
+        "name":      "scene6_coffee",
+        "da_line":   "<break time=\"1.88s\"/>Selv tak. Vi ses til mødet senere!",
+        "user_turn": False,
     },
 ]
 
@@ -115,9 +113,10 @@ def merge_audio(video: pathlib.Path, audio: pathlib.Path, out: pathlib.Path) -> 
             "ffmpeg", "-y",
             "-i", str(video),
             "-i", str(audio),
+            "-map", "0:v:0",
+            "-map", "1:a:0",
             "-c:v", "copy",
             "-c:a", "aac",
-            "-shortest",
             str(out),
         ],
         check=True,
@@ -164,6 +163,8 @@ for scene in SCENES:
         shutil.copy2(silent_mp4, out_mp4)
         print(f"    copy (no dialogue) → {out_mp4.name}")
 
-    extract_last_frame(out_mp4, last_jpg)
+    # Extract from silent source — video frames are identical and the merged
+    # file's container duration may exceed the video stream length.
+    extract_last_frame(silent_mp4, last_jpg)
 
 print("\n✓ Done — static/coffee/ is ready.")
