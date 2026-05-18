@@ -93,7 +93,7 @@ if linked_chat:
         f"{linked_chat}</code> — your settings sync from this account to the bot.</div>",
         unsafe_allow_html=True,
     )
-    if st.button("Unlink Telegram account", use_container_width=True):
+    if st.button("Unlink Telegram account", width="stretch"):
         unlink_telegram(sb_user_id, sb_token)
         st.rerun()
 else:
@@ -122,7 +122,7 @@ else:
           </span>
         </div>""", unsafe_allow_html=True)
         st.markdown("<br>", unsafe_allow_html=True)
-        if st.button("Generate a new code", use_container_width=True):
+        if st.button("Generate a new code", width="stretch"):
             new_code, err = create_link_code(sb_user_id, sb_token)
             if new_code:
                 st.session_state.tg_link_code = new_code
@@ -130,7 +130,7 @@ else:
             else:
                 st.error(f"Could not generate code: {err}")
     else:
-        if st.button("Generate link code", use_container_width=True):
+        if st.button("Generate link code", width="stretch"):
             code, err = create_link_code(sb_user_id, sb_token)
             if code:
                 st.session_state.tg_link_code = code
@@ -248,8 +248,8 @@ st.markdown("<div class='sec-div'></div>", unsafe_allow_html=True)
 # ── Navigation ────────────────────────────────────────────────────────────────
 _col1, _col2 = st.columns(2)
 with _col1:
-    if st.button("← Back to Settings", use_container_width=True):
+    if st.button("← Back to Settings", width="stretch"):
         st.switch_page("pages/account.py")
 with _col2:
-    if st.button("🏠 Start Learning", use_container_width=True, type="primary"):
+    if st.button("🏠 Start Learning", width="stretch", type="primary"):
         st.switch_page("pages/home.py")

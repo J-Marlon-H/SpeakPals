@@ -295,14 +295,14 @@ with st.sidebar:
     st.markdown("<br>", unsafe_allow_html=True)
     if rs_phase not in ("start", "complete"):
         if st.button("Finish Lesson", key="rs_finish",
-                     use_container_width=True, type="primary"):
+                     width="stretch", type="primary"):
             st.session_state["correct_log"]    = st.session_state.rs_correct_log
             st.session_state["coaching_log"]   = st.session_state.rs_coaching_log
             st.session_state["selected_scene"] = "restaurant_lesson"
             for k in _RS_KEYS:
                 st.session_state.pop(k, None)
             st.switch_page("pages/feedback.py")
-    if st.button("🏠 Exit lesson", key="rs_exit", use_container_width=True):
+    if st.button("🏠 Exit lesson", key="rs_exit", width="stretch"):
         components.html("""<script>
 try {
     var imgs = window.parent.document.querySelectorAll('img[data-sp-lf]');
@@ -331,7 +331,7 @@ if True:
         </div>""", unsafe_allow_html=True)
         _, btn_col, _ = st.columns([2, 2, 2])
         with btn_col:
-            if st.button("▶  Start Lesson", use_container_width=True, type="primary"):
+            if st.button("▶  Start Lesson", width="stretch", type="primary"):
                 st.session_state.rs_phase     = "video"
                 st.session_state.rs_scene_idx = 0
                 st.rerun()
@@ -356,7 +356,7 @@ try {
         </div>""", unsafe_allow_html=True)
         _, btn_col, _ = st.columns([2, 2, 2])
         with btn_col:
-            if st.button("View Feedback →", use_container_width=True, type="primary"):
+            if st.button("View Feedback →", width="stretch", type="primary"):
                 st.session_state["correct_log"]    = st.session_state.rs_correct_log
                 st.session_state["coaching_log"]   = st.session_state.rs_coaching_log
                 st.session_state["selected_scene"] = "restaurant_lesson"
@@ -378,7 +378,7 @@ try {
     elif rs_phase == "mic":
         last_frame = VIDEO_DIR / f"scene{rs_scene_idx + 1}_last.jpg"
         if last_frame.exists():
-            st.image(str(last_frame), use_container_width=True)
+            st.image(str(last_frame), width="stretch")
 
     # ── Feedback phase ─────────────────────────────────────────────────────────
     elif rs_phase == "feedback":
@@ -394,7 +394,7 @@ try {
         # Show last frame for context while user listens to tip
         last_frame = VIDEO_DIR / f"scene{rs_scene_idx + 1}_last.jpg"
         if last_frame.exists():
-            st.image(str(last_frame), use_container_width=True)
+            st.image(str(last_frame), width="stretch")
 
         # Show Continue button only as fallback when TTS is unavailable
         if not _has_feedback_audio:
@@ -404,7 +404,7 @@ try {
                 next_idx = rs_scene_idx + 1
                 is_last  = next_idx >= len(SCENES)
                 label    = "Finish Lesson 🎉" if is_last else "Continue  →"
-                if st.button(label, use_container_width=True, type="primary"):
+                if st.button(label, width="stretch", type="primary"):
                     if is_last:
                         st.session_state.rs_phase = "complete"
                     else:

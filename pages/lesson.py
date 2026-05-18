@@ -266,7 +266,7 @@ with st.sidebar:
         )
     with col_acct:
         st.markdown("<div style='padding-top:18px'>", unsafe_allow_html=True)
-        if st.button("⚙", help="Account settings", use_container_width=True):
+        if st.button("⚙", help="Account settings", width="stretch"):
             st.switch_page("pages/account.py")
         st.markdown("</div>", unsafe_allow_html=True)
     st.markdown(
@@ -344,7 +344,7 @@ with st.sidebar:
             with rb:
                 if st.button("↺", key=f"rch_{last_char_i}",
                              help=f"Replay {char_label.lower()}",
-                             use_container_width=True):
+                             width="stretch"):
                     st.session_state.replay_char_seq += 1
                     st.rerun()
 
@@ -361,11 +361,11 @@ with st.sidebar:
             "Great session! Head to the feedback page to review what I noted.</div>",
             unsafe_allow_html=True
         )
-        if st.button("View Feedback →", type="primary", use_container_width=True):
+        if st.button("View Feedback →", type="primary", width="stretch"):
             st.switch_page("pages/feedback.py")
     elif st.session_state.get("turn_count", 0) >= 1:
         st.markdown("<div style='height:1px;background:rgba(17,24,39,.1);margin:8px 12px'></div>", unsafe_allow_html=True)
-        if st.button("Finish Lesson", type="primary", use_container_width=True):
+        if st.button("Finish Lesson", type="primary", width="stretch"):
             st.switch_page("pages/feedback.py")
 
     # Feedback widget — rendered in sidebar so it doesn't create a stCustomComponentV1
@@ -373,7 +373,7 @@ with st.sidebar:
     render_feedback_widget()
 
     # Back to Home — always last → pinned to bottom by CSS (.st-key-btn_home)
-    if st.button("🏠 Back to Home", key="btn_home", use_container_width=True):
+    if st.button("🏠 Back to Home", key="btn_home", width="stretch"):
         st.switch_page("pages/home.py")
 
 # ── VAD / scene component ──────────────────────────────────────────────────────

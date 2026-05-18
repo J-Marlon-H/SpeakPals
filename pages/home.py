@@ -261,12 +261,12 @@ with col_hdr:
 </div>""", unsafe_allow_html=True)
 with col_fb:
     st.markdown("<div style='padding-top:18px'>", unsafe_allow_html=True)
-    if st.button("📋\nFeedback", key="nav_feedback", use_container_width=True):
+    if st.button("📋\nFeedback", key="nav_feedback", width="stretch"):
         st.switch_page("pages/feedback.py")
     st.markdown("</div>", unsafe_allow_html=True)
 with col_acct:
     st.markdown("<div style='padding-top:18px'>", unsafe_allow_html=True)
-    if st.button("⚙️\nSettings", key="nav_settings", use_container_width=True):
+    if st.button("⚙️\nSettings", key="nav_settings", width="stretch"):
         st.switch_page("pages/account.py")
     st.markdown("</div>", unsafe_allow_html=True)
 
@@ -293,7 +293,7 @@ with col_scenes:
         "New</span></div>",
         unsafe_allow_html=True,
     )
-    if st.button("🍜 At the Restaurant", key="btn_restaurant_lesson", use_container_width=True):
+    if st.button("🍜 At the Restaurant", key="btn_restaurant_lesson", width="stretch"):
         st.switch_page("pages/restaurant_lesson.py")
     st.markdown(
         "<div class='scene-desc'>A video lesson built from your onboarding conversation — "
@@ -317,7 +317,7 @@ with col_scenes:
         cols = st.columns(min(len(scenes), 3), gap="large")
         for col, scene in zip(cols, scenes):
             with col:
-                if st.button(scene["title"], key=scene["key"], use_container_width=True):
+                if st.button(scene["title"], key=scene["key"], width="stretch"):
                     st.session_state["selected_scene"] = scene["key"]
                     for k in LESSON_STATE_KEYS:
                         st.session_state.pop(k, None)
@@ -343,7 +343,7 @@ with col_tutor:
     if _FREE_SCENE and st.button(
         "Talk with your Tutor",
         key="btn_tutor_chat",
-        use_container_width=True,
+        width="stretch",
     ):
         st.session_state["selected_scene"] = "free_conversation"
         for k in LESSON_STATE_KEYS:
