@@ -169,12 +169,12 @@ var langCode  = "da";
 var lastFrame = null;   // base64 data URI of the current scene's last frame
 
 function updateUI() {
-  micWrap.style.opacity      = isMicPhase ? "1" : "0.35";
+  micWrap.style.opacity       = "1";
   micWrap.style.pointerEvents = isMicPhase ? "auto" : "none";
-  micLbl.textContent          = isMicPhase ? activeLabel : "";
   micBtn.disabled             = !isMicPhase;
+  micLbl.textContent = isMicPhase ? activeLabel : "";
   var avPanel = document.getElementById("avPanel");
-  avPanel.style.cursor        = isMicPhase ? "pointer" : "default";
+  avPanel.style.cursor = isMicPhase ? "pointer" : "default";
   document.getElementById("avTipHint").style.display = isMicPhase ? "block" : "none";
   avMouth.classList.toggle("on", isFeedbackPhase);
   avLbl.textContent = isFeedbackPhase ? "speaking…" : "";

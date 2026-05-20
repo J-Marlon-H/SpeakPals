@@ -137,13 +137,13 @@ st.set_page_config(page_title="Restaurant Lesson — SpeakPals", page_icon="🍜
 
 st.markdown("""<style>
   html,body{font-family:system-ui,-apple-system,BlinkMacSystemFont,Roboto,sans-serif!important}
-  #MainMenu,footer,[data-testid="stToolbar"]{visibility:hidden}
+  #MainMenu,footer,[data-testid="stToolbar"]{display:none!important}
   [data-testid="stHeader"],header,.stAppHeader{display:none!important}
   [data-testid="stStatusWidget"]{display:none!important}
   [data-testid="collapsedControl"],[data-testid="stSidebarCollapseButton"],
   [data-testid="stSidebarNav"]{display:none!important}
   [data-testid="stAppViewContainer"],[data-testid="stMain"]{background:#ffffff!important}
-  .block-container{padding:1rem 1.5rem!important;max-width:100%!important}
+  .block-container{padding:0.25rem 1.5rem 0!important;max-width:100%!important}
   div[data-testid="stVerticalBlock"]{gap:0.4rem!important}
   .stButton button{border-radius:10px!important;font-weight:600!important;font-size:13px!important}
   .stButton button[kind="primary"]{
@@ -168,6 +168,7 @@ st.markdown("""<style>
     width:280px!important;padding:0 16px 14px!important;
     background:#f5f5f5!important;border-top:1px solid #e5e5e5!important;
     z-index:100!important}
+  .st-key-restaurant_mic{margin-left:-1.5rem!important}
   @keyframes msgSlideIn{from{opacity:0;transform:translateX(-14px)}to{opacity:1;transform:translateX(0)}}
 </style>""", unsafe_allow_html=True)
 
@@ -377,16 +378,23 @@ try {
         scene = SCENES[rs_scene_idx]
         video_url = f"/app/static/restaurant/{scene['video']}"
         st.markdown(
-            f'<video src="{video_url}" playsinline '
-            f'style="width:100%;border-radius:14px;display:block"></video>',
+            f'<div style="width:min(100%,calc((100vh - 220px)*16/9));padding-bottom:56.25%;position:relative;overflow:hidden;border-radius:14px;margin:0 auto 12px">'
+            f'<video src="{video_url}" playsinline style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover"></video>'
+            f'</div>',
             unsafe_allow_html=True,
         )
 
     # ── Mic phase ──────────────────────────────────────────────────────────────
     elif rs_phase == "mic":
+        img_url = f"/app/static/restaurant/scene{rs_scene_idx + 1}_last.jpg"
         last_frame = VIDEO_DIR / f"scene{rs_scene_idx + 1}_last.jpg"
         if last_frame.exists():
-            st.image(str(last_frame), width="stretch")
+            st.markdown(
+                f'<div style="width:min(100%,calc((100vh - 220px)*16/9));padding-bottom:56.25%;position:relative;overflow:hidden;border-radius:14px;margin:0 auto 12px">'
+                f'<img src="{img_url}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover">'
+                f'</div>',
+                unsafe_allow_html=True,
+            )
 
     # ── Feedback phase ─────────────────────────────────────────────────────────
     elif rs_phase == "feedback":
@@ -398,9 +406,15 @@ try {
                 f'<audio autoplay src="data:audio/mpeg;base64,{tts_b64}" style="display:none"></audio>',
                 unsafe_allow_html=True,
             )
+        img_url = f"/app/static/restaurant/scene{rs_scene_idx + 1}_last.jpg"
         last_frame = VIDEO_DIR / f"scene{rs_scene_idx + 1}_last.jpg"
         if last_frame.exists():
-            st.image(str(last_frame), width="stretch")
+            st.markdown(
+                f'<div style="width:min(100%,calc((100vh - 220px)*16/9));padding-bottom:56.25%;position:relative;overflow:hidden;border-radius:14px;margin:0 auto 12px">'
+                f'<img src="{img_url}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover">'
+                f'</div>',
+                unsafe_allow_html=True,
+            )
         # Show Continue button only as fallback when TTS is unavailable
         if not _has_feedback_audio:
             st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
