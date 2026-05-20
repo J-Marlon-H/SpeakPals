@@ -365,7 +365,7 @@ try {
         scene = SCENES[cs_scene_idx]
         video_url = f"/app/static/coffee/{scene['video']}"
         st.markdown(
-            f'<video src="{video_url}" autoplay playsinline '
+            f'<video src="{video_url}" playsinline '
             f'style="width:100%;border-radius:14px;display:block"></video>',
             unsafe_allow_html=True,
         )

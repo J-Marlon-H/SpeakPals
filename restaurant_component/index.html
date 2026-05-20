@@ -289,7 +289,8 @@ function tryAttachVideo() {
       if (v._sp_watched) continue;
       if (v.ended) { v._sp_watched = true; continue; }
       v._sp_watched = true;
-      // play() intentionally omitted — autoplay attribute handles it
+      // Component owns playback — no autoplay attribute on the element
+      if (!v._sp_playing) { v._sp_playing = true; v.play().catch(function(){}); }
       // Remove any previous scene's overlay the moment this video produces its first frame
       v.addEventListener('playing', function() { removeLastFrameOverlay(); }, {once:true});
       v.addEventListener('ended', function() {
