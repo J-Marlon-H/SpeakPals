@@ -232,8 +232,6 @@ _comp_base: dict = {
     "key":         "restaurant_mic",   # same key → same iframe across reruns
     "height":      160,
     "default":     None,
-    # Pass last frame so the component can overlay it the instant the video ends,
-    # hiding the Streamlit rerender gap entirely.
     "last_frame":  _last_frame_uri(rs_scene_idx) if rs_phase == "video" else None,
 }
 if IS_LOCAL:
@@ -395,17 +393,14 @@ try {
         ev      = st.session_state.rs_evaluation or {}
         tts_b64 = ev.get("tts_b64", "")
 
-        # Play Lars' TTS audio; feedback text is in the sidebar conversation
         if tts_b64:
             st.markdown(
                 f'<audio autoplay src="data:audio/mpeg;base64,{tts_b64}" style="display:none"></audio>',
                 unsafe_allow_html=True,
             )
-        # Show last frame for context while user listens to tip
         last_frame = VIDEO_DIR / f"scene{rs_scene_idx + 1}_last.jpg"
         if last_frame.exists():
             st.image(str(last_frame), width="stretch")
-
         # Show Continue button only as fallback when TTS is unavailable
         if not _has_feedback_audio:
             st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)

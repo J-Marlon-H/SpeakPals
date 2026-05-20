@@ -201,7 +201,14 @@ window.addEventListener("message", function(e) {
     if (a.visible) { prewarmMic(); }
     updateUI();
   }
-  if (a.watch_video != null) { if (a.watch_video) startWatchingVideo(); else stopWatchingVideo(); }
+  if (a.watch_video != null) {
+    if (a.watch_video) {
+      startWatchingVideo();
+    } else {
+      stopWatchingVideo();
+      removeLastFrameOverlay(); // mic phase started, st.image() is now in DOM
+    }
+  }
   if (a.watch_audio != null) {
     isFeedbackPhase = a.watch_audio;
     if (a.watch_audio) startWatchingAudio(); else stopWatchingAudio();
@@ -267,7 +274,7 @@ function startWatchingVideo() {
           send({type:"video_ended", scene_idx:sceneIdx});
           return;
         }
-        if (v._sp_watched && v.paused && !v.ended) { v.play().catch(function(){}); }
+        // play() intentionally omitted — autoplay attribute handles it
       }
     } catch(e) {}
   }, 400);
@@ -282,7 +289,7 @@ function tryAttachVideo() {
       if (v._sp_watched) continue;
       if (v.ended) { v._sp_watched = true; continue; }
       v._sp_watched = true;
-      if (v.paused) { v.play().catch(function(){}); }
+      // play() intentionally omitted — autoplay attribute handles it
       // Remove any previous scene's overlay the moment this video produces its first frame
       v.addEventListener('playing', function() { removeLastFrameOverlay(); }, {once:true});
       v.addEventListener('ended', function() {
